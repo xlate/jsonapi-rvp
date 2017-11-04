@@ -1,4 +1,4 @@
-package io.xlate.jsonapi.rs.boundary;
+package io.xlate.jsonapi.rs;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;

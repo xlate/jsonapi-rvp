@@ -1,4 +1,4 @@
-package io.xlate.jsonapi.rs.boundary;
+package io.xlate.jsonapi.rs;
 
 import javax.ws.rs.core.MediaType;
 
