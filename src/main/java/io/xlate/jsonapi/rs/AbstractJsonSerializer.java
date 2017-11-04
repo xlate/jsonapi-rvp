@@ -24,7 +24,7 @@ import javax.json.stream.JsonGenerator;
 import javax.ws.rs.core.UriInfo;
 import javax.xml.bind.DatatypeConverter;
 
-public abstract class AbstractJsonSerializer<E extends AuditedEntity> {
+public abstract class AbstractJsonSerializer<E extends JsonApiEntity> {
 
     private final Class<E> type;
     private final String typeName;

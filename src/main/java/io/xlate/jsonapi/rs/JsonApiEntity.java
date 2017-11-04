@@ -10,7 +10,7 @@ import javax.persistence.Id;
 import javax.persistence.MappedSuperclass;
 
 @MappedSuperclass
-public abstract class AuditedEntity {
+public abstract class JsonApiEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -40,8 +40,8 @@ public abstract class AuditedEntity {
         setUpdatedAt(updatedAt);
     }
 
-    protected void copyAuditDetails(Collection<? extends AuditedEntity> associations) {
-        for (AuditedEntity entity : associations) {
+    protected void copyAuditDetails(Collection<? extends JsonApiEntity> associations) {
+        for (JsonApiEntity entity : associations) {
             entity.setCreatedBy(this.getCreatedBy());
             entity.setCreatedAt(this.getCreatedAt());
             entity.setUpdatedBy(this.getUpdatedBy());

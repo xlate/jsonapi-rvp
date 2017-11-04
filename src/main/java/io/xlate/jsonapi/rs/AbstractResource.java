@@ -33,7 +33,7 @@ import javax.ws.rs.core.SecurityContext;
 import javax.ws.rs.core.UriBuilder;
 import javax.ws.rs.core.UriInfo;
 
-public abstract class AbstractResource<E extends AuditedEntity> {
+public abstract class AbstractResource<E extends JsonApiEntity> {
 
 	protected final transient Class<E> entityClass;
 
