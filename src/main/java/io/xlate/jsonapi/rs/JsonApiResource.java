@@ -33,7 +33,7 @@ import javax.ws.rs.core.SecurityContext;
 import javax.ws.rs.core.UriBuilder;
 import javax.ws.rs.core.UriInfo;
 
-public abstract class AbstractResource<E extends JsonApiEntity> {
+public abstract class JsonApiResource<E extends JsonApiEntity> {
 
 	protected final transient Class<E> entityClass;
 
@@ -54,7 +54,7 @@ public abstract class AbstractResource<E extends JsonApiEntity> {
 
 	CacheControl cacheControl = new CacheControl();
 
-	public AbstractResource(final Class<E> entityClass) {
+	public JsonApiResource(final Class<E> entityClass) {
 		this.entityClass = entityClass;
 		cacheControl.setPrivate(true);
 	}
