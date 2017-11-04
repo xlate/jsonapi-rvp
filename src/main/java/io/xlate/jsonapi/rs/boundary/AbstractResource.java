@@ -1,6 +1,7 @@
 package io.xlate.jsonapi.rs.boundary;
 
 import java.net.URI;
+import java.sql.Timestamp;
 import java.util.Date;
 import java.util.List;
 import java.util.Set;
@@ -32,8 +33,6 @@ import javax.ws.rs.core.SecurityContext;
 import javax.ws.rs.core.UriBuilder;
 import javax.ws.rs.core.UriInfo;
 
-import io.xlate.jsonapi.rs.entity.AuditedEntity;
-
 public abstract class AbstractResource<E extends AuditedEntity> {
 
 	protected final transient Class<E> entityClass;
@@ -57,7 +56,6 @@ public abstract class AbstractResource<E extends AuditedEntity> {
 
 	public AbstractResource(final Class<E> entityClass) {
 		this.entityClass = entityClass;
-
 		cacheControl.setPrivate(true);
 	}
 
@@ -66,6 +64,7 @@ public abstract class AbstractResource<E extends AuditedEntity> {
 	public abstract Response patch(long id, JsonObject input);
     public abstract Response update(long id, JsonObject input);
 	public abstract Response delete(long id);
+	protected abstract AbstractJsonSerializer<E> getSerializer();
 
 	protected void validate(E entity) {
 	    Set<ConstraintViolation<E>> violations = validator.validate(entity);
@@ -100,7 +99,7 @@ public abstract class AbstractResource<E extends AuditedEntity> {
 		return ok.build();
 	}
 
-	protected Response ok(E entity) {
+	protected Response ok(Object entity) {
 		EntityTag etag = new EntityTag(Integer.toString(entity.hashCode()));
 		ResponseBuilder builder;
 		builder = rsRequest.evaluatePreconditions(etag);
@@ -131,6 +130,7 @@ public abstract class AbstractResource<E extends AuditedEntity> {
 		return new EntityTag(Long.toHexString(buffer.toString().hashCode()));
 	}
 
+	@Deprecated
 	protected Response ok(GenericEntity<List<E>> entityList) {
 		Date maxUpdatedAt = null;
 
@@ -170,8 +170,8 @@ public abstract class AbstractResource<E extends AuditedEntity> {
 	}
 
 	private void persist(final E entity) {
-		//Timestamp now = new Timestamp(System.currentTimeMillis());
-		//TODO entity.setCreated(getUserFullName(), now);
+		Timestamp now = new Timestamp(System.currentTimeMillis());
+		entity.setCreated("UNKNOWN", now);
 		persistenceContext.persist(entity);
 	}
 
@@ -242,7 +242,7 @@ public abstract class AbstractResource<E extends AuditedEntity> {
 
 	protected Response responseFor(E entity) {
 		if (entity != null) {
-			return ok(entity);
+			return ok(getSerializer().serialize(entity, uriInfo));
 		}
 		return notFound();
 	}
@@ -253,8 +253,8 @@ public abstract class AbstractResource<E extends AuditedEntity> {
 
 		if (dbEntity != null) {
 			entity.setId(id);
-			//TODO entity.setUpdated(getUserFullName(), new Timestamp(System.currentTimeMillis()));
-			return ok(persistenceContext.merge(entity));
+			entity.setUpdated("UNKNOWN", new Timestamp(System.currentTimeMillis()));
+			return ok(getSerializer().serialize(persistenceContext.merge(entity), uriInfo));
 		}
 		return notFound();
 	}

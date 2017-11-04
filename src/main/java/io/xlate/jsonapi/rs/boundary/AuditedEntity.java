@@ -1,4 +1,4 @@
-package io.xlate.jsonapi.rs.entity;
+package io.xlate.jsonapi.rs.boundary;
 
 import java.sql.Timestamp;
 import java.util.Collection;

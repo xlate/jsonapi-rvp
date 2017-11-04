@@ -6,10 +6,14 @@ import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.TimeZone;
 
 import javax.json.Json;
 import javax.json.JsonArray;
+import javax.json.JsonArrayBuilder;
 import javax.json.JsonNumber;
 import javax.json.JsonObject;
 import javax.json.JsonObjectBuilder;
@@ -19,8 +23,6 @@ import javax.json.JsonValue.ValueType;
 import javax.json.stream.JsonGenerator;
 import javax.ws.rs.core.UriInfo;
 import javax.xml.bind.DatatypeConverter;
-
-import io.xlate.jsonapi.rs.entity.AuditedEntity;
 
 public abstract class AbstractJsonSerializer<E extends AuditedEntity> {
 
@@ -40,27 +42,76 @@ public abstract class AbstractJsonSerializer<E extends AuditedEntity> {
         return typeName;
     }
 
+    public JsonObject serialize(List<E> entities, UriInfo uriInfo) {
+        return serialize(entities, uriInfo, true);
+    }
+
+    public JsonObject serialize(List<E> entities, UriInfo uriInfo, boolean withRelationships) {
+        final JsonObjectBuilder root = Json.createObjectBuilder();
+        final JsonArrayBuilder data = Json.createArrayBuilder();
+
+        for (E entity : entities) {
+            data.add(serializeData(entity, uriInfo, withRelationships));
+        }
+
+        root.add("data", data);
+
+        final JsonArrayBuilder included = Json.createArrayBuilder();
+        final Map<String, String> written = new HashMap<>();
+
+        for (E entity : entities) {
+            for (JsonValue entry : serializeIncluded(entity, uriInfo)) {
+                JsonObject obj = (JsonObject) entry;
+
+                String objId = obj.getString("id");
+                String objType = obj.getString("type");
+
+                if (!objType.equals(written.get(objId))) {
+                    written.put(objId, objType);
+                    included.add(entry);
+                }
+            }
+        }
+
+        if (!written.isEmpty()) {
+            root.add("included", included);
+        }
+
+        return root.build();
+    }
+
     public JsonObject serialize(E source, UriInfo uriInfo) {
         return serialize(source, uriInfo, true);
     }
 
     public JsonObject serialize(E source, UriInfo uriInfo, boolean withRelationships) {
-        JsonObjectBuilder builder = Json.createObjectBuilder()
-                .add("id", toString(source.getId()))
-                .add("type", getTypeName())
-                .add("attributes", serializeAttributes(source, uriInfo));
+        JsonObjectBuilder root = Json.createObjectBuilder();
 
-        if (withRelationships) {
-            builder.add("relationships", serializeRelationships(source, uriInfo));
+        root.add("data", serializeData(source, uriInfo, withRelationships));
+
+        final JsonArray included = serializeIncluded(source, uriInfo);
+
+        if (included != null) {
+            root.add("included", included);
         }
 
-        builder.add("links", serializeLinks(source, uriInfo));
-
-        return builder.build();
+        return root.build();
     }
 
-    public JsonArray serializeIncluded(E source, UriInfo uriInfo) {
-        return null;
+    protected JsonObjectBuilder serializeData(E source, UriInfo uriInfo, boolean withRelationships) {
+        JsonObjectBuilder data = Json.createObjectBuilder();
+
+        data.add("id", toString(source.getId()));
+        data.add("type", getTypeName());
+        data.add("attributes", serializeAttributes(source, uriInfo));
+
+        if (withRelationships) {
+            data.add("relationships", serializeRelationships(source, uriInfo));
+        }
+
+        data.add("links", serializeLinks(source, uriInfo));
+
+        return data;
     }
 
     protected abstract JsonObject serializeAttributes(E source, UriInfo uriInfo);
@@ -73,6 +124,11 @@ public abstract class AbstractJsonSerializer<E extends AuditedEntity> {
     @SuppressWarnings("unused")
     protected JsonValue serializeLinks(E source, UriInfo uriInfo) {
         return JsonValue.NULL;
+    }
+
+    @SuppressWarnings("unused")
+    protected JsonArray serializeIncluded(E source, UriInfo uriInfo) {
+        return null;
     }
 
     public E deserialize(JsonObject source, E target, boolean patch) {
