@@ -236,7 +236,7 @@ public abstract class JsonApiResource<E extends JsonApiEntity> {
 		throw new NotFoundException();
 	}
 
-	protected Response retrieveImpl(final Long id) {
+	protected Response readImpl(final Long id) {
 		return responseFor(find(id));
 	}
 

@@ -26,6 +26,7 @@ import javax.xml.bind.DatatypeConverter;
 
 public abstract class JsonApiSerializer<E extends JsonApiEntity> {
 
+    private static final JsonArray emptyJsonArray = Json.createArrayBuilder().build();
     private final Class<E> type;
     private final String typeName;
 
@@ -128,7 +129,7 @@ public abstract class JsonApiSerializer<E extends JsonApiEntity> {
 
     @SuppressWarnings("unused")
     protected JsonArray serializeIncluded(E source, UriInfo uriInfo) {
-        return null;
+        return emptyJsonArray;
     }
 
     public E deserialize(JsonObject source, E target, boolean patch) {
