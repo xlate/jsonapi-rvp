@@ -24,12 +24,12 @@ import javax.json.stream.JsonGenerator;
 import javax.ws.rs.core.UriInfo;
 import javax.xml.bind.DatatypeConverter;
 
-public abstract class AbstractJsonSerializer<E extends JsonApiEntity> {
+public abstract class JsonApiSerializer<E extends JsonApiEntity> {
 
     private final Class<E> type;
     private final String typeName;
 
-    public AbstractJsonSerializer(Class<E> type, String typeName) {
+    public JsonApiSerializer(Class<E> type, String typeName) {
         this.type = type;
         this.typeName = typeName;
     }

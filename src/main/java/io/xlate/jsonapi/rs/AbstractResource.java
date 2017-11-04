@@ -64,7 +64,7 @@ public abstract class AbstractResource<E extends JsonApiEntity> {
 	public abstract Response patch(long id, JsonObject input);
     public abstract Response update(long id, JsonObject input);
 	public abstract Response delete(long id);
-	protected abstract AbstractJsonSerializer<E> getSerializer();
+	protected abstract JsonApiSerializer<E> getSerializer();
 
 	protected void validate(E entity) {
 	    Set<ConstraintViolation<E>> violations = validator.validate(entity);
