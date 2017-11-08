@@ -92,25 +92,36 @@ public abstract class JsonApiSerializer<E extends JsonApiEntity> {
 
         final JsonArray included = serializeIncluded(source, uriInfo);
 
-        if (included != null) {
+        if (!included.isEmpty()) {
             root.add("included", included);
         }
 
         return root.build();
     }
 
-    protected JsonObjectBuilder serializeData(E source, UriInfo uriInfo, boolean withRelationships) {
-        JsonObjectBuilder data = Json.createObjectBuilder();
+    public JsonObject serializeData(E source, UriInfo uriInfo, boolean withRelationships) {
+        JsonObjectBuilder data = serializeIdentifier(source);
 
-        data.add("id", toString(source.getId()));
-        data.add("type", getTypeName());
         data.add("attributes", serializeAttributes(source, uriInfo));
 
         if (withRelationships) {
-            data.add("relationships", serializeRelationships(source, uriInfo));
+            JsonObjectBuilder rel = serializeRelationships(source, uriInfo);
+
+            if (rel != null) {
+                data.add("relationships", rel);
+            }
         }
 
         data.add("links", serializeLinks(source, uriInfo));
+
+        return data.build();
+    }
+
+    public JsonObjectBuilder serializeIdentifier(E source) {
+        JsonObjectBuilder data = Json.createObjectBuilder();
+
+        data.add("type", getTypeName());
+        data.add("id", toString(source.getId()));
 
         return data;
     }
@@ -118,8 +129,8 @@ public abstract class JsonApiSerializer<E extends JsonApiEntity> {
     protected abstract JsonObject serializeAttributes(E source, UriInfo uriInfo);
 
     @SuppressWarnings("unused")
-    protected JsonValue serializeRelationships(E source, UriInfo uriInfo) {
-        return JsonValue.NULL;
+    protected JsonObjectBuilder serializeRelationships(E source, UriInfo uriInfo) {
+        return null;
     }
 
     @SuppressWarnings("unused")

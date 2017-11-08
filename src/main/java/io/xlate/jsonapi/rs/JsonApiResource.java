@@ -154,8 +154,9 @@ public abstract class JsonApiResource<E extends JsonApiEntity> {
 		return builder.build();
 	}
 
-	protected ResponseBuilder created(long id) {
-		return Response.created(getUri("read", id));
+	protected Response created(E entity) {
+	    ResponseBuilder builder = Response.created(getUri("read", entity.getId()));
+		return builder.entity(getSerializer().serialize(entity, uriInfo)).build();
 	}
 
 	protected Response seeOther(long id) {
@@ -166,7 +167,7 @@ public abstract class JsonApiResource<E extends JsonApiEntity> {
 	    validate(entity);
 		persist(entity);
 
-		return created(entity.getId()).entity(entity).build();
+		return created(entity);
 	}
 
 	private void persist(final E entity) {
