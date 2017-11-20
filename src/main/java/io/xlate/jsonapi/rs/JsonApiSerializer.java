@@ -170,7 +170,7 @@ public abstract class JsonApiSerializer<E extends JsonApiEntity> {
     protected abstract E deserializeAttributes(JsonObject source, E target, boolean patch);
 
     @SuppressWarnings("unused")
-    protected void deserializeRelationships(JsonObject source, E target, boolean patch) {
+    protected void deserializeRelationships(JsonObject rels, E target, boolean patch) {
         return; //NO-OP
     }
 
