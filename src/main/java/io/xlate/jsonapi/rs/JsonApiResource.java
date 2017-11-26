@@ -1,28 +1,33 @@
 package io.xlate.jsonapi.rs;
 
+import java.io.IOException;
 import java.net.URI;
-import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.ArrayList;
-import java.util.Date;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Properties;
 import java.util.Set;
 
 import javax.inject.Inject;
 import javax.json.Json;
+import javax.json.JsonArrayBuilder;
+import javax.json.JsonNumber;
 import javax.json.JsonObject;
+import javax.json.JsonString;
+import javax.json.JsonValue;
 import javax.persistence.EntityManager;
-import javax.persistence.NoResultException;
 import javax.persistence.PersistenceContext;
 import javax.persistence.PersistenceException;
-import javax.persistence.Query;
 import javax.persistence.TypedQuery;
 import javax.persistence.criteria.CriteriaBuilder;
 import javax.persistence.criteria.CriteriaQuery;
 import javax.persistence.criteria.Order;
 import javax.persistence.criteria.Root;
 import javax.validation.ConstraintViolation;
-import javax.validation.ConstraintViolationException;
 import javax.validation.Validator;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
@@ -34,7 +39,6 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.core.CacheControl;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.EntityTag;
-import javax.ws.rs.core.GenericEntity;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Request;
@@ -73,12 +77,96 @@ public abstract class JsonApiResource<E extends JsonApiEntity> {
 
     protected abstract JsonApiSerializer<E> getSerializer();
 
-    protected void validate(E entity) {
-        Set<ConstraintViolation<E>> violations = validator.validate(entity);
+    protected Response validate(JsonObject input) {
+        Properties constraints = new Properties();
+
+        try {
+            constraints.load(getClass().getResourceAsStream("/jsonapi-constraints/" + getSerializer().getTypeName() + ".properties"));
+        } catch (IOException e) {
+            e.printStackTrace();
+            return Response.serverError().build();
+        }
+
+        Set<ConstraintViolation<E>> violations = new LinkedHashSet<>();//validator.validate(entity);
+
+        for (String sourceName : constraints.stringPropertyNames()) {
+            String fieldName = constraints.getProperty(sourceName);
+            JsonValue jsonValue = sourceName.indexOf('.') > -1 ? input : null;
+
+            for (String sourceKey : sourceName.split("\\.")) {
+                if (jsonValue instanceof JsonObject) {
+                    JsonObject jsonObj = (JsonObject) jsonValue;
+
+                    if (jsonObj.containsKey(sourceKey)) {
+                        jsonValue = jsonObj.get(sourceKey);
+                    } else {
+                        jsonValue = null;
+                        break;
+                    }
+                } else {
+                    jsonValue = null;
+                    break;
+                }
+            }
+
+            if (jsonValue != null && jsonValue != input) {
+                switch (jsonValue.getValueType()) {
+                case STRING:
+                    violations.addAll(validator.validateValue(entityClass, fieldName, ((JsonString) jsonValue).getString()));
+                    break;
+                case TRUE:
+                    violations.addAll(validator.validateValue(entityClass, fieldName, Boolean.TRUE));
+                    break;
+                case FALSE:
+                    violations.addAll(validator.validateValue(entityClass, fieldName, Boolean.FALSE));
+                    break;
+                case NUMBER:
+                    violations.addAll(validator.validateValue(entityClass, fieldName, ((JsonNumber) jsonValue).longValue()));
+                    break;
+                case OBJECT:
+                    // TODO: proper object validation
+                    break;
+                case NULL:
+                default:
+                    violations.addAll(validator.validateValue(entityClass, fieldName, null));
+                    break;
+                }
+            } else {
+                violations.addAll(validator.validateValue(entityClass, fieldName, null));
+            }
+        }
 
         if (!violations.isEmpty()) {
-            throw new ConstraintViolationException(violations);
+            Map<String, List<String>> errorMap = new LinkedHashMap<>();
+
+            for (ConstraintViolation<?> violation : violations) {
+                String property = violation.getPropertyPath().toString().replace('.', '/');
+
+                if (!errorMap.containsKey(property)) {
+                    errorMap.put(property, new ArrayList<String>(2));
+                }
+
+                errorMap.get(property).add(violation.getMessage());
+            }
+
+            JsonArrayBuilder errors = Json.createArrayBuilder();
+
+            for (Entry<String, List<String>> property : errorMap.entrySet()) {
+                final String attr = property.getKey();
+
+                for (String message : property.getValue()) {
+                    errors.add(Json.createObjectBuilder()
+                                   .add("source", Json.createObjectBuilder()
+                                                      .add("pointer", "data/attributes/" + attr))
+                                   .add("detail", message));
+                }
+            }
+
+            JsonObject jsonErrors = Json.createObjectBuilder().add("errors", errors).build();
+            return Response.status(JsonApiStatus.UNPROCESSABLE_ENTITY).entity(jsonErrors).build();
         }
+
+        return null;
     }
 
     /*
@@ -120,46 +208,6 @@ public abstract class JsonApiResource<E extends JsonApiEntity> {
         return builder.build();
     }
 
-    private static EntityTag entityTag(Date updatedAt, long count) {
-        StringBuilder buffer = new StringBuilder();
-
-        if (updatedAt != null) {
-            buffer.append(Long.toString(updatedAt.getTime()));
-        } else {
-            buffer.append('0');
-        }
-
-        buffer.append('.');
-
-        buffer.append(Long.toString(count));
-
-        return new EntityTag(Long.toHexString(buffer.toString().hashCode()));
-    }
-
-    @Deprecated
-    protected Response ok(GenericEntity<List<E>> entityList) {
-        Date maxUpdatedAt = null;
-
-        for (E entity : entityList.getEntity()) {
-            Date updatedAt = entity.getUpdatedAt();
-
-            if (updatedAt == null) {
-                continue;
-            }
-
-            if (maxUpdatedAt == null || maxUpdatedAt.before(updatedAt)) {
-                maxUpdatedAt = updatedAt;
-            }
-        }
-
-        ResponseBuilder builder;
-        builder = Response.ok(entityList);
-        builder.tag(entityTag(maxUpdatedAt, entityList.getEntity().size()));
-
-        builder.cacheControl(cacheControl);
-        return builder.build();
-    }
-
     protected Response created(E entity) {
         ResponseBuilder builder = Response.created(getUri("read", entity.getId()));
         return builder.entity(getSerializer().serialize(entity, uriInfo)).build();
@@ -171,8 +219,13 @@ public abstract class JsonApiResource<E extends JsonApiEntity> {
 
     @POST
     public Response create(JsonObject input) {
+        Response validationResult = validate(input);
+
+        if (validationResult != null) {
+            return validationResult;
+        }
+
         E entity = getSerializer().deserialize(input, null, false);
-        validate(entity);
         persist(entity);
 
         return created(entity);
@@ -232,31 +285,6 @@ public abstract class JsonApiResource<E extends JsonApiEntity> {
         return persistenceContext.createQuery(query).getResultList();
     }
 
-    protected ResponseBuilder evaluate(String queryName, String eTagHeader, Object... params) {
-        if (eTagHeader == null) {
-            return null;
-        }
-
-        Query query = persistenceContext.createNamedQuery(queryName);
-
-        if (params != null) {
-            for (int i = 0; i < params.length; i++) {
-                query.setParameter(i + 1, params[i]);
-            }
-        }
-
-        Object[] result;
-
-        try {
-            result = (Object[]) query.getSingleResult();
-        } catch (@SuppressWarnings("unused") NoResultException e) {
-            return null;
-        }
-
-        EntityTag eTag = entityTag((Date) result[0], (Long) result[1]);
-        return rsRequest.evaluatePreconditions(eTag);
-    }
-
     protected <T> List<T> findByQuery(Class<T> resultClass, String queryName, Object... params) {
         return findByQuery(resultClass, queryName, 0, 100, params);
     }
@@ -313,21 +341,22 @@ public abstract class JsonApiResource<E extends JsonApiEntity> {
     }
 
     protected Response update(long id, JsonObject input, boolean patch) {
+        Response validationResult = validate(input);
+
+        if (validationResult != null) {
+            return validationResult;
+        }
+
         final E entity = find(id);
 
         if (entity != null) {
             JsonApiSerializer<E> ser = getSerializer();
             E deserialized = ser.deserialize(input, entity, patch);
-            validate(deserialized);
             deserialized.setUpdated("UNKNOWN", new Timestamp(System.currentTimeMillis()));
             return ok(ser.serialize(persistenceContext.merge(deserialized), uriInfo));
         }
 
         return notFound();
-    }
-
-    protected void remove(final E entity) {
-        persistenceContext.remove(entity);
     }
 
     @DELETE
@@ -341,10 +370,19 @@ public abstract class JsonApiResource<E extends JsonApiEntity> {
                 persistenceContext.flush();
                 return Response.noContent().build();
             } catch (PersistenceException e) {
-                Throwable cause = getRootCause(e);
+                //Throwable cause = getRootCause(e);
                 JsonObject response;
+                /*String code;
+                String title;
 
                 if (cause instanceof SQLException) {
+                    String sqlState = ((SQLException) cause).getSQLState();
+
+                    if ("23000".equals(sqlState)) {
+                        // Constraint violation;
+                        title = "";
+                    }
+
                     response = Json.createObjectBuilder()
                             .add("errors", Json.createArrayBuilder()
                                                .add(Json.createObjectBuilder()
@@ -359,7 +397,13 @@ public abstract class JsonApiResource<E extends JsonApiEntity> {
                                                         .add("code", "D999")
                                                         .add("title", "Unexpected error")))
                             .build();
-                }
+                }*/
+
+                response = Json.createObjectBuilder()
+                        .add("errors", Json.createArrayBuilder()
+                                           .add(Json.createObjectBuilder()
+                                                    .add("title", "Unexpected error")))
+                        .build();
 
                 return Response.status(Status.CONFLICT).entity(response).build();
             }
