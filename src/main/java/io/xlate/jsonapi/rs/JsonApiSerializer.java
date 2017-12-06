@@ -4,11 +4,15 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.sql.Time;
 import java.sql.Timestamp;
+import java.util.Arrays;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TimeZone;
 
 import javax.json.Json;
@@ -21,6 +25,7 @@ import javax.json.JsonString;
 import javax.json.JsonValue;
 import javax.json.JsonValue.ValueType;
 import javax.json.stream.JsonGenerator;
+import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.UriInfo;
 import javax.xml.bind.DatatypeConverter;
 
@@ -118,10 +123,14 @@ public abstract class JsonApiSerializer<E extends JsonApiEntity> {
     }
 
     public JsonObjectBuilder serializeIdentifier(E source) {
+        return serializeIdentifier(Long.toString(source.getId()));
+    }
+
+    public JsonObjectBuilder serializeIdentifier(String id) {
         JsonObjectBuilder data = Json.createObjectBuilder();
 
         data.add("type", getTypeName());
-        data.add("id", toString(source.getId()));
+        data.add("id", id);
 
         return data;
     }
@@ -172,6 +181,20 @@ public abstract class JsonApiSerializer<E extends JsonApiEntity> {
     @SuppressWarnings("unused")
     protected void deserializeRelationships(JsonObject rels, E target, boolean patch) {
         return; //NO-OP
+    }
+
+    protected static Set<String> getRequestedIncludes(UriInfo uriInfo) {
+        MultivaluedMap<String, String> params = uriInfo.getQueryParameters();
+        Set<String> includes;
+
+        if (params.containsKey("include")) {
+            List<String> includeList = Arrays.asList(params.getFirst("include").split(","));
+            includes = Collections.unmodifiableSet(new HashSet<>(includeList));
+        } else {
+            includes = Collections.emptySet();
+        }
+
+        return includes;
     }
 
     protected static JsonValue toString(final Object value) {
