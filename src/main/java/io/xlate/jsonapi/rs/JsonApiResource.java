@@ -1,9 +1,12 @@
 package io.xlate.jsonapi.rs;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.sql.Timestamp;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -11,6 +14,9 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import javax.inject.Inject;
 import javax.json.Json;
@@ -19,19 +25,27 @@ import javax.json.JsonNumber;
 import javax.json.JsonObject;
 import javax.json.JsonString;
 import javax.json.JsonValue;
+import javax.persistence.EntityGraph;
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
 import javax.persistence.PersistenceException;
+import javax.persistence.Subgraph;
 import javax.persistence.TypedQuery;
 import javax.persistence.criteria.CriteriaBuilder;
 import javax.persistence.criteria.CriteriaQuery;
+import javax.persistence.criteria.Expression;
+import javax.persistence.criteria.Join;
+import javax.persistence.criteria.JoinType;
 import javax.persistence.criteria.Order;
 import javax.persistence.criteria.Root;
+import javax.persistence.criteria.Selection;
+import javax.persistence.metamodel.ManagedType;
+import javax.persistence.metamodel.Metamodel;
+import javax.persistence.metamodel.PluralAttribute;
 import javax.validation.ConstraintViolation;
 import javax.validation.Validator;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
-import javax.ws.rs.NotFoundException;
 import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
@@ -78,10 +92,13 @@ public abstract class JsonApiResource<E extends JsonApiEntity> {
     protected abstract JsonApiSerializer<E> getSerializer();
 
     protected Response validate(JsonObject input) {
+        String constraintResourceName = "/jsonapi-constraints/" + getSerializer().getTypeName() + ".properties";
         Properties constraints = new Properties();
 
-        try {
-            constraints.load(getClass().getResourceAsStream("/jsonapi-constraints/" + getSerializer().getTypeName() + ".properties"));
+        try (InputStream stream = getClass().getResourceAsStream(constraintResourceName)) {
+            if (stream != null) {
+                constraints.load(stream);
+            }
         } catch (IOException e) {
             e.printStackTrace();
             return Response.serverError().build();
@@ -112,7 +129,9 @@ public abstract class JsonApiResource<E extends JsonApiEntity> {
             if (jsonValue != null && jsonValue != input) {
                 switch (jsonValue.getValueType()) {
                 case STRING:
-                    violations.addAll(validator.validateValue(entityClass, fieldName, ((JsonString) jsonValue).getString()));
+                    violations.addAll(validator.validateValue(entityClass,
+                                                              fieldName,
+                                                              ((JsonString) jsonValue).getString()));
                     break;
                 case TRUE:
                     violations.addAll(validator.validateValue(entityClass, fieldName, Boolean.TRUE));
@@ -121,7 +140,9 @@ public abstract class JsonApiResource<E extends JsonApiEntity> {
                     violations.addAll(validator.validateValue(entityClass, fieldName, Boolean.FALSE));
                     break;
                 case NUMBER:
-                    violations.addAll(validator.validateValue(entityClass, fieldName, ((JsonNumber) jsonValue).longValue()));
+                    violations.addAll(validator.validateValue(entityClass,
+                                                              fieldName,
+                                                              ((JsonNumber) jsonValue).longValue()));
                     break;
                 case OBJECT:
                     // TODO: proper object validation
@@ -156,8 +177,9 @@ public abstract class JsonApiResource<E extends JsonApiEntity> {
 
                 for (String message : property.getValue()) {
                     errors.add(Json.createObjectBuilder()
-                                   .add("source", Json.createObjectBuilder()
-                                                      .add("pointer", "data/attributes/" + attr))
+                                   .add("source",
+                                        Json.createObjectBuilder()
+                                            .add("pointer", "data/attributes/" + attr))
                                    .add("detail", message));
                 }
             }
@@ -184,7 +206,18 @@ public abstract class JsonApiResource<E extends JsonApiEntity> {
     }
 
     protected static Response notFound() {
-        return Response.status(Status.NOT_FOUND).build(); //EntityNotFoundMapper.notFound();
+        Status notFound = Status.NOT_FOUND;
+
+        JsonObject errors = Json.createObjectBuilder()
+                                .add("errors",
+                                     Json.createArrayBuilder()
+                                         .add(Json.createObjectBuilder()
+                                                  .add("status", String.valueOf(notFound.getStatusCode()))
+                                                  .add("title", notFound.getReasonPhrase())
+                                                  .add("detail", "The requested resource can not be found.")))
+                                .build();
+
+        return Response.status(notFound).entity(errors).build();
     }
 
     protected static Response ok() {
@@ -237,31 +270,137 @@ public abstract class JsonApiResource<E extends JsonApiEntity> {
         persistenceContext.persist(entity);
     }
 
+    static String toJsonName(String attributeName) {
+        StringBuilder jsonName = new StringBuilder(attributeName);
+        Pattern p = Pattern.compile("([A-Z])[a-z]");
+        Matcher m = p.matcher(jsonName);
+
+        while (m.find()) {
+            char replacement = m.group(1).toLowerCase().charAt(0);
+            jsonName.setCharAt(m.start(), replacement);
+            jsonName.insert(m.start(), '-');
+        }
+
+        return jsonName.toString();
+    }
+
+    static String toAttributeName(String jsonName) {
+        StringBuilder attribute = new StringBuilder(jsonName);
+        Pattern p = Pattern.compile("-(.)");
+        Matcher m = p.matcher(attribute);
+
+        while (m.find()) {
+            char replacement = m.group(1).toUpperCase().charAt(0);
+            attribute.deleteCharAt(m.start());
+            attribute.setCharAt(m.start(), replacement);
+        }
+
+        return attribute.toString();
+    }
+
     @GET
     public Response index() {
-        CriteriaBuilder builder = persistenceContext.getCriteriaBuilder();
-        CriteriaQuery<E> query = builder.createQuery(this.entityClass);
-        Root<E> root = query.from(this.entityClass);
-        query = query.select(root);
-
+        JsonArrayBuilder errors = null;
         MultivaluedMap<String, String> params = uriInfo.getQueryParameters();
+
+        CriteriaBuilder builder = persistenceContext.getCriteriaBuilder();
+        final CriteriaQuery<Object[]> query = builder.createQuery(Object[].class);
+        Root<E> root = query.from(this.entityClass);
+
+        Metamodel model = persistenceContext.getMetamodel();
+        ManagedType<E> rootType = model.managedType(this.entityClass);
+        Set<String> included = new HashSet<>();
+        List<Join<?, ?>> fetched = new ArrayList<>();
+        Set<String> collections = rootType.getAttributes()
+                                          .stream()
+                                          .filter(a -> a instanceof PluralAttribute<?, ?, ?>)
+                                          .map(a -> a.getName())
+                                          .collect(Collectors.toSet());
+        List<String> counted = new ArrayList<>(collections);
+
+        if (params.containsKey("include")) {
+            List<String> includeParams = params.get("include");
+
+            if (includeParams.size() > 1) {
+                errors = (errors != null) ? errors : Json.createArrayBuilder();
+                errors.add(Json.createObjectBuilder()
+                                         .add("source", Json.createObjectBuilder().add("parameter", "include"))
+                                         .add("title", "Invalid Query Parameter")
+                                         .add("detail", "Multiple `include` parameters are not supported."));
+            } else {
+                String includeParam = includeParams.get(0);
+
+                for (String include : includeParam.split(",")) {
+                    String attribute = toAttributeName(include);
+
+                    if (included.contains(attribute)) {
+                        errors = (errors != null) ? errors : Json.createArrayBuilder();
+                        errors.add(Json.createObjectBuilder()
+                                                 .add("source", Json.createObjectBuilder().add("parameter", "include"))
+                                                 .add("title", "Invalid Query Parameter")
+                                                 .add("detail", "The relationshop path `" + include + "` is listed multiple times."));
+                    } else {
+                        included.add(attribute);
+                        counted.remove(attribute);
+
+                        try {
+                            fetched.add((Join<?, ?>) root.fetch(attribute, JoinType.INNER));
+                        } catch (@SuppressWarnings("unused") IllegalArgumentException e) {
+                            errors = (errors != null) ? errors : Json.createArrayBuilder();
+                            errors.add(Json.createObjectBuilder()
+                                                     .add("source", Json.createObjectBuilder().add("parameter", "include"))
+                                                     .add("title", "Invalid Query Parameter")
+                                                     .add("detail", "The resource does not have a `" + include + "` relationship path."));
+                        }
+                    }
+                }
+            }
+        }
+
+        if (errors != null) {
+            JsonObject response = Json.createObjectBuilder()
+                                      .add("errors", errors)
+                                      .build();
+
+            return Response.status(Status.BAD_REQUEST)
+                           .entity(response)
+                           .build();
+        }
+
+        List<Selection<?>> selections = new ArrayList<>(1 + counted.size());
+        selections.add(root);
+
+        for (String collection : counted) {
+            selections.add(builder.countDistinct(root.join(collection, JoinType.LEFT)));
+        }
+
+        query.multiselect(selections).distinct(true);
+
+        List<Expression<?>> grouping = new ArrayList<>(1 + fetched.size());
+        grouping.add(root);
+        grouping.addAll(fetched);
+        query.groupBy(grouping);
 
         if (params.containsKey("sort")) {
             String[] sortKeys = params.getFirst("sort").split(",");
             List<Order> order = new ArrayList<>(sortKeys.length);
 
             for (String sortKey : sortKeys) {
-                if (sortKey.startsWith("-")) {
-                    order.add(builder.desc(root.get(sortKey.substring(1))));
+                boolean descending = sortKey.startsWith("-");
+                String attribute = toAttributeName(sortKey.substring(descending ? 1 : 0));
+                javax.persistence.criteria.Path<Object> path = root.get(attribute);
+
+                if (descending) {
+                    order.add(builder.desc(path));
                 } else {
-                    order.add(builder.asc(root.get(sortKey)));
+                    order.add(builder.asc(path));
                 }
             }
 
-            query = query.orderBy(order);
+            query.orderBy(order);
         }
 
-        TypedQuery<E> typedQuery = persistenceContext.createQuery(query);
+        TypedQuery<Object[]> typedQuery = persistenceContext.createQuery(query);
 
         if (params.containsKey("page[offset]")) {
             typedQuery.setFirstResult(Integer.parseInt(params.getFirst("page[offset]")));
@@ -271,8 +410,31 @@ public abstract class JsonApiResource<E extends JsonApiEntity> {
             typedQuery.setMaxResults(Integer.parseInt(params.getFirst("page[limit]")));
         }
 
-        final List<E> results = typedQuery.getResultList();
-        return ok(getSerializer().serialize(results, uriInfo));
+        final List<?> results = typedQuery.getResultList();
+        //System.out.println(results.size());
+
+        @SuppressWarnings("unchecked")
+        List<E> target = results.stream()
+                                .map(e -> {
+                                    E entity;
+
+                                    if (e instanceof Object[]) {
+                                        Object[] selected = (Object[]) e;
+                                        entity = (E) selected[0];
+                                        Map<String, Long> counts = new HashMap<>(selected.length - 1);
+                                        for (int i = 1; i < selected.length; i++) {
+                                            counts.put(counted.get(i - 1), (Long) selected[i]);
+                                        }
+                                        entity.setRelationshipCounts(counts);
+                                    } else {
+                                        entity = (E) e;
+                                    }
+
+                                    return entity;
+                                })
+                                .collect(Collectors.toList());
+
+        return ok(getSerializer().serialize(target, uriInfo));
     }
 
     protected List<E> findAll() {
@@ -310,19 +472,68 @@ public abstract class JsonApiResource<E extends JsonApiEntity> {
 
     protected E find(final Long id) {
         E entity = persistenceContext.find(entityClass, id);
-        if (entity != null) {
-            return entity;
-        }
-        throw new NotFoundException();
+
+        return entity;
     }
 
     @GET
     @Path("{id}")
     public Response read(@PathParam("id") final long id) {
-        E entity = find(id);
+        MultivaluedMap<String, String> params = uriInfo.getQueryParameters();
+        Map<String, Object> properties = new HashMap<>(1);
+
+        if (params.containsKey("include")) {
+            Map<String, Subgraph<?>> subGraphs = new HashMap<>();
+            EntityGraph<E> graph = persistenceContext.createEntityGraph(entityClass);
+            for (String include : params.getFirst("include").split(",")) {
+                if (include.indexOf('.') > -1) {
+                    Subgraph<?> sg = subGraphs.get(include.substring(0, include.indexOf('.')));
+                    if (sg == null) {
+                        sg = graph.addSubgraph(include.substring(0, include.indexOf('.')));
+                        subGraphs.put(include.substring(0, include.indexOf('.')), sg);
+                    }
+                    sg.addAttributeNodes(include.substring(include.indexOf('.') + 1));
+                    continue; //FIXME
+                } else {
+                    try {
+                        graph.addAttributeNodes(toAttributeName(include.trim()));
+                    } catch (@SuppressWarnings("unused") IllegalArgumentException e) {
+                        return notFound();
+                    }
+                }
+            }
+            properties.put("javax.persistence.fetchgraph", graph);
+        }
+
+
+        E entity = persistenceContext.find(entityClass, id, properties);
 
         if (entity != null) {
             return ok(getSerializer().serialize(entity, uriInfo));
+        }
+
+        return notFound();
+    }
+
+    @GET
+    @Path("{id}/relationships/{relationshipName}")
+    public Response readRelationship(@PathParam("id") final long id, @PathParam("relationshipName") String relationshipName) {
+        EntityGraph<E> graph = persistenceContext.createEntityGraph(entityClass);
+
+        try {
+            graph.addAttributeNodes(relationshipName);
+        } catch (@SuppressWarnings("unused") IllegalArgumentException e) {
+            return notFound();
+        }
+
+        Map<String, Object> properties = new HashMap<>(1);
+        properties.put("javax.persistence.fetchgraph", graph);
+
+        E entity = persistenceContext.find(entityClass, id, properties);
+
+        if (entity != null) {
+            JsonObject rels = getSerializer().serializeRelationships(entity, uriInfo);
+            return ok(rels.get(relationshipName));
         }
 
         return notFound();
@@ -369,41 +580,14 @@ public abstract class JsonApiResource<E extends JsonApiEntity> {
                 persistenceContext.remove(entity);
                 persistenceContext.flush();
                 return Response.noContent().build();
-            } catch (PersistenceException e) {
-                //Throwable cause = getRootCause(e);
+            } catch (@SuppressWarnings("unused") PersistenceException e) {
                 JsonObject response;
-                /*String code;
-                String title;
-
-                if (cause instanceof SQLException) {
-                    String sqlState = ((SQLException) cause).getSQLState();
-
-                    if ("23000".equals(sqlState)) {
-                        // Constraint violation;
-                        title = "";
-                    }
-
-                    response = Json.createObjectBuilder()
-                            .add("errors", Json.createArrayBuilder()
-                                               .add(Json.createObjectBuilder()
-                                                        .add("code", "D100")
-                                                        .add("title", "Database error")
-                                                        .add("detail", cause.getMessage())))
-                            .build();
-                } else {
-                    response = Json.createObjectBuilder()
-                            .add("errors", Json.createArrayBuilder()
-                                               .add(Json.createObjectBuilder()
-                                                        .add("code", "D999")
-                                                        .add("title", "Unexpected error")))
-                            .build();
-                }*/
-
                 response = Json.createObjectBuilder()
-                        .add("errors", Json.createArrayBuilder()
-                                           .add(Json.createObjectBuilder()
-                                                    .add("title", "Unexpected error")))
-                        .build();
+                               .add("errors",
+                                    Json.createArrayBuilder()
+                                        .add(Json.createObjectBuilder()
+                                                 .add("title", "Unexpected error")))
+                               .build();
 
                 return Response.status(Status.CONFLICT).entity(response).build();
             }

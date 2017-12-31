@@ -2,12 +2,15 @@ package io.xlate.jsonapi.rs;
 
 import java.sql.Timestamp;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Map;
 
 import javax.persistence.Column;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.MappedSuperclass;
+import javax.persistence.Transient;
 
 @MappedSuperclass
 public abstract class JsonApiEntity {
@@ -28,6 +31,9 @@ public abstract class JsonApiEntity {
 
     @Column(name = "UPDATED_AT", nullable = false)
     private Timestamp updatedAt;
+
+    @Transient
+    protected Map<String, Long> relationshipCounts = Collections.emptyMap();
 
     @Override
     public int hashCode() {
@@ -113,5 +119,13 @@ public abstract class JsonApiEntity {
 
     private void setUpdatedAt(Timestamp updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public Map<String, Long> getRelationshipCounts() {
+        return relationshipCounts;
+    }
+
+    public void setRelationshipCounts(Map<String, Long> relationshipCounts) {
+        this.relationshipCounts = relationshipCounts;
     }
 }

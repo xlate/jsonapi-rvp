@@ -31,7 +31,7 @@ import javax.xml.bind.DatatypeConverter;
 
 public abstract class JsonApiSerializer<E extends JsonApiEntity> {
 
-    private static final JsonArray emptyJsonArray = Json.createArrayBuilder().build();
+    protected static final JsonArray emptyJsonArray = Json.createArrayBuilder().build();
     private final Class<E> type;
     private final String typeName;
 
@@ -110,14 +110,18 @@ public abstract class JsonApiSerializer<E extends JsonApiEntity> {
         data.add("attributes", serializeAttributes(source, uriInfo));
 
         if (withRelationships) {
-            JsonObjectBuilder rel = serializeRelationships(source, uriInfo);
+            JsonObject rel = serializeRelationships(source, uriInfo);
 
             if (rel != null) {
                 data.add("relationships", rel);
             }
         }
 
-        data.add("links", serializeLinks(source, uriInfo));
+        JsonValue links = serializeLinks(source, uriInfo);
+
+        if (links != JsonValue.NULL) {
+            data.add("links", links);
+        }
 
         return data.build();
     }
@@ -138,7 +142,7 @@ public abstract class JsonApiSerializer<E extends JsonApiEntity> {
     protected abstract JsonObject serializeAttributes(E source, UriInfo uriInfo);
 
     @SuppressWarnings("unused")
-    protected JsonObjectBuilder serializeRelationships(E source, UriInfo uriInfo) {
+    protected JsonObject serializeRelationships(E source, UriInfo uriInfo) {
         return null;
     }
 
@@ -149,6 +153,11 @@ public abstract class JsonApiSerializer<E extends JsonApiEntity> {
 
     @SuppressWarnings("unused")
     protected JsonArray serializeIncluded(E source, UriInfo uriInfo) {
+        return serializeIncluded(source, uriInfo, false);
+    }
+
+    @SuppressWarnings("unused")
+    protected JsonArray serializeIncluded(E source, UriInfo uriInfo, boolean withRelationships) {
         return emptyJsonArray;
     }
 
