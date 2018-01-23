@@ -2,15 +2,12 @@ package io.xlate.jsonapi.rs;
 
 import java.sql.Timestamp;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.Map;
 
 import javax.persistence.Column;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.MappedSuperclass;
-import javax.persistence.Transient;
 
 @MappedSuperclass
 public abstract class JsonApiEntity {
@@ -31,9 +28,6 @@ public abstract class JsonApiEntity {
 
     @Column(name = "UPDATED_AT", nullable = false)
     private Timestamp updatedAt;
-
-    @Transient
-    protected Map<String, Long> relationshipCounts = Collections.emptyMap();
 
     @Override
     public int hashCode() {
@@ -93,7 +87,7 @@ public abstract class JsonApiEntity {
         return createdBy;
     }
 
-    private void setCreatedBy(String createdBy) {
+    public void setCreatedBy(String createdBy) {
         this.createdBy = createdBy;
     }
 
@@ -101,7 +95,7 @@ public abstract class JsonApiEntity {
         return createdAt;
     }
 
-    private void setCreatedAt(Timestamp createdAt) {
+    public void setCreatedAt(Timestamp createdAt) {
         this.createdAt = createdAt;
     }
 
@@ -109,7 +103,7 @@ public abstract class JsonApiEntity {
         return updatedBy;
     }
 
-    private void setUpdatedBy(String updatedBy) {
+    public void setUpdatedBy(String updatedBy) {
         this.updatedBy = updatedBy;
     }
 
@@ -117,15 +111,7 @@ public abstract class JsonApiEntity {
         return updatedAt;
     }
 
-    private void setUpdatedAt(Timestamp updatedAt) {
+    public void setUpdatedAt(Timestamp updatedAt) {
         this.updatedAt = updatedAt;
-    }
-
-    public Map<String, Long> getRelationshipCounts() {
-        return relationshipCounts;
-    }
-
-    public void setRelationshipCounts(Map<String, Long> relationshipCounts) {
-        this.relationshipCounts = relationshipCounts;
     }
 }
