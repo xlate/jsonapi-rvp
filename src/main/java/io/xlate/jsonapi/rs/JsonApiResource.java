@@ -1,17 +1,24 @@
 package io.xlate.jsonapi.rs;
 
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.annotation.PostConstruct;
 import javax.inject.Inject;
 import javax.json.Json;
+import javax.json.JsonArrayBuilder;
 import javax.json.JsonObject;
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
+import javax.validation.ConstraintViolation;
 import javax.validation.Validator;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
@@ -37,6 +44,7 @@ import javax.ws.rs.core.UriInfo;
 
 import io.xlate.jsonapi.rs.internal.boundary.PersistenceController;
 import io.xlate.jsonapi.rs.internal.entity.EntityMetamodel;
+import io.xlate.jsonapi.rs.internal.entity.JsonApiRequest;
 
 @Path("")
 @Consumes(JsonApiType.JSONAPI)
@@ -44,7 +52,7 @@ import io.xlate.jsonapi.rs.internal.entity.EntityMetamodel;
 public abstract class JsonApiResource {
 
     @Context
-    protected Request rsRequest;
+    protected Request request;
 
     @Context
     protected UriInfo uriInfo;
@@ -85,105 +93,56 @@ public abstract class JsonApiResource {
         cacheControl.setPrivate(true);
     }
 
-/*    protected Response validate(JsonObject input) {
-        String constraintResourceName = "/jsonapi-constraints/" + getSerializer().getTypeName() + ".properties";
-        Properties constraints = new Properties();
+    protected Response validate(String resourceType, String id, JsonObject input) {
+        JsonApiRequest jsonApiRequest = new JsonApiRequest(request.getMethod(),
+                                                           model.getEntityMeta(resourceType),
+                                                           id,
+                                                           input);
 
-        try (InputStream stream = getClass().getResourceAsStream(constraintResourceName)) {
-            if (stream != null) {
-                constraints.load(stream);
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-            return Response.serverError().build();
-        }
+        try {
+            Set<ConstraintViolation<JsonApiRequest>> violations = validator.validate(jsonApiRequest);
 
-        Set<ConstraintViolation<E>> violations = new LinkedHashSet<>();//validator.validate(entity);
+            if (!violations.isEmpty()) {
+                Map<String, List<String>> errorMap = new LinkedHashMap<>();
 
-        for (String sourceName : constraints.stringPropertyNames()) {
-            String fieldName = constraints.getProperty(sourceName);
-            JsonValue jsonValue = sourceName.indexOf('.') > -1 ? input : null;
+                for (ConstraintViolation<?> violation : violations) {
+                    String property = violation.getPropertyPath().toString().replace('.', '/');
 
-            for (String sourceKey : sourceName.split("\\.")) {
-                if (jsonValue instanceof JsonObject) {
-                    JsonObject jsonObj = (JsonObject) jsonValue;
-
-                    if (jsonObj.containsKey(sourceKey)) {
-                        jsonValue = jsonObj.get(sourceKey);
-                    } else {
-                        jsonValue = null;
-                        break;
+                    if (!errorMap.containsKey(property)) {
+                        errorMap.put(property, new ArrayList<String>(2));
                     }
-                } else {
-                    jsonValue = null;
-                    break;
-                }
-            }
 
-            if (jsonValue != null && jsonValue != input) {
-                switch (jsonValue.getValueType()) {
-                case STRING:
-                    violations.addAll(validator.validateValue(entityClass,
-                                                              fieldName,
-                                                              ((JsonString) jsonValue).getString()));
-                    break;
-                case TRUE:
-                    violations.addAll(validator.validateValue(entityClass, fieldName, Boolean.TRUE));
-                    break;
-                case FALSE:
-                    violations.addAll(validator.validateValue(entityClass, fieldName, Boolean.FALSE));
-                    break;
-                case NUMBER:
-                    violations.addAll(validator.validateValue(entityClass,
-                                                              fieldName,
-                                                              ((JsonNumber) jsonValue).longValue()));
-                    break;
-                case OBJECT:
-                    // TODO: proper object validation
-                    break;
-                case NULL:
-                default:
-                    violations.addAll(validator.validateValue(entityClass, fieldName, null));
-                    break;
-                }
-            } else {
-                violations.addAll(validator.validateValue(entityClass, fieldName, null));
-            }
-        }
-
-        if (!violations.isEmpty()) {
-            Map<String, List<String>> errorMap = new LinkedHashMap<>();
-
-            for (ConstraintViolation<?> violation : violations) {
-                String property = violation.getPropertyPath().toString().replace('.', '/');
-
-                if (!errorMap.containsKey(property)) {
-                    errorMap.put(property, new ArrayList<String>(2));
+                    errorMap.get(property).add(violation.getMessage());
                 }
 
-                errorMap.get(property).add(violation.getMessage());
-            }
+                JsonArrayBuilder errors = Json.createArrayBuilder();
 
-            JsonArrayBuilder errors = Json.createArrayBuilder();
+                for (Entry<String, List<String>> property : errorMap.entrySet()) {
+                    final String key = property.getKey();
 
-            for (Entry<String, List<String>> property : errorMap.entrySet()) {
-                final String attr = property.getKey();
+                    if (key.isEmpty()) {
+                        continue;
+                    }
 
-                for (String message : property.getValue()) {
-                    errors.add(Json.createObjectBuilder()
-                                   .add("source",
-                                        Json.createObjectBuilder()
-                                            .add("pointer", "data/attributes/" + attr))
-                                   .add("detail", message));
+                    for (String message : property.getValue()) {
+                        errors.add(Json.createObjectBuilder()
+                                       .add("source",
+                                            Json.createObjectBuilder()
+                                                .add("pointer", key))
+                                       .add("title", "Invalid JSON API Document Structure")
+                                       .add("detail", message));
+                    }
                 }
-            }
 
-            JsonObject jsonErrors = Json.createObjectBuilder().add("errors", errors).build();
-            return Response.status(JsonApiStatus.UNPROCESSABLE_ENTITY).entity(jsonErrors).build();
+                JsonObject jsonErrors = Json.createObjectBuilder().add("errors", errors).build();
+                return Response.status(JsonApiStatus.UNPROCESSABLE_ENTITY).entity(jsonErrors).build();
+            }
+        } catch (Exception e) {
+            return internalServerError(e);
         }
 
         return null;
-    }*/
+    }
 
     /*
      * protected Account getUserAccount() { return ((AccountCallerPrincipal)
@@ -225,7 +184,8 @@ public abstract class JsonApiResource {
                                          .add(Json.createObjectBuilder()
                                                   .add("status", String.valueOf(statusCode.getStatusCode()))
                                                   .add("title", statusCode.getReasonPhrase())
-                                                  .add("detail", "An error has occurred processing the request. Please try again later.")))
+                                                  .add("detail",
+                                                       "An error has occurred processing the request. Please try again later.")))
                                 .build();
 
         return Response.status(statusCode).entity(errors).build();
@@ -240,7 +200,7 @@ public abstract class JsonApiResource {
     protected Response ok(Object entity) {
         EntityTag etag = new EntityTag(Integer.toString(entity.hashCode()));
         ResponseBuilder builder;
-        builder = rsRequest.evaluatePreconditions(etag);
+        builder = request.evaluatePreconditions(etag);
 
         if (builder == null) {
             builder = Response.ok(entity);
@@ -253,7 +213,9 @@ public abstract class JsonApiResource {
     }
 
     protected Response created(String resourceType, JsonObject jsonEntity) {
-        ResponseBuilder builder = Response.created(getUri("read", resourceType, jsonEntity.getJsonObject("data").getString("id")));
+        ResponseBuilder builder = Response.created(getUri("read",
+                                                          resourceType,
+                                                          jsonEntity.getJsonObject("data").getString("id")));
         return builder.entity(jsonEntity).build();
     }
 
@@ -264,14 +226,11 @@ public abstract class JsonApiResource {
     @POST
     @Path("{resource-type}")
     public Response create(@PathParam("resource-type") String resourceType, JsonObject input) {
-        /*Response validationResult = validate(input);
+        Response validationResult = validate(resourceType, null, input);
 
         if (validationResult != null) {
             return validationResult;
-        }*/
-
-        /*E entity = getSerializer().deserialize(input, null, false);
-        persist(entity);*/
+        }
 
         try {
             JsonObject response = persistence.create(resourceType, input, uriInfo);
@@ -338,28 +297,50 @@ public abstract class JsonApiResource {
 
     }
 
+    @SuppressWarnings("unused")
     @PATCH
-    @Path("{resource-type}/{id}")
-    public Response patch(@PathParam("resource-type") String resourceType,
-                          @PathParam("id") String id,
-                          JsonObject input) {
-        return update(resourceType, id, input, true);
+    @Path("{resource-type}/{id}/relationships/{relationship-name}")
+    public Response replaceRelationship(@PathParam("resource-type") String resourceType,
+                                        @PathParam("id") final String id,
+                                        @PathParam("relationship-name") String relationshipName,
+                                        final JsonObject input) {
+        // TODO: implement relationship updates
+        return Response.status(Status.NOT_IMPLEMENTED).build();
     }
 
+    @SuppressWarnings("unused")
+    @POST
+    @Path("{resource-type}/{id}/relationships/{relationship-name}")
+    public Response addRelationship(@PathParam("resource-type") String resourceType,
+                                    @PathParam("id") final String id,
+                                    @PathParam("relationship-name") String relationshipName,
+                                    final JsonObject input) {
+        // TODO: implement relationship updates
+        return Response.status(Status.NOT_IMPLEMENTED).build();
+    }
+
+    @SuppressWarnings("unused")
+    @DELETE
+    @Path("{resource-type}/{id}/relationships/{relationship-name}")
+    public Response deleteRelationship(@PathParam("resource-type") String resourceType,
+                                       @PathParam("id") final String id,
+                                       @PathParam("relationship-name") String relationshipName,
+                                       final JsonObject input) {
+        // TODO: implement relationship updates
+        return Response.status(Status.NOT_IMPLEMENTED).build();
+    }
+
+    @PATCH
     @PUT
     @Path("{resource-type}/{id}")
     public Response update(@PathParam("resource-type") String resourceType,
                            @PathParam("id") String id,
                            final JsonObject input) {
-        return update(resourceType, id, input, false);
-    }
-
-    protected Response update(String resourceType, String id, JsonObject input, boolean patch) {
-        /*Response validationResult = validate(input);
+        Response validationResult = validate(resourceType, id, input);
 
         if (validationResult != null) {
             return validationResult;
-        }*/
+        }
 
         try {
             JsonObject response = persistence.update(resourceType, id, input, uriInfo);
@@ -379,36 +360,15 @@ public abstract class JsonApiResource {
     @DELETE
     @Path("{resource-type}/{id}")
     public Response delete(@PathParam("resource-type") String resourceType, @PathParam("id") final String id) {
-        /*E entity = persistenceContext.find(entityClass, id);
-
-        if (entity != null) {
-            try {
-                persistenceContext.remove(entity);
-                persistenceContext.flush();
+        try {
+            if (persistence.delete(resourceType, id)) {
                 return Response.noContent().build();
-            } catch (@SuppressWarnings("unused") PersistenceException e) {
-                JsonObject response;
-                response = Json.createObjectBuilder()
-                               .add("errors",
-                                    Json.createArrayBuilder()
-                                        .add(Json.createObjectBuilder()
-                                                 .add("title", "Unexpected error")))
-                               .build();
-
-                return Response.status(Status.CONFLICT).entity(response).build();
             }
-        }*/
-
-        return notFound();
-    }
-
-    Throwable getRootCause(Throwable thrown) {
-        Throwable cause = thrown;
-
-        while (cause.getCause() != null) {
-            cause = cause.getCause();
+            return notFound();
+        } catch (WebApplicationException e) {
+            return e.getResponse();
+        } catch (Exception e) {
+            return internalServerError(e);
         }
-
-        return cause;
     }
 }

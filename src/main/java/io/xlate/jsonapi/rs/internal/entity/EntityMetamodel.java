@@ -32,7 +32,31 @@ public class EntityMetamodel extends HashMap<String, EntityMeta> {
     }
 
     public EntityMeta getEntityMeta(Class<?> entityClass) {
-        return classMetaMap.get(entityClass);
+        EntityMeta meta = classMetaMap.get(entityClass);
+
+        if (meta != null) {
+            return meta;
+        }
+
+        // Deal with JPA proxy classes
+        return classMetaMap.entrySet()
+            .stream()
+            .filter(entry -> {
+                Class<Object> key = entry.getKey();
+
+                if (!key.isAssignableFrom(entityClass)) {
+                    return false;
+                }
+
+                if (!entityClass.getSuperclass().isAssignableFrom(key)) {
+                    return false;
+                }
+
+                return true;
+            })
+            .map(entry -> entry.getValue())
+            .findFirst()
+            .orElseGet(() -> null);
     }
 
     public String getResourceType(Class<?> resourceClass) {

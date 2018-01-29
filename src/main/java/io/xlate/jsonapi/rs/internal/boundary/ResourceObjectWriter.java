@@ -1,7 +1,5 @@
 package io.xlate.jsonapi.rs.internal.boundary;
 
-import java.beans.PropertyDescriptor;
-import java.lang.reflect.Method;
 import java.net.URI;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -11,16 +9,21 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
+import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import javax.json.Json;
 import javax.json.JsonArrayBuilder;
 import javax.json.JsonObject;
 import javax.json.JsonObjectBuilder;
+import javax.persistence.Persistence;
+import javax.persistence.PersistenceUtil;
+import javax.persistence.metamodel.Attribute.PersistentAttributeType;
 import javax.persistence.metamodel.EntityType;
 import javax.persistence.metamodel.SingularAttribute;
-import javax.persistence.metamodel.Attribute.PersistentAttributeType;
 import javax.ws.rs.InternalServerErrorException;
 import javax.ws.rs.core.UriBuilder;
 import javax.ws.rs.core.UriInfo;
@@ -30,8 +33,6 @@ import io.xlate.jsonapi.rs.internal.entity.EntityMetamodel;
 import io.xlate.jsonapi.rs.internal.entity.FetchParameters;
 
 public class ResourceObjectWriter {
-
-    private final EntityMetamodel model;
 
     static Pattern attributePattern = Pattern.compile("([A-Z])[a-z]");
 
@@ -48,8 +49,65 @@ public class ResourceObjectWriter {
         return jsonName.toString();
     }
 
+    private final EntityMetamodel model;
+
     public ResourceObjectWriter(EntityMetamodel model) {
         this.model = model;
+    }
+
+    JsonObjectBuilder topLevelBuilder() {
+        JsonObjectBuilder topLevel = Json.createObjectBuilder();
+        topLevel.add("jsonapi", Json.createObjectBuilder().add("version", "1.0"));
+        return topLevel;
+    }
+
+    public JsonObject toJsonApiRelationships(UriInfo uriInfo,
+                                             String resourceType,
+                                             String id,
+                                             String relationshipName,
+                                             String relationshipType,
+                                             Set<String> relatedIds) {
+
+        JsonObjectBuilder response = topLevelBuilder();
+        response.add("links", getRelationshipLink(uriInfo, resourceType, id, relationshipName));
+
+        JsonArrayBuilder relationships = Json.createArrayBuilder();
+
+        for (String relatedId : relatedIds) {
+            relationships.add(Json.createObjectBuilder()
+                                  .add("type", relationshipType)
+                                  .add("id", relatedId));
+        }
+
+        response.add("data", relationships);
+        return response.build();
+    }
+
+    public JsonObject toJsonApiResource(Object bean, UriInfo uriInfo) {
+        EntityMeta meta = model.getEntityMeta(bean.getClass());
+        Map<String, Object> related = new TreeMap<String, Object>();
+
+        PersistenceUtil util = Persistence.getPersistenceUtil();
+
+        related.putAll(meta
+                       .getEntityType()
+                       .getAttributes()
+                       .stream()
+                       .filter(a -> a.isAssociation())
+                       .collect(Collectors.toMap(a -> a.getName(), a -> {
+                           if (util.isLoaded(bean, a.getName())) {
+                               return model.getEntityMeta(bean.getClass())
+                                           .getPropertyValue(bean, a.getName());
+                           } else if (!a.isCollection()) {
+                               return model.getEntityMeta(bean.getClass())
+                                           .getPropertyValue(bean, a.getName());
+                           }
+                           return a;
+                       })));
+
+        return topLevelBuilder()
+                   .add("data", toJson(bean, related, new FetchParameters(), uriInfo))
+                   .build();
     }
 
     public JsonObject toJson(Object bean, UriInfo uriInfo) {
@@ -88,21 +146,8 @@ public class ResourceObjectWriter {
         EntityMeta meta = model.getEntityMeta(bean.getClass());
         EntityType<Object> model = meta.getEntityType();
         SingularAttribute<Object, ?> idattr = model.getId(model.getIdType().getJavaType());
-
-        PropertyDescriptor desc = meta.getPropertyDescriptor(idattr.getName());
-
-        if (desc != null) {
-            Method getter = desc.getReadMethod();
-
-            try {
-                Object id = getter.invoke(bean);
-                return String.valueOf(id);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-
-        throw new InternalServerErrorException();
+        Object id = meta.getPropertyValue(bean, idattr.getName());
+        return String.valueOf(id);
     }
 
     public JsonObject getAttributes(FetchParameters params, Object bean) {
@@ -119,12 +164,10 @@ public class ResourceObjectWriter {
                              params.includeField(resourceType, a.getName())))
              .sorted((a1, a2) -> a1.getName().compareTo(a2.getName()))
              .forEach(a -> {
-                 PropertyDescriptor desc = meta.getPropertyDescriptor(a.getName());
-                 Method getter = desc.getReadMethod();
-
                  try {
-                     Object value = getter.invoke(bean);
-                     String key = toJsonName(desc.getName());
+                     String propertyName = a.getName();
+                     Object value = meta.getPropertyValue(bean, propertyName);
+                     String key = toJsonName(propertyName);
 
                      if (value != null) {
                          if (Date.class.isAssignableFrom(value.getClass())) {
@@ -137,7 +180,7 @@ public class ResourceObjectWriter {
                          attributes.addNull(key);
                      }
                  } catch (Exception e) {
-                     throw new InternalServerErrorException();
+                     throw new InternalServerErrorException(e);
                  }
              });
 
@@ -172,6 +215,7 @@ public class ResourceObjectWriter {
                                                           relationshipName));
 
                 Object entryValue = entry.getValue();
+                boolean many = meta.getEntityType().getAttribute(fieldName).isCollection();
 
                 if (entryValue instanceof Long) {
                     Long count = (Long) entryValue;
@@ -189,6 +233,12 @@ public class ResourceObjectWriter {
                     }
 
                     relationshipEntry.add("data", relationshipData);
+                } else if (!many && entryValue != null) {
+                    Object relatedEntity = entryValue;
+                    JsonObjectBuilder relatedId = Json.createObjectBuilder();
+                    relatedId.add("type", model.getResourceType(relatedEntity.getClass()));
+                    relatedId.add("id", getId(relatedEntity));
+                    relationshipEntry.add("data", relatedId);
                 }
 
                 jsonRelationships.add(relationshipName, relationshipEntry);
@@ -209,7 +259,13 @@ public class ResourceObjectWriter {
     }
 
     public JsonObject getRelationshipLink(UriInfo uriInfo, String resourceType, String id, String relationshipName) {
-        return link(uriInfo, "self", "readRelationship", model.getEntityMeta(resourceType), resourceType, id, relationshipName);
+        return link(uriInfo,
+                    "self",
+                    "readRelationship",
+                    model.getEntityMeta(resourceType),
+                    resourceType,
+                    id,
+                    relationshipName);
     }
 
     public JsonObject getRelationshipLink(UriInfo uriInfo, Object bean, String relationshipName) {

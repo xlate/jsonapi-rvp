@@ -97,4 +97,14 @@ public class EntityMeta {
 
         throw new NoSuchElementException(name);
     }
+
+    public Object getPropertyValue(Object bean, String propertyName) {
+        PropertyDescriptor descriptor = getPropertyDescriptor(propertyName);
+
+        try {
+            return descriptor.getReadMethod().invoke(bean);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
 }
