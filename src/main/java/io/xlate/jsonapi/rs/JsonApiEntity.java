@@ -8,6 +8,8 @@ import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.MappedSuperclass;
+import javax.persistence.PrePersist;
+import javax.persistence.PreUpdate;
 
 @MappedSuperclass
 public abstract class JsonApiEntity {
@@ -28,6 +30,16 @@ public abstract class JsonApiEntity {
 
     @Column(name = "UPDATED_AT", nullable = false)
     private Timestamp updatedAt;
+
+    @PrePersist
+    void prePersist() {
+        this.setCreated("UNKNOWN", new Timestamp(System.currentTimeMillis()));
+    }
+
+    @PreUpdate
+    void preUpdate() {
+        this.setUpdated("UNKNOWN", new Timestamp(System.currentTimeMillis()));
+    }
 
     @Override
     public int hashCode() {

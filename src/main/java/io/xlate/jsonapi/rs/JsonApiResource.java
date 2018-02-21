@@ -43,7 +43,9 @@ import javax.ws.rs.core.UriBuilder;
 import javax.ws.rs.core.UriInfo;
 
 import io.xlate.jsonapi.rs.internal.boundary.PersistenceController;
+import io.xlate.jsonapi.rs.internal.entity.EntityMeta;
 import io.xlate.jsonapi.rs.internal.entity.EntityMetamodel;
+import io.xlate.jsonapi.rs.internal.entity.FetchParameters;
 import io.xlate.jsonapi.rs.internal.entity.JsonApiRequest;
 
 @Path("")
@@ -93,7 +95,53 @@ public abstract class JsonApiResource {
         cacheControl.setPrivate(true);
     }
 
-    protected Response validate(String resourceType, String id, JsonObject input) {
+    protected Response validateParameters(FetchParameters params) {
+        Set<ConstraintViolation<FetchParameters>> violations = validator.validate(params);
+
+        if (!violations.isEmpty()) {
+            Map<String, List<String>> errorMap = new LinkedHashMap<>();
+
+            for (ConstraintViolation<?> violation : violations) {
+                String property = violation.getPropertyPath().toString().replace('.', '/');
+
+                if (property.isEmpty()) {
+                    continue;
+                }
+
+                if (!errorMap.containsKey(property)) {
+                    errorMap.put(property, new ArrayList<String>(2));
+                }
+
+                errorMap.get(property).add(violation.getMessage());
+            }
+
+            JsonArrayBuilder errors = Json.createArrayBuilder();
+
+            for (Entry<String, List<String>> property : errorMap.entrySet()) {
+                final String key = property.getKey();
+
+                if (key.isEmpty()) {
+                    continue;
+                }
+
+                for (String message : property.getValue()) {
+                    errors.add(Json.createObjectBuilder()
+                                   .add("source",
+                                        Json.createObjectBuilder()
+                                            .add("parameter", key))
+                                   .add("title", "Invalid Query Parameter")
+                                   .add("detail", message));
+                }
+            }
+
+            JsonObject jsonErrors = Json.createObjectBuilder().add("errors", errors).build();
+            return Response.status(Status.BAD_REQUEST).entity(jsonErrors).build();
+        }
+
+        return null;
+    }
+
+    protected Response validateEntity(String resourceType, String id, JsonObject input) {
         JsonApiRequest jsonApiRequest = new JsonApiRequest(request.getMethod(),
                                                            model.getEntityMeta(resourceType),
                                                            id,
@@ -226,7 +274,7 @@ public abstract class JsonApiResource {
     @POST
     @Path("{resource-type}")
     public Response create(@PathParam("resource-type") String resourceType, JsonObject input) {
-        Response validationResult = validate(resourceType, null, input);
+        Response validationResult = validateEntity(resourceType, null, input);
 
         if (validationResult != null) {
             return validationResult;
@@ -257,10 +305,22 @@ public abstract class JsonApiResource {
     @Path("{resource-type}/{id}")
     public Response read(@PathParam("resource-type") String resourceType, @PathParam("id") final String id) {
         try {
-            JsonObject response = persistence.fetch(resourceType, id, uriInfo);
+            EntityMeta meta = model.getEntityMeta(resourceType);
 
-            if (response != null) {
-                return ok(response);
+            if (meta != null) {
+                FetchParameters params = new FetchParameters(meta, id, uriInfo);
+
+                Response validationResult = validateParameters(params);
+
+                if (validationResult != null) {
+                    return validationResult;
+                }
+
+                JsonObject response = persistence.fetch(params);
+
+                if (response != null) {
+                    return ok(response);
+                }
             }
 
             return notFound();
@@ -336,7 +396,7 @@ public abstract class JsonApiResource {
     public Response update(@PathParam("resource-type") String resourceType,
                            @PathParam("id") String id,
                            final JsonObject input) {
-        Response validationResult = validate(resourceType, id, input);
+        Response validationResult = validateEntity(resourceType, id, input);
 
         if (validationResult != null) {
             return validationResult;

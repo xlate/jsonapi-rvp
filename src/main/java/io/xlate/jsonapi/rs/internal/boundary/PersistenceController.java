@@ -2,7 +2,6 @@ package io.xlate.jsonapi.rs.internal.boundary;
 
 import java.lang.reflect.AccessibleObject;
 import java.lang.reflect.Method;
-import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -12,8 +11,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import javax.json.Json;
@@ -45,12 +42,10 @@ import javax.persistence.metamodel.EntityType;
 import javax.persistence.metamodel.SingularAttribute;
 import javax.ws.rs.InternalServerErrorException;
 import javax.ws.rs.WebApplicationException;
-import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import javax.ws.rs.core.UriInfo;
 
-import io.xlate.jsonapi.rs.JsonApiEntity;
 import io.xlate.jsonapi.rs.internal.entity.EntityMeta;
 import io.xlate.jsonapi.rs.internal.entity.EntityMetamodel;
 import io.xlate.jsonapi.rs.internal.entity.FetchParameters;
@@ -152,9 +147,6 @@ public class PersistenceController {
 
         reader.fromJson(this, entity, input);
 
-        ((JsonApiEntity) entity).setCreated("UNKNOWN",
-                                            new Timestamp(System.currentTimeMillis()));
-
         em.persist(entity);
         em.flush();
 
@@ -178,9 +170,6 @@ public class PersistenceController {
         }
 
         reader.fromJson(this, entity, input);
-
-        ((JsonApiEntity) entity).setUpdated("UNKNOWN",
-                                            new Timestamp(System.currentTimeMillis()));
 
         final Object updatedEntity = em.merge(entity);
         em.flush();
@@ -264,19 +253,16 @@ public class PersistenceController {
         return entity;
     }
 
-    public JsonObject fetch(String resourceType, String id, UriInfo uriInfo) {
-        EntityMeta meta = model.getEntityMeta(resourceType);
-
-        if (meta == null) {
-            return null;
-        }
-
+    public JsonObject fetch(FetchParameters params) {
+        EntityMeta meta = params.getEntityMeta();
         Class<Object> entityClass = meta.getEntityClass();
         EntityType<Object> rootType = meta.getEntityType();
 
         validateEntityKey(rootType);
 
-        FetchParameters params = getFetchParameters(rootType, id, uriInfo);
+        String id = params.getId();
+        UriInfo uriInfo = params.getUriInfo();
+
         final CriteriaBuilder builder = em.getCriteriaBuilder();
         final CriteriaQuery<Tuple> query = builder.createTupleQuery();
 
@@ -435,183 +421,6 @@ public class PersistenceController {
         }
     }
 
-    FetchParameters getFetchParameters(EntityType<Object> rootType, String id, UriInfo uriInfo) {
-        FetchParameters fetchp = new FetchParameters();
-        MultivaluedMap<String, String> params = uriInfo.getQueryParameters();
-        JsonArrayBuilder errors = Json.createArrayBuilder();
-
-        params.entrySet()
-              .stream()
-              .filter(p -> p.getKey().matches("fields\\[[^]]+?\\]"))
-              .forEach(p -> {
-                  Pattern fieldp = Pattern.compile("fields\\[([^]]+?)\\]");
-                  Matcher fieldm = fieldp.matcher(p.getKey());
-                  fieldm.find();
-                  for (String fieldl : p.getValue()) {
-                      for (String fieldName : fieldl.split(",")) {
-                          fetchp.addField(fieldm.group(1), ResourceObjectReader.toAttributeName(fieldName));
-                      }
-                  }
-              });
-
-        if (params.containsKey("include")) {
-            List<String> includeParams = params.get("include");
-            validateSingle("include", includeParams, errors);
-
-            String includeParam = includeParams.get(0);
-
-            for (String include : includeParam.split(",")) {
-                String attribute = ResourceObjectReader.toAttributeName(include);
-
-                if (fetchp.getInclude().contains(attribute)) {
-                    errors = (errors != null) ? errors : Json.createArrayBuilder();
-                    errors.add(Json.createObjectBuilder()
-                                   .add("source", Json.createObjectBuilder().add("parameter", "include"))
-                                   .add("title", "Invalid Query Parameter")
-                                   .add("detail",
-                                        "The relationshop path `" + include + "` is listed multiple times."));
-                } else {
-                    try {
-                        Attribute<?, ?> attr = rootType.getAttribute(attribute);
-
-                        if (!attr.isAssociation()) {
-                            errors = (errors != null) ? errors : Json.createArrayBuilder();
-                            errors.add(Json.createObjectBuilder()
-                                           .add("source", Json.createObjectBuilder().add("parameter", "include"))
-                                           .add("title", "Invalid Query Parameter")
-                                           .add("detail", "Attribute `" + include + "` is not a relationship."));
-                        } else {
-                            if (!fetchp.includeField(rootType.getJavaType().getSimpleName(), attribute)) {
-                                errors = (errors != null) ? errors : Json.createArrayBuilder();
-                                errors.add(Json.createObjectBuilder()
-                                               .add("source", Json.createObjectBuilder().add("parameter", "include"))
-                                               .add("title", "Invalid Query Parameter")
-                                               .add("detail",
-                                                    "Cannot include relationshop `" + include
-                                                            + "` not selected by parameter `field["
-                                                            + rootType.getJavaType().getSimpleName() + "]`."));
-                            }
-                        }
-                    } catch (@SuppressWarnings("unused") IllegalArgumentException e) {
-                        errors = (errors != null) ? errors : Json.createArrayBuilder();
-                        errors.add(Json.createObjectBuilder()
-                                       .add("source", Json.createObjectBuilder().add("parameter", "include"))
-                                       .add("title", "Invalid Query Parameter")
-                                       .add("detail",
-                                            "The resource does not have a `" + include + "` relationship path."));
-                    }
-
-                    fetchp.getInclude().add(attribute);
-                    fetchp.getCount().remove(attribute);
-                }
-            }
-        }
-
-        if (params.containsKey("sort")) {
-            if (id != null) {
-                throw new JsonApiBadRequestException(Json.createObjectBuilder()
-                                                         .add("source",
-                                                              Json.createObjectBuilder().add("parameter", "sort"))
-                                                         .add("title", "Invalid Query Parameter")
-                                                         .add("detail", "Cannot sort a single resource, `" + id + "`")
-                                                         .build());
-            }
-
-            List<String> sortParams = params.get("sort");
-            validateSingle("sort", sortParams, errors);
-
-            String sortParam = sortParams.get(0);
-
-            for (String sort : sortParam.split(",")) {
-                boolean descending = sort.startsWith("-");
-                String attribute = ResourceObjectReader.toAttributeName(sort.substring(descending ? 1 : 0));
-
-                try {
-                    Attribute<?, ?> attr = rootType.getAttribute(attribute);
-
-                    if (attr.isAssociation()) {
-                        errors = (errors != null) ? errors : Json.createArrayBuilder();
-                        errors.add(Json.createObjectBuilder()
-                                       .add("source", Json.createObjectBuilder().add("parameter", "sort"))
-                                       .add("title", "Invalid Query Parameter")
-                                       .add("detail", "Sort key `" + sort + "` is not an attribute."));
-                    }
-                } catch (@SuppressWarnings("unused") IllegalArgumentException e) {
-                    errors = (errors != null) ? errors : Json.createArrayBuilder();
-                    errors.add(Json.createObjectBuilder()
-                                   .add("source", Json.createObjectBuilder().add("parameter", "sort"))
-                                   .add("title", "Invalid Query Parameter")
-                                   .add("detail", "The resource does not have a `" + sort + "` attribute."));
-                }
-
-                fetchp.getSort().add(descending ? '-' + attribute : attribute);
-            }
-        }
-
-        if (params.containsKey("page[offset]")) {
-            if (id != null) {
-                errors.add(Json.createObjectBuilder()
-                               .add("source", Json.createObjectBuilder().add("parameter", "page[offset]"))
-                               .add("title", "Invalid Query Parameter")
-                               .add("detail", "Pagination invalid for single resource requests."));
-            }
-
-            List<String> pageOffsetParams = params.get("page[offset]");
-            validateSingle("page[offset]", pageOffsetParams, errors);
-
-            try {
-                fetchp.setPageOffset(Integer.parseInt(pageOffsetParams.get(0)));
-            } catch (@SuppressWarnings("unused") NumberFormatException e) {
-                errors.add(Json.createObjectBuilder()
-                               .add("source", Json.createObjectBuilder().add("parameter", "page[offset]"))
-                               .add("title", "Invalid Query Parameter")
-                               .add("detail", "Page offset must be an integer value."));
-            }
-        }
-
-        if (params.containsKey("page[limit]")) {
-            if (id != null) {
-                throw new JsonApiBadRequestException(Json.createObjectBuilder()
-                                                         .add("source",
-                                                              Json.createObjectBuilder().add("parameter",
-                                                                                             "page[limit]"))
-                                                         .add("title", "Invalid Query Parameter")
-                                                         .add("detail",
-                                                              "Pagination invalid for single resource requests")
-                                                         .build());
-            }
-
-            List<String> pageLimitParams = params.get("page[limit]");
-            validateSingle("page[limit]", pageLimitParams, errors);
-
-            try {
-                fetchp.setPageLimit(Integer.parseInt(pageLimitParams.get(0)));
-            } catch (@SuppressWarnings("unused") NumberFormatException e) {
-                errors.add(Json.createObjectBuilder()
-                               .add("source", Json.createObjectBuilder().add("parameter", "page[limit]"))
-                               .add("title", "Invalid Query Parameter")
-                               .add("detail", "Page limit must be an integer value."));
-            }
-        }
-
-        JsonArray errorsArray = errors.build();
-
-        if (errorsArray.size() > 0) {
-            throw new JsonApiBadRequestException(errorsArray);
-        }
-
-        return fetchp;
-    }
-
-    void validateSingle(String paramName, List<String> paramValues, JsonArrayBuilder errors) {
-        if (paramValues.size() > 1) {
-            errors.add(Json.createObjectBuilder()
-                           .add("source", Json.createObjectBuilder().add("parameter", paramName))
-                           .add("title", "Invalid Query Parameter")
-                           .add("detail", "Multiple `" + paramName + "` parameters are not supported."));
-        }
-    }
-
     void getIncluded(FetchParameters params,
                      Class<Object> entityClass,
                      Map<Object, Map<String, List<Object>>> relationships,
@@ -630,12 +439,8 @@ public class PersistenceController {
         final Root<Object> root = query.from(includedClass);
         final Join<Object, Object> join = root.join(inverseAttribute.getName());
 
-        /*final Root<Object> root = query.from(entityClass);
-        final Join<Object, Object> join = root.join(attribute);*/
-
         final List<Attribute<Object, ?>> fetchedAttributes = new ArrayList<>();
-
-        EntityGraph<Object> graph = em.createEntityGraph(includedClass);
+        final EntityGraph<Object> graph = em.createEntityGraph(includedClass);
 
         model.getEntityMeta(bindable.getBindableJavaType())
             .getEntityType()

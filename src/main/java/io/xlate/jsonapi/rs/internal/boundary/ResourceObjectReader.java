@@ -37,7 +37,7 @@ public class ResourceObjectReader {
 
     private final EntityMetamodel model;
 
-    static String toAttributeName(String jsonName) {
+    public static String toAttributeName(String jsonName) {
         StringBuilder attribute = new StringBuilder(jsonName);
         Matcher m = jsonPattern.matcher(attribute);
 

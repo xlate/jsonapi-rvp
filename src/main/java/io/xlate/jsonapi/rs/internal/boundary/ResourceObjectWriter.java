@@ -89,25 +89,23 @@ public class ResourceObjectWriter {
 
         PersistenceUtil util = Persistence.getPersistenceUtil();
 
-        related.putAll(meta
-                       .getEntityType()
-                       .getAttributes()
-                       .stream()
-                       .filter(a -> a.isAssociation())
-                       .collect(Collectors.toMap(a -> a.getName(), a -> {
-                           if (util.isLoaded(bean, a.getName())) {
-                               return model.getEntityMeta(bean.getClass())
-                                           .getPropertyValue(bean, a.getName());
-                           } else if (!a.isCollection()) {
-                               return model.getEntityMeta(bean.getClass())
-                                           .getPropertyValue(bean, a.getName());
-                           }
-                           return a;
-                       })));
+        related.putAll(meta.getEntityType()
+                           .getAttributes()
+                           .stream()
+                           .filter(a -> a.isAssociation())
+                           .collect(Collectors.toMap(a -> a.getName(), a -> {
+                               if (util.isLoaded(bean, a.getName())) {
+                                   return model.getEntityMeta(bean.getClass())
+                                               .getPropertyValue(bean, a.getName());
+                               } else if (!a.isCollection()) {
+                                   return model.getEntityMeta(bean.getClass())
+                                               .getPropertyValue(bean, a.getName());
+                               }
+                               return a;
+                           })));
 
-        return topLevelBuilder()
-                   .add("data", toJson(bean, related, new FetchParameters(), uriInfo))
-                   .build();
+        return topLevelBuilder().add("data", toJson(bean, related, null, uriInfo))
+                                .build();
     }
 
     public JsonObject toJson(Object bean, UriInfo uriInfo) {
@@ -160,8 +158,7 @@ public class ResourceObjectWriter {
              .stream()
              .filter(a -> !a.isId() &&
                      a.getPersistentAttributeType() == PersistentAttributeType.BASIC &&
-                     (params == null ||
-                             params.includeField(resourceType, a.getName())))
+                     (params == null || params.includeField(resourceType, a.getName())))
              .sorted((a1, a2) -> a1.getName().compareTo(a2.getName()))
              .forEach(a -> {
                  try {
@@ -203,7 +200,7 @@ public class ResourceObjectWriter {
         for (Entry<String, Object> entry : related.entrySet()) {
             String fieldName = entry.getKey();
 
-            if (params.includeField(resourceType, fieldName)) {
+            if (params == null || params.includeField(resourceType, fieldName)) {
                 included++;
                 String relationshipName = toJsonName(fieldName);
                 JsonObjectBuilder relationshipEntry = Json.createObjectBuilder();
