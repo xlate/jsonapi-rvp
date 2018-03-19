@@ -1,17 +1,21 @@
 package io.xlate.jsonapi.rs.internal.boundary;
 
+import java.beans.PropertyDescriptor;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Pattern;
 
 import javax.json.JsonObject;
+import javax.json.JsonString;
 import javax.json.JsonValue;
 import javax.json.JsonValue.ValueType;
 import javax.validation.ConstraintValidator;
 import javax.validation.ConstraintValidatorContext;
 import javax.ws.rs.HttpMethod;
 
+import io.xlate.jsonapi.rs.internal.entity.EntityMeta;
 import io.xlate.jsonapi.rs.internal.entity.JsonApiRequest;
 
 public class JsonApiRequestValidator implements ConstraintValidator<ValidJsonApiRequest, JsonApiRequest> {
@@ -227,6 +231,86 @@ public class JsonApiRequestValidator implements ConstraintValidator<ValidJsonApi
                         + "The value of the id member MUST be a string.")
                        .addPropertyNode("/data/id")
                        .addConstraintViolation();
+            }
+        }
+
+        return validStructure;
+    }
+
+    boolean validAttributes(JsonApiRequest value, ConstraintValidatorContext context, boolean validStructure) {
+        JsonObject data = value.getDocument().getJsonObject("data");
+
+        if (!data.containsKey("attributes")) {
+            return validStructure;
+        }
+
+        JsonValue attributesValue = data.get("attributes");
+
+        if (attributesValue.getValueType() != ValueType.OBJECT) {
+            validStructure = false;
+            context.buildConstraintViolationWithTemplate(""
+                    + "The value of the `attributes` key MUST be an object (an \"attributes object\").")
+                   .addPropertyNode("/data/attributes")
+                   .addConstraintViolation();
+        } else {
+            JsonObject attributes = (JsonObject) attributesValue;
+            EntityMeta meta = value.getEntityMeta();
+            Class<Object> entityClass = value.getEntityMeta().getEntityClass();
+
+            for (String attributeKey : attributes.keySet()) {
+                if (validMemberName(attributeKey)) {
+                    PropertyDescriptor property = meta.getPropertyDescriptor(attributeKey);
+                    Class<?> propertyType = property.getPropertyType();
+                    JsonValue attributeValue = attributes.get(attributeKey);
+
+                    switch (attributeValue.getValueType()) {
+                    case ARRAY:
+                    case OBJECT:
+                        // TODO: Add support for object and array attributes
+                        context.buildConstraintViolationWithTemplate(""
+                                + "Array and Object attributes not supported.")
+                               .addPropertyNode("/data/attributes/" + attributeKey)
+                               .addConstraintViolation();
+                        break;
+                    case FALSE:
+                    case TRUE:
+                        if (!Boolean.class.isAssignableFrom(propertyType)) {
+                            context.buildConstraintViolationWithTemplate(""
+                                    + "Incompatible data type")
+                                   .addPropertyNode("/data/attributes/" + attributeKey)
+                                   .addConstraintViolation();
+                        }
+                        break;
+                    case NULL:
+                        break;
+                    case NUMBER:
+                        if (!Number.class.isAssignableFrom(propertyType)) {
+                            context.buildConstraintViolationWithTemplate(""
+                                    + "Incompatible data type")
+                                   .addPropertyNode("/data/attributes/" + attributeKey)
+                                   .addConstraintViolation();
+                        }
+                        break;
+                    case STRING:
+                        String jsonString = ((JsonString) attributeValue).getString();
+                        try {
+                            Method valueOf = propertyType.getMethod("valueOf", String.class);
+                            valueOf.invoke(null, jsonString);
+                        } catch (@SuppressWarnings("unused") Exception e) {
+                            context.buildConstraintViolationWithTemplate(""
+                                    + "Incompatible data type")
+                                   .addPropertyNode("/data/attributes/" + attributeKey)
+                                   .addConstraintViolation();
+                        }
+                        break;
+                    }
+                } else {
+                    validStructure = false;
+                    context.buildConstraintViolationWithTemplate(""
+                            + "Attribute name `" + attributeKey + "` contains in invalid character.")
+                           .addPropertyNode("/data/attributes/" + attributeKey)
+                           .addConstraintViolation();
+                }
             }
         }
 

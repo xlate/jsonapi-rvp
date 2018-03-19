@@ -19,6 +19,7 @@ import javax.json.JsonObject;
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
 import javax.validation.ConstraintViolation;
+import javax.validation.ConstraintViolationException;
 import javax.validation.Validator;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
@@ -33,7 +34,6 @@ import javax.ws.rs.core.CacheControl;
 import javax.ws.rs.core.Configuration;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.EntityTag;
-import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Request;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.ResponseBuilder;
@@ -126,9 +126,7 @@ public abstract class JsonApiResource {
 
                 for (String message : property.getValue()) {
                     errors.add(Json.createObjectBuilder()
-                                   .add("source",
-                                        Json.createObjectBuilder()
-                                            .add("parameter", key))
+                                   .add("source", Json.createObjectBuilder().add("parameter", key))
                                    .add("title", "Invalid Query Parameter")
                                    .add("detail", message));
                 }
@@ -141,6 +139,49 @@ public abstract class JsonApiResource {
         return null;
     }
 
+    protected static JsonObject mapErrors(String title, Set<?> violationSet) {
+        Map<String, List<String>> errorMap = new LinkedHashMap<>();
+        @SuppressWarnings("unchecked")
+        Set<ConstraintViolation<?>> violations = (Set<ConstraintViolation<?>>) violationSet;
+
+        for (ConstraintViolation<?> violation : violations) {
+            String property = violation.getPropertyPath().toString().replace('.', '/');
+
+            if (!errorMap.containsKey(property)) {
+                errorMap.put(property, new ArrayList<String>(2));
+            }
+
+            errorMap.get(property).add(violation.getMessage());
+        }
+
+        JsonArrayBuilder errors = Json.createArrayBuilder();
+
+        for (Entry<String, List<String>> property : errorMap.entrySet()) {
+            final String key = property.getKey();
+
+            if (key.isEmpty()) {
+                continue;
+            }
+
+            final String pointer;
+
+            if (key.startsWith("/")) {
+                pointer = key;
+            } else {
+                pointer = "/data/attributes/" + key;
+            }
+
+            for (String message : property.getValue()) {
+                errors.add(Json.createObjectBuilder()
+                               .add("source", Json.createObjectBuilder().add("pointer", pointer))
+                               .add("title", title)
+                               .add("detail", message));
+            }
+        }
+
+        return Json.createObjectBuilder().add("errors", errors).build();
+    }
+
     protected Response validateEntity(String resourceType, String id, JsonObject input) {
         JsonApiRequest jsonApiRequest = new JsonApiRequest(request.getMethod(),
                                                            model.getEntityMeta(resourceType),
@@ -151,38 +192,7 @@ public abstract class JsonApiResource {
             Set<ConstraintViolation<JsonApiRequest>> violations = validator.validate(jsonApiRequest);
 
             if (!violations.isEmpty()) {
-                Map<String, List<String>> errorMap = new LinkedHashMap<>();
-
-                for (ConstraintViolation<?> violation : violations) {
-                    String property = violation.getPropertyPath().toString().replace('.', '/');
-
-                    if (!errorMap.containsKey(property)) {
-                        errorMap.put(property, new ArrayList<String>(2));
-                    }
-
-                    errorMap.get(property).add(violation.getMessage());
-                }
-
-                JsonArrayBuilder errors = Json.createArrayBuilder();
-
-                for (Entry<String, List<String>> property : errorMap.entrySet()) {
-                    final String key = property.getKey();
-
-                    if (key.isEmpty()) {
-                        continue;
-                    }
-
-                    for (String message : property.getValue()) {
-                        errors.add(Json.createObjectBuilder()
-                                       .add("source",
-                                            Json.createObjectBuilder()
-                                                .add("pointer", key))
-                                       .add("title", "Invalid JSON API Document Structure")
-                                       .add("detail", message));
-                    }
-                }
-
-                JsonObject jsonErrors = Json.createObjectBuilder().add("errors", errors).build();
+                JsonObject jsonErrors = mapErrors("Invalid JSON API Document Structure", violations);
                 return Response.status(JsonApiStatus.UNPROCESSABLE_ENTITY).entity(jsonErrors).build();
             }
         } catch (Exception e) {
@@ -233,16 +243,11 @@ public abstract class JsonApiResource {
                                                   .add("status", String.valueOf(statusCode.getStatusCode()))
                                                   .add("title", statusCode.getReasonPhrase())
                                                   .add("detail",
-                                                       "An error has occurred processing the request. Please try again later.")))
+                                                       "An error has occurred processing the request. "
+                                                               + "Please try again later.")))
                                 .build();
 
         return Response.status(statusCode).entity(errors).build();
-    }
-
-    protected static Response ok() {
-        ResponseBuilder ok = Response.ok("{\"reason\": \"Success\"}");
-        ok.type(MediaType.APPLICATION_JSON_TYPE);
-        return ok.build();
     }
 
     protected Response ok(Object entity) {
@@ -288,6 +293,10 @@ public abstract class JsonApiResource {
             }
 
             return notFound();
+        } catch (ConstraintViolationException e) {
+            Set<ConstraintViolation<?>> violations = e.getConstraintViolations();
+            JsonObject jsonErrors = mapErrors("Invalid Input", violations);
+            return Response.status(JsonApiStatus.UNPROCESSABLE_ENTITY).entity(jsonErrors).build();
         } catch (WebApplicationException e) {
             return e.getResponse();
         } catch (Exception e) {
@@ -410,6 +419,10 @@ public abstract class JsonApiResource {
             }
 
             return notFound();
+        } catch (ConstraintViolationException e) {
+            Set<ConstraintViolation<?>> violations = e.getConstraintViolations();
+            JsonObject jsonErrors = mapErrors("Invalid Input", violations);
+            return Response.status(JsonApiStatus.UNPROCESSABLE_ENTITY).entity(jsonErrors).build();
         } catch (WebApplicationException e) {
             return e.getResponse();
         } catch (Exception e) {

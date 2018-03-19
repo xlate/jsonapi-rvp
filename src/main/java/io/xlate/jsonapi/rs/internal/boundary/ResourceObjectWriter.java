@@ -4,16 +4,15 @@ import java.net.URI;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
-import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 import javax.json.Json;
 import javax.json.JsonArrayBuilder;
@@ -89,20 +88,23 @@ public class ResourceObjectWriter {
 
         PersistenceUtil util = Persistence.getPersistenceUtil();
 
-        related.putAll(meta.getEntityType()
-                           .getAttributes()
-                           .stream()
-                           .filter(a -> a.isAssociation())
-                           .collect(Collectors.toMap(a -> a.getName(), a -> {
-                               if (util.isLoaded(bean, a.getName())) {
-                                   return model.getEntityMeta(bean.getClass())
-                                               .getPropertyValue(bean, a.getName());
-                               } else if (!a.isCollection()) {
-                                   return model.getEntityMeta(bean.getClass())
-                                               .getPropertyValue(bean, a.getName());
-                               }
-                               return a;
-                           })));
+        meta.getEntityType()
+            .getAttributes()
+            .stream()
+            .filter(a -> a.isAssociation())
+            .forEach(a -> {
+                Object value;
+
+                if (util.isLoaded(bean, a.getName())) {
+                    value = meta.getPropertyValue(bean, a.getName());
+                } else if (!a.isCollection()) {
+                    value = meta.getPropertyValue(bean, a.getName());
+                } else {
+                    value = a;
+                }
+
+                related.put(a.getName(), value);
+            });
 
         return topLevelBuilder().add("data", toJson(bean, related, null, uriInfo))
                                 .build();
@@ -217,10 +219,10 @@ public class ResourceObjectWriter {
                 if (entryValue instanceof Long) {
                     Long count = (Long) entryValue;
                     relationshipEntry.add("meta", Json.createObjectBuilder().add("count", count));
-                } else if (entryValue instanceof List) {
+                } else if (entryValue instanceof Collection) {
                     JsonArrayBuilder relationshipData = Json.createArrayBuilder();
                     @SuppressWarnings("unchecked")
-                    List<Object> relatedEntities = (List<Object>) entryValue;
+                    Collection<Object> relatedEntities = (Collection<Object>) entryValue;
 
                     for (Object relatedEntity : relatedEntities) {
                         JsonObjectBuilder relatedId = Json.createObjectBuilder();
