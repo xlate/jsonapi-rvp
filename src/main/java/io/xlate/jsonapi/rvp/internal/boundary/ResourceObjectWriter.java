@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  ******************************************************************************/
-package io.xlate.jsonapi.rs.internal.boundary;
+package io.xlate.jsonapi.rvp.internal.boundary;
 
 import java.net.URI;
 import java.time.OffsetDateTime;
@@ -43,9 +43,9 @@ import javax.ws.rs.InternalServerErrorException;
 import javax.ws.rs.core.UriBuilder;
 import javax.ws.rs.core.UriInfo;
 
-import io.xlate.jsonapi.rs.internal.entity.EntityMeta;
-import io.xlate.jsonapi.rs.internal.entity.EntityMetamodel;
-import io.xlate.jsonapi.rs.internal.entity.FetchParameters;
+import io.xlate.jsonapi.rvp.internal.entity.EntityMeta;
+import io.xlate.jsonapi.rvp.internal.entity.EntityMetamodel;
+import io.xlate.jsonapi.rvp.internal.entity.FetchParameters;
 
 public class ResourceObjectWriter {
 

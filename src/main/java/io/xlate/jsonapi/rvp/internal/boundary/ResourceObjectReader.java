@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  ******************************************************************************/
-package io.xlate.jsonapi.rs.internal.boundary;
+package io.xlate.jsonapi.rvp.internal.boundary;
 
 import java.beans.PropertyDescriptor;
 import java.lang.reflect.Method;
@@ -44,8 +44,8 @@ import javax.persistence.metamodel.Bindable;
 import javax.persistence.metamodel.EntityType;
 import javax.ws.rs.InternalServerErrorException;
 
-import io.xlate.jsonapi.rs.internal.entity.EntityMeta;
-import io.xlate.jsonapi.rs.internal.entity.EntityMetamodel;
+import io.xlate.jsonapi.rvp.internal.entity.EntityMeta;
+import io.xlate.jsonapi.rvp.internal.entity.EntityMetamodel;
 
 public class ResourceObjectReader {
 

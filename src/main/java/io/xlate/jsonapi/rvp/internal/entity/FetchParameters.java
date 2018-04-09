@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  ******************************************************************************/
-package io.xlate.jsonapi.rs.internal.entity;
+package io.xlate.jsonapi.rvp.internal.entity;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -26,8 +26,8 @@ import java.util.regex.Pattern;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.UriInfo;
 
-import io.xlate.jsonapi.rs.internal.boundary.ResourceObjectReader;
-import io.xlate.jsonapi.rs.internal.boundary.ValidJsonApiUriParameters;
+import io.xlate.jsonapi.rvp.internal.boundary.ResourceObjectReader;
+import io.xlate.jsonapi.rvp.internal.boundary.ValidJsonApiUriParameters;
 
 @ValidJsonApiUriParameters
 public class FetchParameters {

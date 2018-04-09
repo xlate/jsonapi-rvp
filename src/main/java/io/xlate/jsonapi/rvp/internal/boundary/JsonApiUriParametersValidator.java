@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  ******************************************************************************/
-package io.xlate.jsonapi.rs.internal.boundary;
+package io.xlate.jsonapi.rvp.internal.boundary;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -28,7 +28,7 @@ import javax.validation.ConstraintValidator;
 import javax.validation.ConstraintValidatorContext;
 import javax.ws.rs.core.MultivaluedMap;
 
-import io.xlate.jsonapi.rs.internal.entity.FetchParameters;
+import io.xlate.jsonapi.rvp.internal.entity.FetchParameters;
 
 public class JsonApiUriParametersValidator
         implements ConstraintValidator<ValidJsonApiUriParameters, FetchParameters> {

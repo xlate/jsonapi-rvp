@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  ******************************************************************************/
-package io.xlate.jsonapi.rs.internal.boundary;
+package io.xlate.jsonapi.rvp.internal.boundary;
 
 import static java.lang.annotation.ElementType.TYPE;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
@@ -29,8 +29,8 @@ import javax.validation.Payload;
 @Target(TYPE)
 @Retention(RUNTIME)
 @Documented
-@Constraint(validatedBy = { JsonApiUriParametersValidator.class })
-public @interface ValidJsonApiUriParameters {
+@Constraint(validatedBy = { JsonApiRequestValidator.class })
+public @interface ValidJsonApiRequest {
 
     String message() default "{io.xlate.jsonapi.rvp.constraints.ValidJsonApiStructure.message}";
 
