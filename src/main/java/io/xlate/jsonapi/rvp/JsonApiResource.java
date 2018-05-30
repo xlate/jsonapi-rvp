@@ -1,16 +1,16 @@
 /*******************************************************************************
  * Copyright (C) 2018 xlate.io LLC, http://www.xlate.io
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published
  * by the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU Affero General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  ******************************************************************************/
@@ -54,6 +54,9 @@ import javax.ws.rs.core.Request;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.ResponseBuilder;
 import javax.ws.rs.core.Response.Status;
+import javax.ws.rs.core.SecurityContext;
+import javax.ws.rs.core.UriBuilder;
+import javax.ws.rs.core.UriInfo;
 
 import io.xlate.jsonapi.rvp.internal.boundary.PersistenceController;
 import io.xlate.jsonapi.rvp.internal.entity.EntityMeta;
@@ -61,13 +64,9 @@ import io.xlate.jsonapi.rvp.internal.entity.EntityMetamodel;
 import io.xlate.jsonapi.rvp.internal.entity.FetchParameters;
 import io.xlate.jsonapi.rvp.internal.entity.JsonApiRequest;
 
-import javax.ws.rs.core.SecurityContext;
-import javax.ws.rs.core.UriBuilder;
-import javax.ws.rs.core.UriInfo;
-
 @Path("")
-@Consumes(JsonApiType.JSONAPI)
-@Produces(JsonApiType.JSONAPI)
+@Consumes(JsonApiType.APPLICATION_JSONAPI)
+@Produces(JsonApiType.APPLICATION_JSONAPI)
 public abstract class JsonApiResource {
 
     @Context
