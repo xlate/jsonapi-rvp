@@ -26,7 +26,7 @@ import javax.ws.rs.HttpMethod;
 import javax.ws.rs.NameBinding;
 
 
-@Target({ ElementType.METHOD, ElementType.TYPE })
+@Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
 @HttpMethod("PATCH")
 @Documented
