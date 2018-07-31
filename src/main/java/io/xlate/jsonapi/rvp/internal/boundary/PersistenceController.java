@@ -1,16 +1,16 @@
 /*******************************************************************************
  * Copyright (C) 2018 xlate.io LLC, http://www.xlate.io
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published
  * by the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU Affero General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  ******************************************************************************/
@@ -366,11 +366,12 @@ public class PersistenceController {
 
         if (id != null) {
             JsonArray singleton = data.build();
+
             if (singleton.isEmpty()) {
                 return null;
-            } else {
-                response.add("data", singleton.get(0));
             }
+
+            response.add("data", singleton.get(0));
         } else {
             response.add("data", data);
         }
@@ -438,7 +439,7 @@ public class PersistenceController {
         }
     }
 
-    void getIncluded(FetchParameters params,
+    void getIncluded(@SuppressWarnings("unused") FetchParameters params,
                      Class<Object> entityClass,
                      Map<Object, Map<String, List<Object>>> relationships,
                      String attribute) {
@@ -516,9 +517,9 @@ public class PersistenceController {
             }
 
             throw new IllegalStateException("No inverse relationship mapped for " + attribute.getName());
-        } else {
-            return otherMeta.getAttribute(mappedBy);
         }
+
+        return otherMeta.getAttribute(mappedBy);
     }
 
     String getMappedBy(Attribute<Object, ?> attribute) {
