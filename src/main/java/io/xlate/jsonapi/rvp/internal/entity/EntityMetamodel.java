@@ -1,16 +1,16 @@
 /*******************************************************************************
  * Copyright (C) 2018 xlate.io LLC, http://www.xlate.io
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published
  * by the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU Affero General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  ******************************************************************************/
@@ -79,6 +79,21 @@ public class EntityMetamodel extends HashMap<String, EntityMeta> {
         if (classMetaMap.containsKey(resourceClass)) {
             return classMetaMap.get(resourceClass).getResourceType();
         }
+        /* Check if we are working with a proxy object, e.g. from Hibernate */
+        String className = resourceClass.getName();
+        int dollarIndex = className.indexOf('$');
+
+        if (dollarIndex > 0) {
+            try {
+                Class<?> unproxiedClass = Class.forName(className.substring(0, dollarIndex));
+                if (classMetaMap.containsKey(unproxiedClass)) {
+                    return classMetaMap.get(unproxiedClass).getResourceType();
+                }
+            } catch (ClassNotFoundException e) {
+                //TODO: add proper logging
+            }
+        }
+
         return resourceClass.getName();
     }
 }
