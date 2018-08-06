@@ -1,16 +1,16 @@
 /*******************************************************************************
  * Copyright (C) 2018 xlate.io LLC, http://www.xlate.io
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as published
- * by the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- * 
+ *
+ * This program is free software: you can redistribute it and/or modify it under
+ * the terms of the GNU Affero General Public License as published by the Free
+ * Software Foundation, either version 3 of the License, or (at your option) any
+ * later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more
+ * details.
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  ******************************************************************************/
@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -34,6 +35,7 @@ import javax.json.Json;
 import javax.json.JsonArrayBuilder;
 import javax.json.JsonObject;
 import javax.json.JsonObjectBuilder;
+import javax.json.JsonValue;
 import javax.persistence.Persistence;
 import javax.persistence.PersistenceUtil;
 import javax.persistence.metamodel.Attribute.PersistentAttributeType;
@@ -48,6 +50,8 @@ import io.xlate.jsonapi.rvp.internal.entity.EntityMetamodel;
 import io.xlate.jsonapi.rvp.internal.entity.FetchParameters;
 
 public class ResourceObjectWriter {
+
+    private static final Logger logger = Logger.getLogger(ResourceObjectWriter.class.getName());
 
     static Pattern attributePattern = Pattern.compile("([A-Z])[a-z]");
 
@@ -236,20 +240,40 @@ public class ResourceObjectWriter {
                     Long count = (Long) entryValue;
                     relationshipEntry.add("meta", Json.createObjectBuilder().add("count", count));
                 } else if (entryValue instanceof Collection) {
-                    JsonArrayBuilder relationshipData = Json.createArrayBuilder();
+                    JsonValue relationshipData;
                     @SuppressWarnings("unchecked")
                     Collection<Object> relatedEntities = (Collection<Object>) entryValue;
 
-                    for (Object relatedEntity : relatedEntities) {
-                        JsonObjectBuilder relatedId = Json.createObjectBuilder();
-                        relatedId.add("type", model.getResourceType(relatedEntity.getClass()));
-                        relatedId.add("id", getId(relatedEntity));
-                        relationshipData.add(relatedId);
+                    if (many) {
+                        JsonArrayBuilder relationshipArray = Json.createArrayBuilder();
+
+                        for (Object relatedEntity : relatedEntities) {
+                            JsonObjectBuilder relatedId = Json.createObjectBuilder();
+                            relatedId.add("type", model.getResourceType(relatedEntity.getClass()));
+                            relatedId.add("id", getId(relatedEntity));
+                            relationshipArray.add(relatedId);
+                        }
+
+                        relationshipData = relationshipArray.build();
+                    } else {
+                        final int count = relatedEntities.size();
+                        if (count == 1) {
+                            final Object relatedEntity;
+                            relatedEntity = relatedEntities.iterator().next();
+                            JsonObjectBuilder relatedId = Json.createObjectBuilder();
+                            relatedId.add("type", model.getResourceType(relatedEntity.getClass()));
+                            relatedId.add("id", getId(relatedEntity));
+                            relationshipData = relatedId.build();
+                        } else {
+                            logger.warning("Non-collection-valued relationship `" + fieldName + "` with " + count
+                                    + " could not be mapped.");
+                            continue;
+                        }
                     }
 
                     relationshipEntry.add("data", relationshipData);
-                } else if (!many && entryValue != null) {
-                    Object relatedEntity = entryValue;
+                } else if (entryValue != null && !many) {
+                    final Object relatedEntity = entryValue;
                     JsonObjectBuilder relatedId = Json.createObjectBuilder();
                     relatedId.add("type", model.getResourceType(relatedEntity.getClass()));
                     relatedId.add("id", getId(relatedEntity));
