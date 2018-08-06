@@ -85,18 +85,19 @@ public class ResourceObjectReader {
         JsonObject relationships = data.getJsonObject("relationships");
 
         for (Entry<String, JsonValue> entry : relationships.entrySet()) {
-            String name = entry.getKey();
+            String jsonKey = entry.getKey();
+            String fieldName = toAttributeName(jsonKey);
             JsonValue value = entry.getValue();
             JsonValue relationshipData = ((JsonObject) value).get("data");
-            Attribute<Object, ?> entityAttribute = rootType.getAttribute(name);
+            Attribute<Object, ?> entityAttribute = rootType.getAttribute(fieldName);
 
             if (relationshipData.getValueType() == ValueType.ARRAY) {
                 if (!entityAttribute.isCollection()) {
                     errors.add(Json.createObjectBuilder()
                                    .add("source",
-                                        Json.createObjectBuilder().add("pointer", "/data/relationships/" + name))
+                                        Json.createObjectBuilder().add("pointer", "/data/relationships/" + jsonKey))
                                    .add("title", "Invalid relationship")
-                                   .add("detail", "Relationship `" + name + "` is not a collection.")
+                                   .add("detail", "Relationship `" + jsonKey + "` is not a collection.")
                                    .build());
                 }
 
@@ -113,7 +114,7 @@ public class ResourceObjectReader {
                     } else {
                         errors.add(Json.createObjectBuilder()
                                        .add("source",
-                                            Json.createObjectBuilder().add("pointer", "/data/relationships/" + name))
+                                            Json.createObjectBuilder().add("pointer", "/data/relationships/" + jsonKey))
                                        .add("title", "Invalid relationship")
                                        .add("detail",
                                             "The resource of type `" + relType + "` with ID `" + relId
@@ -121,14 +122,14 @@ public class ResourceObjectReader {
                     }
                 }
 
-                putRelationship(entity, name, replacements);
+                putRelationship(entity, fieldName, replacements);
             } else if (relationshipData.getValueType() == ValueType.OBJECT) {
                 if (entityAttribute.isCollection()) {
                     errors.add(Json.createObjectBuilder()
                                    .add("source",
-                                        Json.createObjectBuilder().add("pointer", "/data/relationships/" + name))
+                                        Json.createObjectBuilder().add("pointer", "/data/relationships/" + jsonKey))
                                    .add("title", "Invalid singular relationship")
-                                   .add("detail", "Relationship `" + name + "` is a collection.")
+                                   .add("detail", "Relationship `" + jsonKey + "` is a collection.")
                                    .build());
                 }
 
@@ -138,11 +139,11 @@ public class ResourceObjectReader {
                 Object replacement = persistence.findObject(relType, relId);
 
                 if (replacement != null) {
-                    putRelationship(entity, name, Arrays.asList(replacement));
+                    putRelationship(entity, fieldName, Arrays.asList(replacement));
                 } else {
                     errors.add(Json.createObjectBuilder()
                                    .add("source",
-                                        Json.createObjectBuilder().add("pointer", "/data/relationships/" + name))
+                                        Json.createObjectBuilder().add("pointer", "/data/relationships/" + jsonKey))
                                    .add("title", "Invalid relationship")
                                    .add("detail",
                                         "The resource of type `" + relType + "` with ID `" + relId
