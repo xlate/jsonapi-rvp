@@ -1,16 +1,16 @@
 /*******************************************************************************
  * Copyright (C) 2018 xlate.io LLC, http://www.xlate.io
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published
  * by the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU Affero General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  ******************************************************************************/
@@ -62,17 +62,17 @@ public class FetchParameters {
         }
 
         MultivaluedMap<String, String> params = uriInfo.getQueryParameters();
+        Pattern fieldp = Pattern.compile("fields\\[([^]]+?)\\]");
 
         params.entrySet()
               .stream()
               .filter(p -> p.getKey().matches("fields\\[[^]]+?\\]"))
               .forEach(p -> {
-                  Pattern fieldp = Pattern.compile("fields\\[([^]]+?)\\]");
                   Matcher fieldm = fieldp.matcher(p.getKey());
                   fieldm.find();
                   for (String fieldl : p.getValue()) {
                       for (String fieldName : fieldl.split(",")) {
-                          this.addField(fieldm.group(1), ResourceObjectReader.toAttributeName(fieldName));
+                          addField(this.fields, fieldm.group(1), ResourceObjectReader.toAttributeName(fieldName));
                       }
                   }
               });
