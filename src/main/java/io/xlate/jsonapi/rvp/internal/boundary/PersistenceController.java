@@ -507,7 +507,9 @@ public class PersistenceController {
                 @SuppressWarnings("unchecked")
                 Bindable<Object> otherBindable = (Bindable<Object>) otherAttribute;
 
-                if (thisType.equals(otherBindable.getBindableJavaType())) {
+                boolean assignable = thisType.isAssignableFrom(otherBindable.getBindableJavaType());
+
+                if (assignable) {
                     String otherMappedBy = getMappedBy(otherAttribute);
 
                     if (otherMappedBy.equals(attribute.getName())) {
