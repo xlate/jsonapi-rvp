@@ -346,8 +346,11 @@ public class PersistenceController {
                                                                      relName -> new ArrayList<Object>())));
                });
 
-        for (String included : params.getInclude()) {
-            getIncluded(params, entityClass, relationships, included);
+        /* Only retrieve included records if something was found. */
+        if (!results.isEmpty()) {
+            for (String included : params.getInclude()) {
+                getIncluded(params, entityClass, relationships, included);
+            }
         }
 
         JsonObjectBuilder response = writer.topLevelBuilder();
