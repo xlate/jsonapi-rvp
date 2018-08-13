@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  ******************************************************************************/
-package io.xlate.jsonapi.rvp.internal.boundary;
+package io.xlate.jsonapi.rvp.internal.persistence.boundary;
 
 import java.lang.reflect.AccessibleObject;
 import java.lang.reflect.Method;
@@ -61,9 +61,12 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
-import io.xlate.jsonapi.rvp.internal.entity.EntityMeta;
-import io.xlate.jsonapi.rvp.internal.entity.EntityMetamodel;
-import io.xlate.jsonapi.rvp.internal.entity.FetchParameters;
+import io.xlate.jsonapi.rvp.JsonApiQuery;
+import io.xlate.jsonapi.rvp.internal.JsonApiBadRequestException;
+import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMeta;
+import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMetamodel;
+import io.xlate.jsonapi.rvp.internal.rs.boundary.ResourceObjectReader;
+import io.xlate.jsonapi.rvp.internal.rs.boundary.ResourceObjectWriter;
 
 import javax.ws.rs.core.UriInfo;
 
@@ -85,7 +88,7 @@ public class PersistenceController {
         return entityType.getId(entityType.getIdType().getJavaType());
     }
 
-    List<Order> getOrderBy(CriteriaBuilder builder, Root<Object> root, FetchParameters params) {
+    List<Order> getOrderBy(CriteriaBuilder builder, Root<Object> root, JsonApiQuery params) {
         List<String> sortKeys = params.getSort();
 
         if (!sortKeys.isEmpty()) {
@@ -227,7 +230,7 @@ public class PersistenceController {
         }
     }
 
-    Object findObject(String resourceType, String id) {
+    public Object findObject(String resourceType, String id) {
         EntityMeta meta = model.getEntityMeta(resourceType);
 
         if (meta == null) {
@@ -270,7 +273,7 @@ public class PersistenceController {
         return entity;
     }
 
-    public JsonObject fetch(FetchParameters params) {
+    public JsonObject fetch(JsonApiQuery params) {
         EntityMeta meta = params.getEntityMeta();
         Class<Object> entityClass = meta.getEntityClass();
         EntityType<Object> rootType = meta.getEntityType();
@@ -442,7 +445,7 @@ public class PersistenceController {
         }
     }
 
-    void getIncluded(@SuppressWarnings("unused") FetchParameters params,
+    void getIncluded(@SuppressWarnings("unused") JsonApiQuery params,
                      Class<Object> entityClass,
                      Map<Object, Map<String, List<Object>>> relationships,
                      String attribute) {

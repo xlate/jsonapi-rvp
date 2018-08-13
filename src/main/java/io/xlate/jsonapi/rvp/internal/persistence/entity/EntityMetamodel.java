@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  ******************************************************************************/
-package io.xlate.jsonapi.rvp.internal.entity;
+package io.xlate.jsonapi.rvp.internal.persistence.entity;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -75,25 +75,13 @@ public class EntityMetamodel extends HashMap<String, EntityMeta> {
             .orElseGet(() -> null);
     }
 
-    public String getResourceType(Class<?> resourceClass) {
-        if (classMetaMap.containsKey(resourceClass)) {
-            return classMetaMap.get(resourceClass).getResourceType();
-        }
-        /* Check if we are working with a proxy object, e.g. from Hibernate */
-        String className = resourceClass.getName();
-        int dollarIndex = className.indexOf('$');
+    public String getResourceType(Class<?> entityClass) {
+        EntityMeta meta = getEntityMeta(entityClass);
 
-        if (dollarIndex > 0) {
-            try {
-                Class<?> unproxiedClass = Class.forName(className.substring(0, dollarIndex));
-                if (classMetaMap.containsKey(unproxiedClass)) {
-                    return classMetaMap.get(unproxiedClass).getResourceType();
-                }
-            } catch (ClassNotFoundException e) {
-                //TODO: add proper logging
-            }
+        if (meta != null) {
+            return meta.getResourceType();
         }
 
-        return resourceClass.getName();
+        return entityClass.getName();
     }
 }

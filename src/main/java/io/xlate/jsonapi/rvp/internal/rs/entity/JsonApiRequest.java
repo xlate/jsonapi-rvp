@@ -14,11 +14,12 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  ******************************************************************************/
-package io.xlate.jsonapi.rvp.internal.entity;
+package io.xlate.jsonapi.rvp.internal.rs.entity;
 
 import javax.json.JsonObject;
 
-import io.xlate.jsonapi.rvp.internal.boundary.ValidJsonApiRequest;
+import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMeta;
+import io.xlate.jsonapi.rvp.internal.validation.boundary.ValidJsonApiRequest;
 
 @ValidJsonApiRequest
 public class JsonApiRequest {

@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  ******************************************************************************/
-package io.xlate.jsonapi.rvp.internal.boundary;
+package io.xlate.jsonapi.rvp.internal.rs.boundary;
 
 import java.net.URI;
 import java.time.OffsetDateTime;
@@ -45,9 +45,9 @@ import javax.ws.rs.InternalServerErrorException;
 import javax.ws.rs.core.UriBuilder;
 import javax.ws.rs.core.UriInfo;
 
-import io.xlate.jsonapi.rvp.internal.entity.EntityMeta;
-import io.xlate.jsonapi.rvp.internal.entity.EntityMetamodel;
-import io.xlate.jsonapi.rvp.internal.entity.FetchParameters;
+import io.xlate.jsonapi.rvp.JsonApiQuery;
+import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMeta;
+import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMetamodel;
 
 public class ResourceObjectWriter {
 
@@ -74,7 +74,7 @@ public class ResourceObjectWriter {
         this.model = model;
     }
 
-    JsonObjectBuilder topLevelBuilder() {
+    public JsonObjectBuilder topLevelBuilder() {
         JsonObjectBuilder topLevel = Json.createObjectBuilder();
         topLevel.add("jsonapi", Json.createObjectBuilder().add("version", "1.0"));
         return topLevel;
@@ -134,13 +134,13 @@ public class ResourceObjectWriter {
         return toJson(bean, null, uriInfo);
     }
 
-    public JsonObject toJson(Object bean, FetchParameters params, UriInfo uriInfo) {
+    public JsonObject toJson(Object bean, JsonApiQuery params, UriInfo uriInfo) {
         return toJson(bean, Collections.emptyMap(), params, uriInfo);
     }
 
     public JsonObject toJson(Object bean,
                              Map<String, Object> related,
-                             FetchParameters params,
+                             JsonApiQuery params,
                              UriInfo uriInfo) {
 
         String resourceType = model.getResourceType(bean.getClass());
@@ -170,7 +170,7 @@ public class ResourceObjectWriter {
         return String.valueOf(id);
     }
 
-    public JsonObject getAttributes(FetchParameters params, Object bean) {
+    public JsonObject getAttributes(JsonApiQuery params, Object bean) {
         JsonObjectBuilder attributes = Json.createObjectBuilder();
         EntityMeta meta = model.getEntityMeta(bean.getClass());
         String resourceType = meta.getResourceType();
@@ -208,7 +208,7 @@ public class ResourceObjectWriter {
 
     public JsonObject getRelationships(Object bean,
                                        Map<String, Object> related,
-                                       FetchParameters params,
+                                       JsonApiQuery params,
                                        UriInfo uriInfo) {
 
         JsonObjectBuilder jsonRelationships = Json.createObjectBuilder();
@@ -307,13 +307,13 @@ public class ResourceObjectWriter {
                     relationshipName);
     }
 
-    public JsonObject getRelationshipLink(UriInfo uriInfo, Object bean, String relationshipName) {
+    /*public JsonObject getRelationshipLink(UriInfo uriInfo, Object bean, String relationshipName) {
         EntityMeta meta = model.getEntityMeta(bean.getClass());
         String resourceType = meta.getResourceType();
         String id = getId(bean);
 
         return link(uriInfo, "self", "readRelationship", meta, resourceType, id, relationshipName);
-    }
+    }*/
 
     public JsonObject link(UriInfo uriInfo, String linkName, String methodName, EntityMeta meta, Object... params) {
         UriBuilder self = uriInfo.getBaseUriBuilder();

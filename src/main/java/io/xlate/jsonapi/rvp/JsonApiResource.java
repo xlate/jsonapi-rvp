@@ -16,27 +16,21 @@
  ******************************************************************************/
 package io.xlate.jsonapi.rvp;
 
-import java.net.URI;
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import javax.annotation.PostConstruct;
+import javax.enterprise.inject.Any;
+import javax.enterprise.inject.Instance;
 import javax.inject.Inject;
-import javax.json.Json;
-import javax.json.JsonArrayBuilder;
 import javax.json.JsonObject;
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
 import javax.validation.ConstraintViolation;
 import javax.validation.ConstraintViolationException;
 import javax.validation.Validator;
+import javax.ws.rs.BadRequestException;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
@@ -49,24 +43,25 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.CacheControl;
 import javax.ws.rs.core.Configuration;
 import javax.ws.rs.core.Context;
-import javax.ws.rs.core.EntityTag;
 import javax.ws.rs.core.Request;
 import javax.ws.rs.core.Response;
-import javax.ws.rs.core.Response.ResponseBuilder;
-import javax.ws.rs.core.Response.Status;
-import javax.ws.rs.core.UriBuilder;
 import javax.ws.rs.core.UriInfo;
 
-import io.xlate.jsonapi.rvp.internal.boundary.PersistenceController;
-import io.xlate.jsonapi.rvp.internal.entity.EntityMeta;
-import io.xlate.jsonapi.rvp.internal.entity.EntityMetamodel;
-import io.xlate.jsonapi.rvp.internal.entity.FetchParameters;
-import io.xlate.jsonapi.rvp.internal.entity.JsonApiRequest;
+import io.xlate.jsonapi.rvp.internal.persistence.boundary.PersistenceController;
+import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMeta;
+import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMetamodel;
+import io.xlate.jsonapi.rvp.internal.rs.boundary.InternalContext;
+import io.xlate.jsonapi.rvp.internal.rs.boundary.Responses;
+import io.xlate.jsonapi.rvp.internal.rs.entity.JsonApiRequest;
 
 @Path("")
 @Consumes(JsonApiType.APPLICATION_JSONAPI)
 @Produces(JsonApiType.APPLICATION_JSONAPI)
 public abstract class JsonApiResource {
+
+    @Inject
+    @Any
+    private Instance<JsonApiHandler<?>> handlers;
 
     @Context
     protected Request request;
@@ -107,91 +102,14 @@ public abstract class JsonApiResource {
         cacheControl.setPrivate(true);
     }
 
-    protected Response validateParameters(FetchParameters params) {
-        Set<ConstraintViolation<FetchParameters>> violations = validator.validate(params);
+    protected Response validateParameters(JsonApiQuery params) {
+        Set<ConstraintViolation<JsonApiQuery>> violations = validator.validate(params);
 
         if (!violations.isEmpty()) {
-            Map<String, List<String>> errorMap = new LinkedHashMap<>();
-
-            for (ConstraintViolation<?> violation : violations) {
-                String property = violation.getPropertyPath().toString().replace('.', '/');
-
-                if (property.isEmpty()) {
-                    continue;
-                }
-
-                if (!errorMap.containsKey(property)) {
-                    errorMap.put(property, new ArrayList<String>(2));
-                }
-
-                errorMap.get(property).add(violation.getMessage());
-            }
-
-            JsonArrayBuilder errors = Json.createArrayBuilder();
-
-            for (Entry<String, List<String>> property : errorMap.entrySet()) {
-                final String key = property.getKey();
-
-                if (key.isEmpty()) {
-                    continue;
-                }
-
-                for (String message : property.getValue()) {
-                    errors.add(Json.createObjectBuilder()
-                                   .add("source", Json.createObjectBuilder().add("parameter", key))
-                                   .add("title", "Invalid Query Parameter")
-                                   .add("detail", message));
-                }
-            }
-
-            JsonObject jsonErrors = Json.createObjectBuilder().add("errors", errors).build();
-            return Response.status(Status.BAD_REQUEST).entity(jsonErrors).build();
+            return Responses.badRequest(violations);
         }
 
         return null;
-    }
-
-    protected static JsonObject mapErrors(String title, Set<?> violationSet) {
-        Map<String, List<String>> errorMap = new LinkedHashMap<>();
-        @SuppressWarnings("unchecked")
-        Set<ConstraintViolation<?>> violations = (Set<ConstraintViolation<?>>) violationSet;
-
-        for (ConstraintViolation<?> violation : violations) {
-            String property = violation.getPropertyPath().toString().replace('.', '/');
-
-            if (!errorMap.containsKey(property)) {
-                errorMap.put(property, new ArrayList<String>(2));
-            }
-
-            errorMap.get(property).add(violation.getMessage());
-        }
-
-        JsonArrayBuilder errors = Json.createArrayBuilder();
-
-        for (Entry<String, List<String>> property : errorMap.entrySet()) {
-            final String key = property.getKey();
-
-            if (key.isEmpty()) {
-                continue;
-            }
-
-            final String pointer;
-
-            if (key.startsWith("/")) {
-                pointer = key;
-            } else {
-                pointer = "/data/attributes/" + key;
-            }
-
-            for (String message : property.getValue()) {
-                errors.add(Json.createObjectBuilder()
-                               .add("source", Json.createObjectBuilder().add("pointer", pointer))
-                               .add("title", title)
-                               .add("detail", message));
-            }
-        }
-
-        return Json.createObjectBuilder().add("errors", errors).build();
     }
 
     protected Response validateEntity(String resourceType, String id, JsonObject input) {
@@ -204,93 +122,22 @@ public abstract class JsonApiResource {
             Set<ConstraintViolation<JsonApiRequest>> violations = validator.validate(jsonApiRequest);
 
             if (!violations.isEmpty()) {
-                JsonObject jsonErrors = mapErrors("Invalid JSON API Document Structure", violations);
-                return Response.status(JsonApiStatus.UNPROCESSABLE_ENTITY).entity(jsonErrors).build();
+                return Responses.unprocessableEntity("Invalid JSON API Document Structure", violations);
             }
         } catch (Exception e) {
-            return internalServerError(e);
+            return Responses.internalServerError(e);
         }
 
         return null;
     }
 
-    /*
-     * protected Account getUserAccount() { return ((AccountCallerPrincipal)
-     * security.getUserPrincipal()).getAccount(); }
-     *
-     * protected String getUserFullName() { return getUserAccount().getName(); }
-     */
-
-    protected URI getUri(String method, String resourceType, String id) {
-        UriBuilder builder = UriBuilder.fromUri(uriInfo.getBaseUri());
-        builder.path(getClass());
-        builder.path(getClass(), method);
-        return builder.build(resourceType, id);
-    }
-
-    protected static Response notFound() {
-        Status notFound = Status.NOT_FOUND;
-
-        JsonObject errors = Json.createObjectBuilder()
-                                .add("errors",
-                                     Json.createArrayBuilder()
-                                         .add(Json.createObjectBuilder()
-                                                  .add("status", String.valueOf(notFound.getStatusCode()))
-                                                  .add("title", notFound.getReasonPhrase())
-                                                  .add("detail", "The requested resource can not be found.")))
-                                .build();
-
-        return Response.status(notFound).entity(errors).build();
-    }
-
-    protected Response internalServerError(Exception e) {
-        Logger.getLogger(getClass().getName()).log(Level.WARNING, "Internal Server Error", e);
-
-        Status statusCode = Status.INTERNAL_SERVER_ERROR;
-
-        JsonObject errors = Json.createObjectBuilder()
-                                .add("errors",
-                                     Json.createArrayBuilder()
-                                         .add(Json.createObjectBuilder()
-                                                  .add("status", String.valueOf(statusCode.getStatusCode()))
-                                                  .add("title", statusCode.getReasonPhrase())
-                                                  .add("detail",
-                                                       "An error has occurred processing the request. "
-                                                               + "Please try again later.")))
-                                .build();
-
-        return Response.status(statusCode).entity(errors).build();
-    }
-
-    protected Response ok(Object entity) {
-        EntityTag etag = new EntityTag(Integer.toString(entity.hashCode()));
-        ResponseBuilder builder;
-        builder = request.evaluatePreconditions(etag);
-
-        if (builder == null) {
-            builder = Response.ok(entity);
-            builder.tag(etag);
-        }
-
-        builder.cacheControl(cacheControl);
-
-        return builder.build();
-    }
-
-    protected Response created(String resourceType, JsonObject jsonEntity) {
-        ResponseBuilder builder = Response.created(getUri("read",
-                                                          resourceType,
-                                                          jsonEntity.getJsonObject("data").getString("id")));
-        return builder.entity(jsonEntity).build();
-    }
-
-    protected Response seeOther(String resourceType, String id) {
-        return Response.seeOther(getUri("read", resourceType, id)).build();
-    }
-
     @POST
     @Path("{resource-type}")
     public Response create(@PathParam("resource-type") String resourceType, JsonObject input) {
+        InternalContext context = new InternalContext(request, uriInfo, resourceType, input);
+        JsonApiHandler<?> handler = handlers.get();
+        handler.onCreateRequest(context);
+
         Response validationResult = validateEntity(resourceType, null, input);
 
         if (validationResult != null) {
@@ -301,18 +148,18 @@ public abstract class JsonApiResource {
             JsonObject response = persistence.create(resourceType, input, uriInfo);
 
             if (response != null) {
-                return created(resourceType, response);
+                return Responses.created(uriInfo, getClass(), resourceType, response);
             }
 
-            return notFound();
+            return Responses.notFound();
         } catch (ConstraintViolationException e) {
-            Set<ConstraintViolation<?>> violations = e.getConstraintViolations();
-            JsonObject jsonErrors = mapErrors("Invalid Input", violations);
-            return Response.status(JsonApiStatus.UNPROCESSABLE_ENTITY).entity(jsonErrors).build();
+            return Responses.unprocessableEntity("Invalid Input", e.getConstraintViolations());
+        } catch (BadRequestException e) {
+            return Responses.badRequest(e);
         } catch (WebApplicationException e) {
             return e.getResponse();
         } catch (Exception e) {
-            return internalServerError(e);
+            return Responses.internalServerError(e);
         }
     }
 
@@ -329,7 +176,7 @@ public abstract class JsonApiResource {
             EntityMeta meta = model.getEntityMeta(resourceType);
 
             if (meta != null) {
-                FetchParameters params = new FetchParameters(meta, id, uriInfo);
+                JsonApiQuery params = new JsonApiQuery(meta, id, uriInfo);
 
                 Response validationResult = validateParameters(params);
 
@@ -340,15 +187,15 @@ public abstract class JsonApiResource {
                 JsonObject response = persistence.fetch(params);
 
                 if (response != null) {
-                    return ok(response);
+                    return Responses.ok(cacheControl, request, response);
                 }
             }
 
-            return notFound();
+            return Responses.notFound();
         } catch (WebApplicationException e) {
             return e.getResponse();
         } catch (Exception e) {
-            return internalServerError(e);
+            return Responses.internalServerError(e);
         }
     }
 
@@ -365,15 +212,14 @@ public abstract class JsonApiResource {
                                                                relationshipName);
 
             if (response != null) {
-                return ok(response);
+                return Responses.ok(cacheControl, request, response);
             }
 
-            return notFound();
+            return Responses.notFound();
         } catch (WebApplicationException e) {
             return e.getResponse();
         } catch (Exception e) {
-            e.printStackTrace();
-            return internalServerError(e);
+            return Responses.internalServerError(e);
         }
 
     }
@@ -386,7 +232,7 @@ public abstract class JsonApiResource {
                                         @PathParam("relationship-name") String relationshipName,
                                         final JsonObject input) {
         // TODO: implement relationship updates
-        return Response.status(Status.NOT_IMPLEMENTED).build();
+        return Responses.notImplemented();
     }
 
     @SuppressWarnings("unused")
@@ -397,7 +243,7 @@ public abstract class JsonApiResource {
                                     @PathParam("relationship-name") String relationshipName,
                                     final JsonObject input) {
         // TODO: implement relationship updates
-        return Response.status(Status.NOT_IMPLEMENTED).build();
+        return Responses.notImplemented();
     }
 
     @SuppressWarnings("unused")
@@ -408,7 +254,7 @@ public abstract class JsonApiResource {
                                        @PathParam("relationship-name") String relationshipName,
                                        final JsonObject input) {
         // TODO: implement relationship updates
-        return Response.status(Status.NOT_IMPLEMENTED).build();
+        return Responses.notImplemented();
     }
 
     @PATCH
@@ -427,18 +273,18 @@ public abstract class JsonApiResource {
             JsonObject response = persistence.update(resourceType, id, input, uriInfo);
 
             if (response != null) {
-                return ok(response);
+                return Responses.ok(cacheControl, request, response);
             }
 
-            return notFound();
+            return Responses.notFound();
         } catch (ConstraintViolationException e) {
-            Set<ConstraintViolation<?>> violations = e.getConstraintViolations();
-            JsonObject jsonErrors = mapErrors("Invalid Input", violations);
-            return Response.status(JsonApiStatus.UNPROCESSABLE_ENTITY).entity(jsonErrors).build();
+            return Responses.unprocessableEntity("Invalid Input", e.getConstraintViolations());
+        } catch (BadRequestException e) {
+            return Responses.badRequest(e);
         } catch (WebApplicationException e) {
             return e.getResponse();
         } catch (Exception e) {
-            return internalServerError(e);
+            return Responses.internalServerError(e);
         }
     }
 
@@ -449,11 +295,11 @@ public abstract class JsonApiResource {
             if (persistence.delete(resourceType, id)) {
                 return Response.noContent().build();
             }
-            return notFound();
+            return Responses.notFound();
         } catch (WebApplicationException e) {
             return e.getResponse();
         } catch (Exception e) {
-            return internalServerError(e);
+            return Responses.internalServerError(e);
         }
     }
 }

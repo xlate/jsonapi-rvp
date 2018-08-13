@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  ******************************************************************************/
-package io.xlate.jsonapi.rvp.internal.entity;
+package io.xlate.jsonapi.rvp;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -26,11 +26,12 @@ import java.util.regex.Pattern;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.UriInfo;
 
-import io.xlate.jsonapi.rvp.internal.boundary.ResourceObjectReader;
-import io.xlate.jsonapi.rvp.internal.boundary.ValidJsonApiUriParameters;
+import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMeta;
+import io.xlate.jsonapi.rvp.internal.rs.boundary.ResourceObjectReader;
+import io.xlate.jsonapi.rvp.internal.validation.boundary.ValidJsonApiQuery;
 
-@ValidJsonApiUriParameters
-public class FetchParameters {
+@ValidJsonApiQuery
+public class JsonApiQuery {
 
     public static final String PARAM_INCLUDE = "include";
     public static final String PARAM_SORT = "sort";
@@ -49,7 +50,7 @@ public class FetchParameters {
     private Integer pageLimit;
     private Map<String, List<String>> fields = new HashMap<>();
 
-    public FetchParameters(EntityMeta entityMeta, String id, UriInfo uriInfo) {
+    public JsonApiQuery(EntityMeta entityMeta, String id, UriInfo uriInfo) {
         super();
         this.entityMeta = entityMeta;
         this.id = id;

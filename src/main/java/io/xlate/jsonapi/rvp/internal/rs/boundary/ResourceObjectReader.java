@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  ******************************************************************************/
-package io.xlate.jsonapi.rvp.internal.boundary;
+package io.xlate.jsonapi.rvp.internal.rs.boundary;
 
 import java.beans.PropertyDescriptor;
 import java.lang.reflect.Method;
@@ -39,13 +39,15 @@ import javax.json.JsonString;
 import javax.json.JsonValue;
 import javax.json.JsonValue.ValueType;
 import javax.persistence.metamodel.Attribute;
-import javax.persistence.metamodel.Attribute.PersistentAttributeType;
 import javax.persistence.metamodel.Bindable;
 import javax.persistence.metamodel.EntityType;
+import javax.ws.rs.BadRequestException;
 import javax.ws.rs.InternalServerErrorException;
 
-import io.xlate.jsonapi.rvp.internal.entity.EntityMeta;
-import io.xlate.jsonapi.rvp.internal.entity.EntityMetamodel;
+import io.xlate.jsonapi.rvp.internal.JsonApiBadRequestException;
+import io.xlate.jsonapi.rvp.internal.persistence.boundary.PersistenceController;
+import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMeta;
+import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMetamodel;
 
 public class ResourceObjectReader {
 
@@ -161,7 +163,7 @@ public class ResourceObjectReader {
 
     public void putAttributes(Object bean, JsonObject attributes) {
         EntityMeta meta = model.getEntityMeta(bean.getClass());
-        EntityType<Object> model = meta.getEntityType();
+        //EntityType<Object> model = meta.getEntityType();
 
         attributes.entrySet()
                   .stream()
@@ -170,11 +172,11 @@ public class ResourceObjectReader {
                       String fieldName = toAttributeName(jsonKey);
 
                       //TODO: validation
-                      Attribute<Object, ?> a1 = model.getAttribute(fieldName);
+                      //Attribute<Object, ?> a1 = model.getAttribute(fieldName);
 
-                      if (a1.getPersistentAttributeType() != PersistentAttributeType.BASIC) {
+                      /*if (a1.getPersistentAttributeType() != PersistentAttributeType.BASIC) {
                           return;
-                      }
+                      }*/
 
                       PropertyDescriptor desc = meta.getPropertyDescriptor(fieldName);
                       JsonValue jsonValue = attributes.get(jsonKey);
@@ -194,7 +196,7 @@ public class ResourceObjectReader {
                           } else if (jsonValueType == ValueType.STRING) {
                               value = ((JsonString) jsonValue).getString();
                           } else {
-                              throw new IllegalStateException("Bad conversion: " + jsonValue);
+                              throw badConversionException(jsonKey, jsonValue);
                           }
                       } else if (Boolean.class.isAssignableFrom(propertyType)) {
                           switch (jsonValueType) {
@@ -205,7 +207,7 @@ public class ResourceObjectReader {
                               value = Boolean.FALSE;
                               break;
                           default:
-                              throw new IllegalStateException("Bad conversion: " + jsonValue);
+                              throw badConversionException(jsonKey, jsonValue);
                           }
                       } else if (Number.class.isAssignableFrom(propertyType)) {
                           if (jsonValueType == ValueType.NUMBER) {
@@ -223,15 +225,15 @@ public class ResourceObjectReader {
                                   } else if (propertyType.isAssignableFrom(Double.class)) {
                                       value = number.doubleValue();
                                   } else {
-                                      throw new IllegalStateException("Bad conversion: " + jsonValue);
+                                      throw badConversionException(jsonKey, jsonValue);
                                   }
                               } else if (propertyType.isAssignableFrom(Double.class)) {
                                   value = number.doubleValue();
                               } else {
-                                  throw new IllegalStateException("Bad conversion: " + jsonValue);
+                                  throw badConversionException(jsonKey, jsonValue);
                               }
                           } else {
-                              throw new IllegalStateException("Bad conversion: " + jsonValue);
+                              throw badConversionException(jsonKey, jsonValue);
                           }
                       } else if (propertyType.isPrimitive()) {
                           if (jsonValueType == ValueType.STRING) {
@@ -243,14 +245,14 @@ public class ResourceObjectReader {
                                   throw new InternalServerErrorException(e);
                               }
                           } else {
-                              throw new IllegalStateException("Bad conversion: " + jsonValue);
+                              throw badConversionException(jsonKey, jsonValue);
                           }
                       } else if (OffsetDateTime.class.isAssignableFrom(propertyType)) {
                           if (jsonValueType == ValueType.STRING) {
                               String jsonString = ((JsonString) jsonValue).getString();
                               value = OffsetDateTime.parse(jsonString);
                           } else {
-                              throw new IllegalStateException("Bad conversion: " + jsonValue);
+                              throw badConversionException(jsonKey, jsonValue);
                           }
                       } else if ((factory = fromInstantMethod(propertyType)) != null) {
                           if (jsonValueType == ValueType.STRING) {
@@ -261,14 +263,18 @@ public class ResourceObjectReader {
                                   throw new InternalServerErrorException(e);
                               }
                           } else {
-                              throw new IllegalStateException("Bad conversion: " + jsonValue);
+                              throw badConversionException(jsonKey, jsonValue);
                           }
                       } else {
-                          throw new IllegalStateException("Bad conversion: " + jsonValue);
+                          throw badConversionException(jsonKey, jsonValue);
                       }
 
                       writeProperty(desc, bean, value);
                   });
+    }
+
+    BadRequestException badConversionException(String jsonKey, JsonValue jsonValue) {
+        return new BadRequestException("Unable to map attribute `"+jsonKey+"` with value `" + jsonValue + "`");
     }
 
     public void putRelationship(Object bean, String relationship, Collection<Object> values) {

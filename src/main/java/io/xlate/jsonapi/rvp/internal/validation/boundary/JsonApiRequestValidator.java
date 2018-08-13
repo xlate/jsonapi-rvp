@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  ******************************************************************************/
-package io.xlate.jsonapi.rvp.internal.boundary;
+package io.xlate.jsonapi.rvp.internal.validation.boundary;
 
 import java.beans.PropertyDescriptor;
 import java.lang.reflect.Method;
@@ -31,8 +31,8 @@ import javax.validation.ConstraintValidator;
 import javax.validation.ConstraintValidatorContext;
 import javax.ws.rs.HttpMethod;
 
-import io.xlate.jsonapi.rvp.internal.entity.EntityMeta;
-import io.xlate.jsonapi.rvp.internal.entity.JsonApiRequest;
+import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMeta;
+import io.xlate.jsonapi.rvp.internal.rs.entity.JsonApiRequest;
 
 public class JsonApiRequestValidator implements ConstraintValidator<ValidJsonApiRequest, JsonApiRequest> {
 
