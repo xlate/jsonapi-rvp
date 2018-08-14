@@ -4,44 +4,18 @@ import java.util.Set;
 
 import javax.validation.ConstraintViolation;
 
-public interface JsonApiHandler<T> {
+public interface JsonApiHandler<T, M> {
 
     String getResourceType();
 
     //****************
 
-    void onCreateRequest(JsonApiContext context);
+    void onRequest(JsonApiContext context);
 
-    void afterCreateValidation(JsonApiContext context, Set<ConstraintViolation<JsonApiQuery>> violations);
+    void afterValidation(JsonApiContext context, Set<ConstraintViolation<?>> violations);
 
-    void beforeCreatePersist(JsonApiContext context, T entity);
+    void beforePersist(JsonApiContext context, T entity);
 
-    void beforeCreateResponse(JsonApiContext context);
-
-    //****************
-
-    void onFetchRequest(JsonApiContext context);
-
-    void afterFetchValidationResult(JsonApiContext context, Set<ConstraintViolation<JsonApiQuery>> violations);
-
-    void beforeFetchResponse(JsonApiContext context);
-
-    //****************
-
-    void onUpdateRequest(JsonApiContext context);
-
-    void afterUpdateValidationResult(JsonApiContext context, Set<ConstraintViolation<JsonApiQuery>> violations);
-
-    void beforeUpdateMerge(JsonApiContext context, T entity);
-
-    void beforeUpdateResponse(JsonApiContext context);
-
-    //****************
-
-    void onDeleteRequest(JsonApiContext context);
-
-    void beforeDelete(JsonApiContext context, T entity);
-
-    void beforeDeleteResponse(JsonApiContext context);
+    void beforeResponse(JsonApiContext context);
 
 }

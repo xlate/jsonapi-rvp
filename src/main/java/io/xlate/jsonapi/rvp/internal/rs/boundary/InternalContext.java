@@ -16,6 +16,8 @@ public class InternalContext implements JsonApiContext {
     private final Request request;
     private final UriInfo uriInfo;
     private final String resourceType;
+    private final String resourceId;
+    private final String relationshipName;
     private JsonApiQuery query;
     private final JsonObject requestEntity;
 
@@ -23,11 +25,34 @@ public class InternalContext implements JsonApiContext {
     private JsonObject responseEntity;
     private Map<String, Object> attributes = new HashMap<>();
 
-    public InternalContext(Request request, UriInfo uriInfo, String resourceType, JsonObject requestEntity) {
+
+    public InternalContext(Request request, UriInfo uriInfo, String resourceType, String id, String relationshipName, JsonObject requestEntity) {
         this.request = request;
         this.uriInfo = uriInfo;
         this.resourceType = resourceType;
+        this.resourceId = id;
+        this.relationshipName = relationshipName;
         this.requestEntity = requestEntity;
+    }
+
+    public InternalContext(Request request, UriInfo uriInfo, String resourceType, String id, JsonObject requestEntity) {
+        this(request, uriInfo, resourceType, id, null, requestEntity);
+    }
+
+    public InternalContext(Request request, UriInfo uriInfo, String resourceType, String id, String relationshipName) {
+        this(request, uriInfo, resourceType, id, relationshipName, null);
+    }
+
+    public InternalContext(Request request, UriInfo uriInfo, String resourceType, JsonObject requestEntity) {
+        this(request, uriInfo, resourceType, null, null, requestEntity);
+    }
+
+    public InternalContext(Request request, UriInfo uriInfo, String resourceType, String id) {
+        this(request, uriInfo, resourceType, id, null, null);
+    }
+
+    public InternalContext(Request request, UriInfo uriInfo, String resourceType) {
+        this(request, uriInfo, resourceType, null, null, null);
     }
 
     @Override
@@ -43,6 +68,16 @@ public class InternalContext implements JsonApiContext {
     @Override
     public String getResourceType() {
         return resourceType;
+    }
+
+    @Override
+    public String getResourceId() {
+        return resourceId;
+    }
+
+    @Override
+    public String getRelationshipName() {
+        return relationshipName;
     }
 
     @Override

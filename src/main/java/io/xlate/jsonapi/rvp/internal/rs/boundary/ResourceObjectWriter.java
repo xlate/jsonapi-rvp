@@ -16,6 +16,8 @@
  ******************************************************************************/
 package io.xlate.jsonapi.rvp.internal.rs.boundary;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.net.URI;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -38,6 +40,7 @@ import javax.json.JsonObjectBuilder;
 import javax.json.JsonValue;
 import javax.persistence.Persistence;
 import javax.persistence.PersistenceUtil;
+import javax.persistence.metamodel.Attribute;
 import javax.persistence.metamodel.Attribute.PersistentAttributeType;
 import javax.persistence.metamodel.EntityType;
 import javax.persistence.metamodel.SingularAttribute;
@@ -192,7 +195,25 @@ public class ResourceObjectWriter {
                          if (Date.class.isAssignableFrom(value.getClass())) {
                              OffsetDateTime odt = ((Date) value).toInstant().atOffset(ZoneOffset.UTC);
                              attributes.add(key, odt.format(DateTimeFormatter.ISO_DATE_TIME));
+                         } else if (OffsetDateTime.class.isAssignableFrom(value.getClass())) {
+                             OffsetDateTime odt = ((OffsetDateTime) value).toInstant().atOffset(ZoneOffset.UTC);
+                             attributes.add(key, odt.format(DateTimeFormatter.ISO_DATE_TIME));
+                         } else if (Boolean.class.isAssignableFrom(value.getClass())) {
+                             attributes.add(key, (Boolean) value);
+                         } else if (BigDecimal.class.isAssignableFrom(value.getClass())) {
+                             attributes.add(key, (BigDecimal) value);
+                         } else if (BigInteger.class.isAssignableFrom(value.getClass())) {
+                             attributes.add(key, (BigInteger) value);
+                         } else if (Long.class.isAssignableFrom(value.getClass())) {
+                             attributes.add(key, (Long) value);
+                         } else if (Integer.class.isAssignableFrom(value.getClass())) {
+                             attributes.add(key, (Integer) value);
+                         } else if (Double.class.isAssignableFrom(value.getClass())) {
+                             attributes.add(key, (Double) value);
+                         } else if (Float.class.isAssignableFrom(value.getClass())) {
+                             attributes.add(key, (Float) value);
                          } else {
+                             // TODO: Things other than string?
                              attributes.add(key, String.valueOf(value));
                          }
                      } else {
@@ -236,7 +257,9 @@ public class ResourceObjectWriter {
                 Object entryValue = entry.getValue();
                 boolean many = meta.getEntityType().getAttribute(fieldName).isCollection();
 
-                if (entryValue instanceof Long) {
+                if (entryValue instanceof Attribute) {
+                    // No operation
+                } else if (entryValue instanceof Long) {
                     Long count = (Long) entryValue;
                     relationshipEntry.add("meta", Json.createObjectBuilder().add("count", count));
                 } else if (entryValue instanceof Collection) {

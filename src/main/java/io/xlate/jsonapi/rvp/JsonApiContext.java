@@ -13,6 +13,10 @@ public interface JsonApiContext {
 
     String getResourceType();
 
+    String getResourceId();
+
+    String getRelationshipName();
+
     JsonApiQuery getQuery();
 
     JsonObject getRequestEntity();

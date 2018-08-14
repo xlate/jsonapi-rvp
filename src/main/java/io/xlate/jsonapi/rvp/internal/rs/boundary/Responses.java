@@ -17,7 +17,6 @@ import javax.validation.ConstraintViolation;
 import javax.ws.rs.BadRequestException;
 import javax.ws.rs.core.CacheControl;
 import javax.ws.rs.core.EntityTag;
-import javax.ws.rs.core.Request;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.ResponseBuilder;
 import javax.ws.rs.core.Response.Status;
@@ -30,32 +29,34 @@ public class Responses {
 
     private static final Logger logger = Logger.getLogger(Responses.class.getName());
 
-    public static Response ok(CacheControl cacheControl, Request request, Object entity) {
+    public static void ok(InternalContext context, CacheControl cacheControl, JsonObject entity) {
         EntityTag etag = new EntityTag(Integer.toString(entity.hashCode()));
         ResponseBuilder builder;
-        builder = request.evaluatePreconditions(etag);
+        builder = context.getRequest().evaluatePreconditions(etag);
 
         if (builder == null) {
+            context.setResponseEntity(entity);
             builder = Response.ok(entity);
             builder.tag(etag);
         }
 
         builder.cacheControl(cacheControl);
-
-        return builder.build();
+        context.setResponseBuilder(builder);
     }
 
-    public static Response created(UriInfo uriInfo, Class<?> resource, String resourceType, JsonObject jsonEntity) {
-        ResponseBuilder builder = Response.created(getUri(uriInfo,
+    public static void created(InternalContext context, Class<?> resource) {
+        ResponseBuilder builder = Response.created(getUri(context.getUriInfo(),
                                                           resource,
                                                           "read",
-                                                          resourceType,
-                                                          jsonEntity.getJsonObject("data").getString("id")));
+                                                          context.getResourceType(),
+                                                          context.getResponseEntity().getJsonObject("data")
+                                                                 .getString("id")));
 
-        return builder.entity(jsonEntity).build();
+        builder.entity(context.getResponseEntity());
+        context.setResponseBuilder(builder);
     }
 
-    public static Response notFound() {
+    public static void notFound(InternalContext context) {
         Status notFound = Status.NOT_FOUND;
 
         JsonObject errors = Json.createObjectBuilder()
@@ -67,14 +68,15 @@ public class Responses {
                                                   .add("detail", "The requested resource can not be found.")))
                                 .build();
 
-        return Response.status(notFound).entity(errors).build();
+        context.setResponseEntity(errors);
+        context.setResponseBuilder(Response.status(notFound).entity(errors));
     }
 
-    public static Response badRequest(BadRequestException e) {
-        return error(e, Status.BAD_REQUEST, e.getMessage());
+    public static void badRequest(InternalContext context, BadRequestException e) {
+        error(context, e, Status.BAD_REQUEST, e.getMessage());
     }
 
-    public static Response badRequest(Set<?> violationSet) {
+    public static void badRequest(InternalContext context, Set<?> violationSet) {
         @SuppressWarnings("unchecked")
         Set<ConstraintViolation<?>> violations = (Set<ConstraintViolation<?>>) violationSet;
 
@@ -112,10 +114,13 @@ public class Responses {
         }
 
         JsonObject jsonErrors = Json.createObjectBuilder().add("errors", errors).build();
-        return Response.status(Status.BAD_REQUEST).entity(jsonErrors).build();
+
+        context.setResponseEntity(jsonErrors);
+        context.setResponseBuilder(Response.status(Status.BAD_REQUEST).entity(jsonErrors));
+
     }
 
-    public static Response unprocessableEntity(String title, Set<?> violationSet) {
+    public static void unprocessableEntity(InternalContext context, String title, Set<?> violationSet) {
         Map<String, List<String>> errorMap = new LinkedHashMap<>();
         @SuppressWarnings("unchecked")
         Set<ConstraintViolation<?>> violations = (Set<ConstraintViolation<?>>) violationSet;
@@ -156,18 +161,21 @@ public class Responses {
         }
 
         JsonObject jsonErrors = Json.createObjectBuilder().add("errors", errors).build();
-        return Response.status(JsonApiStatus.UNPROCESSABLE_ENTITY).entity(jsonErrors).build();
+
+        context.setResponseEntity(jsonErrors);
+        context.setResponseBuilder(Response.status(JsonApiStatus.UNPROCESSABLE_ENTITY).entity(jsonErrors));
     }
 
-    public static Response internalServerError(Exception e) {
-        return error(e,
-                     Status.INTERNAL_SERVER_ERROR,
-                     "An error has occurred processing the request. "
-                             + "Please try again later.");
+    public static void internalServerError(InternalContext context, Exception e) {
+        error(context,
+              e,
+              Status.INTERNAL_SERVER_ERROR,
+              "An error has occurred processing the request. "
+                      + "Please try again later.");
     }
 
-    public static Response notImplemented() {
-        return Response.status(Status.NOT_IMPLEMENTED).build();
+    public static ResponseBuilder notImplemented() {
+        return Response.status(Status.NOT_IMPLEMENTED);
     }
 
     private static URI getUri(UriInfo uriInfo, Class<?> resource, String method, String resourceType, String id) {
@@ -177,7 +185,7 @@ public class Responses {
         return builder.build(resourceType, id);
     }
 
-    private static Response error(Exception e, Status statusCode, String message) {
+    private static void error(InternalContext context, Exception e, Status statusCode, String message) {
         logger.log(Level.WARNING, statusCode.getReasonPhrase(), e);
 
         JsonObject errors = Json.createObjectBuilder()
@@ -189,6 +197,7 @@ public class Responses {
                                                   .add("detail", message)))
                                 .build();
 
-        return Response.status(statusCode).entity(errors).build();
+        context.setResponseEntity(errors);
+        context.setResponseBuilder(Response.status(statusCode).entity(errors));
     }
 }

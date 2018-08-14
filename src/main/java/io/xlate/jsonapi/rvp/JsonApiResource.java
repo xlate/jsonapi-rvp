@@ -47,6 +47,7 @@ import javax.ws.rs.core.Request;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
 
+import io.xlate.jsonapi.rvp.internal.DefaultJsonApiHandler;
 import io.xlate.jsonapi.rvp.internal.persistence.boundary.PersistenceController;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMeta;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMetamodel;
@@ -61,7 +62,7 @@ public abstract class JsonApiResource {
 
     @Inject
     @Any
-    private Instance<JsonApiHandler<?>> handlers;
+    private Instance<JsonApiHandler<?, ?>> handlers;
 
     @Context
     protected Request request;
@@ -102,65 +103,57 @@ public abstract class JsonApiResource {
         cacheControl.setPrivate(true);
     }
 
-    protected Response validateParameters(JsonApiQuery params) {
-        Set<ConstraintViolation<JsonApiQuery>> violations = validator.validate(params);
-
-        if (!violations.isEmpty()) {
-            return Responses.badRequest(violations);
-        }
-
-        return null;
+    protected Set<ConstraintViolation<?>> validateParameters(JsonApiQuery params) {
+        return Collections.unmodifiableSet(validator.validate(params));
     }
 
-    protected Response validateEntity(String resourceType, String id, JsonObject input) {
+    protected Set<ConstraintViolation<?>> validateEntity(String resourceType, String id, JsonObject input) {
         JsonApiRequest jsonApiRequest = new JsonApiRequest(request.getMethod(),
                                                            model.getEntityMeta(resourceType),
                                                            id,
                                                            input);
 
-        try {
-            Set<ConstraintViolation<JsonApiRequest>> violations = validator.validate(jsonApiRequest);
-
-            if (!violations.isEmpty()) {
-                return Responses.unprocessableEntity("Invalid JSON API Document Structure", violations);
-            }
-        } catch (Exception e) {
-            return Responses.internalServerError(e);
-        }
-
-        return null;
+        return Collections.unmodifiableSet(validator.validate(jsonApiRequest));
     }
 
     @POST
     @Path("{resource-type}")
     public Response create(@PathParam("resource-type") String resourceType, JsonObject input) {
         InternalContext context = new InternalContext(request, uriInfo, resourceType, input);
-        JsonApiHandler<?> handler = handlers.get();
-        handler.onCreateRequest(context);
-
-        Response validationResult = validateEntity(resourceType, null, input);
-
-        if (validationResult != null) {
-            return validationResult;
-        }
+        JsonApiHandler<?, ?> handler = findHandler(resourceType, request.getMethod());
 
         try {
-            JsonObject response = persistence.create(resourceType, input, uriInfo);
+            handler.onRequest(context);
 
-            if (response != null) {
-                return Responses.created(uriInfo, getClass(), resourceType, response);
+            Set<ConstraintViolation<?>> violations = validateEntity(resourceType, null, input);
+            handler.afterValidation(context, violations);
+
+            if (violations.isEmpty()) {
+                JsonObject response = persistence.create(context, handler);
+
+                if (response != null) {
+                    context.setResponseEntity(response);
+                    Responses.created(context, getClass());
+                } else {
+                    Responses.notFound(context);
+                }
+            } else {
+                Responses.unprocessableEntity(context, "Invalid JSON API Document Structure", violations);
             }
-
-            return Responses.notFound();
         } catch (ConstraintViolationException e) {
-            return Responses.unprocessableEntity("Invalid Input", e.getConstraintViolations());
+            Responses.unprocessableEntity(context, "Invalid Input", e.getConstraintViolations());
         } catch (BadRequestException e) {
-            return Responses.badRequest(e);
+            // TODO: don't throw these from internal
+            Responses.badRequest(context, e);
         } catch (WebApplicationException e) {
+            // TODO: don't throw these from internal
             return e.getResponse();
         } catch (Exception e) {
-            return Responses.internalServerError(e);
+            Responses.internalServerError(context, e);
         }
+
+        handler.beforeResponse(context);
+        return context.getResponseBuilder().build();
     }
 
     @GET
@@ -172,31 +165,38 @@ public abstract class JsonApiResource {
     @GET
     @Path("{resource-type}/{id}")
     public Response read(@PathParam("resource-type") String resourceType, @PathParam("id") final String id) {
+        InternalContext context = new InternalContext(request, uriInfo, resourceType, id);
+        JsonApiHandler<?, ?> handler = findHandler(resourceType, request.getMethod());
+
         try {
+            handler.onRequest(context);
+
             EntityMeta meta = model.getEntityMeta(resourceType);
 
             if (meta != null) {
                 JsonApiQuery params = new JsonApiQuery(meta, id, uriInfo);
+                Set<ConstraintViolation<?>> violations = validateParameters(params);
 
-                Response validationResult = validateParameters(params);
+                if (violations.isEmpty()) {
+                    JsonObject response = persistence.fetch(params);
 
-                if (validationResult != null) {
-                    return validationResult;
+                    if (response != null) {
+                        Responses.ok(context, cacheControl, response);
+                    }
+                } else {
+                    Responses.badRequest(context, violations);
                 }
-
-                JsonObject response = persistence.fetch(params);
-
-                if (response != null) {
-                    return Responses.ok(cacheControl, request, response);
-                }
+            } else {
+                Responses.notFound(context);
             }
-
-            return Responses.notFound();
         } catch (WebApplicationException e) {
             return e.getResponse();
         } catch (Exception e) {
-            return Responses.internalServerError(e);
+            Responses.internalServerError(context, e);
         }
+
+        handler.beforeResponse(context);
+        return context.getResponseBuilder().build();
     }
 
     @GET
@@ -205,6 +205,9 @@ public abstract class JsonApiResource {
                                      @PathParam("id") final String id,
                                      @PathParam("relationship-name") String relationshipName) {
 
+        InternalContext context = new InternalContext(request, uriInfo, resourceType, id, relationshipName);
+        JsonApiHandler<?, ?> handler = findHandler(resourceType, request.getMethod());
+
         try {
             JsonObject response = persistence.getRelationships(resourceType,
                                                                uriInfo,
@@ -212,16 +215,18 @@ public abstract class JsonApiResource {
                                                                relationshipName);
 
             if (response != null) {
-                return Responses.ok(cacheControl, request, response);
+                Responses.ok(context, cacheControl, response);
+            } else {
+                Responses.notFound(context);
             }
-
-            return Responses.notFound();
         } catch (WebApplicationException e) {
             return e.getResponse();
         } catch (Exception e) {
-            return Responses.internalServerError(e);
+            Responses.internalServerError(context, e);
         }
 
+        handler.beforeResponse(context);
+        return context.getResponseBuilder().build();
     }
 
     @SuppressWarnings("unused")
@@ -232,7 +237,7 @@ public abstract class JsonApiResource {
                                         @PathParam("relationship-name") String relationshipName,
                                         final JsonObject input) {
         // TODO: implement relationship updates
-        return Responses.notImplemented();
+        return Responses.notImplemented().build();
     }
 
     @SuppressWarnings("unused")
@@ -243,7 +248,7 @@ public abstract class JsonApiResource {
                                     @PathParam("relationship-name") String relationshipName,
                                     final JsonObject input) {
         // TODO: implement relationship updates
-        return Responses.notImplemented();
+        return Responses.notImplemented().build();
     }
 
     @SuppressWarnings("unused")
@@ -254,7 +259,7 @@ public abstract class JsonApiResource {
                                        @PathParam("relationship-name") String relationshipName,
                                        final JsonObject input) {
         // TODO: implement relationship updates
-        return Responses.notImplemented();
+        return Responses.notImplemented().build();
     }
 
     @PATCH
@@ -263,43 +268,68 @@ public abstract class JsonApiResource {
     public Response update(@PathParam("resource-type") String resourceType,
                            @PathParam("id") String id,
                            final JsonObject input) {
-        Response validationResult = validateEntity(resourceType, id, input);
 
-        if (validationResult != null) {
-            return validationResult;
-        }
+        InternalContext context = new InternalContext(request, uriInfo, resourceType, id, input);
+        JsonApiHandler<?, ?> handler = findHandler(resourceType, request.getMethod());
 
         try {
-            JsonObject response = persistence.update(resourceType, id, input, uriInfo);
+            Set<?> violations = validateEntity(resourceType, null, input);
 
-            if (response != null) {
-                return Responses.ok(cacheControl, request, response);
+            if (violations.isEmpty()) {
+                JsonObject response = persistence.update(resourceType, id, input, uriInfo);
+
+                if (response != null) {
+                    Responses.ok(context, cacheControl, response);
+                } else {
+                    Responses.notFound(context);
+                }
+            } else {
+                Responses.unprocessableEntity(context, "Invalid JSON API Document Structure", violations);
             }
-
-            return Responses.notFound();
         } catch (ConstraintViolationException e) {
-            return Responses.unprocessableEntity("Invalid Input", e.getConstraintViolations());
+            Responses.unprocessableEntity(context, "Invalid Input", e.getConstraintViolations());
         } catch (BadRequestException e) {
-            return Responses.badRequest(e);
+            Responses.badRequest(context, e);
         } catch (WebApplicationException e) {
             return e.getResponse();
         } catch (Exception e) {
-            return Responses.internalServerError(e);
+            Responses.internalServerError(context, e);
         }
+
+        handler.beforeResponse(context);
+        return context.getResponseBuilder().build();
     }
 
     @DELETE
     @Path("{resource-type}/{id}")
     public Response delete(@PathParam("resource-type") String resourceType, @PathParam("id") final String id) {
+        InternalContext context = new InternalContext(request, uriInfo, resourceType, id);
+        JsonApiHandler<?, ?> handler = findHandler(resourceType, request.getMethod());
+
         try {
             if (persistence.delete(resourceType, id)) {
-                return Response.noContent().build();
+                context.setResponseBuilder(Response.noContent());
+            } else {
+                Responses.notFound(context);
             }
-            return Responses.notFound();
         } catch (WebApplicationException e) {
             return e.getResponse();
         } catch (Exception e) {
-            return Responses.internalServerError(e);
+            Responses.internalServerError(context, e);
         }
+
+        handler.beforeResponse(context);
+        return context.getResponseBuilder().build();
+    }
+
+    JsonApiHandler<?, ?> findHandler(String resourceType, String method) {
+        for (JsonApiHandler<?, ?> handler : handlers) {
+            if (resourceType.equals(handler.getResourceType())) {
+                Class<?> type = handler.getClass();
+            }
+
+        }
+
+        return new DefaultJsonApiHandler(resourceType);
     }
 }

@@ -1,15 +1,15 @@
 /*******************************************************************************
  * Copyright (C) 2018 xlate.io LLC, http://www.xlate.io
  *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as published
- * by the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify it under
+ * the terms of the GNU Affero General Public License as published by the Free
+ * Software Foundation, either version 3 of the License, or (at your option) any
+ * later version.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more
+ * details.
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
@@ -60,15 +60,16 @@ import javax.ws.rs.InternalServerErrorException;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
+import javax.ws.rs.core.UriInfo;
 
+import io.xlate.jsonapi.rvp.JsonApiContext;
+import io.xlate.jsonapi.rvp.JsonApiHandler;
 import io.xlate.jsonapi.rvp.JsonApiQuery;
 import io.xlate.jsonapi.rvp.internal.JsonApiBadRequestException;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMeta;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMetamodel;
 import io.xlate.jsonapi.rvp.internal.rs.boundary.ResourceObjectReader;
 import io.xlate.jsonapi.rvp.internal.rs.boundary.ResourceObjectWriter;
-
-import javax.ws.rs.core.UriInfo;
 
 public class PersistenceController {
 
@@ -147,7 +148,11 @@ public class PersistenceController {
                                                        .collect(Collectors.toSet()));
     }
 
-    public JsonObject create(String resourceType, JsonObject input, UriInfo uriInfo) {
+    @SuppressWarnings("unchecked")
+    public <T> JsonObject create(JsonApiContext context, JsonApiHandler<T, ?> handler) {
+        String resourceType = context.getResourceType();
+        JsonObject input = context.getRequestEntity();
+        UriInfo uriInfo = context.getUriInfo();
         EntityMeta meta = model.getEntityMeta(resourceType);
 
         if (meta == null) {
@@ -157,15 +162,17 @@ public class PersistenceController {
         validateEntityKey(meta.getEntityType());
 
         Class<Object> entityClass = meta.getEntityClass();
-        Object entity;
+        T entity;
 
         try {
-            entity = entityClass.newInstance();
+            entity = (T) entityClass.newInstance();
         } catch (InstantiationException | IllegalAccessException e) {
             throw new InternalServerErrorException(e);
         }
 
         reader.fromJson(this, entity, input);
+
+        handler.beforePersist(context, entity);
 
         em.persist(entity);
         em.flush();
@@ -419,10 +426,10 @@ public class PersistenceController {
                                             if (util.isLoaded(e, a.getName())) {
                                                 return model.getEntityMeta(e.getClass())
                                                             .getPropertyValue(e, a.getName());
-                                            } else if (!a.isCollection()) {
+                                            } /*else if (!a.isCollection()) {
                                                 return model.getEntityMeta(e.getClass())
                                                             .getPropertyValue(e, a.getName());
-                                            }
+                                            }*/
                                             return a;
                                         })));
 
@@ -467,11 +474,12 @@ public class PersistenceController {
         final EntityGraph<Object> graph = em.createEntityGraph(includedClass);
 
         model.getEntityMeta(bindable.getBindableJavaType())
-            .getEntityType()
-            .getSingularAttributes()
-            .stream()
-            .filter(a -> a.getBindableJavaType() != entityClass)
-            .forEach(a -> fetchedAttributes.add(a));
+             .getEntityType()
+             .getSingularAttributes()
+             .stream()
+             .filter(a -> !a.isAssociation())
+             .filter(a -> a.getBindableJavaType() != entityClass)
+             .forEach(a -> fetchedAttributes.add(a));
 
         @SuppressWarnings("unchecked")
         Attribute<Object, ?>[] attrNodes = new Attribute[fetchedAttributes.size()];
