@@ -182,6 +182,8 @@ public abstract class JsonApiResource {
 
                     if (response != null) {
                         Responses.ok(context, cacheControl, response);
+                    } else {
+                        Responses.notFound(context);
                     }
                 } else {
                     Responses.badRequest(context, violations);
