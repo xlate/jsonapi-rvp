@@ -18,7 +18,7 @@ package io.xlate.jsonapi.rvp;
 
 import javax.ws.rs.core.MediaType;
 
-public class JsonApiType extends MediaType {
+public class JsonApiMediaType extends MediaType {
 
     public final static String APPLICATION_JSONAPI = "application/vnd.api+json";
 

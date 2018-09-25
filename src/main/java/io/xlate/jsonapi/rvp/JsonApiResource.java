@@ -17,7 +17,6 @@
 package io.xlate.jsonapi.rvp;
 
 import java.util.Collections;
-import java.util.Map;
 import java.util.Set;
 
 import javax.annotation.PostConstruct;
@@ -45,6 +44,7 @@ import javax.ws.rs.core.Configuration;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Request;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.SecurityContext;
 import javax.ws.rs.core.UriInfo;
 
 import io.xlate.jsonapi.rvp.internal.DefaultJsonApiHandler;
@@ -56,8 +56,8 @@ import io.xlate.jsonapi.rvp.internal.rs.boundary.Responses;
 import io.xlate.jsonapi.rvp.internal.rs.entity.JsonApiRequest;
 
 @Path("")
-@Consumes(JsonApiType.APPLICATION_JSONAPI)
-@Produces(JsonApiType.APPLICATION_JSONAPI)
+@Consumes(JsonApiMediaType.APPLICATION_JSONAPI)
+@Produces(JsonApiMediaType.APPLICATION_JSONAPI)
 public abstract class JsonApiResource {
 
     @Inject
@@ -69,6 +69,9 @@ public abstract class JsonApiResource {
 
     @Context
     protected UriInfo uriInfo;
+
+    @Context
+    protected SecurityContext security;
 
     @Context
     protected Configuration config;
@@ -84,15 +87,15 @@ public abstract class JsonApiResource {
     private EntityMetamodel model;
     private PersistenceController persistence;
 
-    private Map<String, Class<Object>> resourceTypes;
+    private Set<JsonApiResourceType<?>> resourceTypes;
 
     @SuppressWarnings("unchecked")
     @PostConstruct
-    void initialize() {
+    private void initialize() {
         if (config.getProperties().containsKey("io.xlate.jsonapi.rs.resourcetypes")) {
-            resourceTypes = (Map<String, Class<Object>>) config.getProperty("io.xlate.jsonapi.rs.resourcetypes");
+            resourceTypes = (Set<JsonApiResourceType<?>>) config.getProperty("io.xlate.jsonapi.rs.resourcetypes");
         } else {
-            resourceTypes = Collections.emptyMap();
+            resourceTypes = Collections.emptySet();
         }
 
         model = new EntityMetamodel(this.getClass(), resourceTypes, persistenceContext.getMetamodel());
@@ -119,7 +122,7 @@ public abstract class JsonApiResource {
     @POST
     @Path("{resource-type}")
     public Response create(@PathParam("resource-type") String resourceType, JsonObject input) {
-        InternalContext context = new InternalContext(request, uriInfo, resourceType, input);
+        InternalContext context = new InternalContext(request, uriInfo, security, resourceType, input);
         JsonApiHandler<?, ?> handler = findHandler(resourceType, request.getMethod());
 
         try {
@@ -165,7 +168,7 @@ public abstract class JsonApiResource {
     @GET
     @Path("{resource-type}/{id}")
     public Response read(@PathParam("resource-type") String resourceType, @PathParam("id") final String id) {
-        InternalContext context = new InternalContext(request, uriInfo, resourceType, id);
+        InternalContext context = new InternalContext(request, uriInfo, security, resourceType, id);
         JsonApiHandler<?, ?> handler = findHandler(resourceType, request.getMethod());
 
         try {
@@ -175,10 +178,11 @@ public abstract class JsonApiResource {
 
             if (meta != null) {
                 JsonApiQuery params = new JsonApiQuery(meta, id, uriInfo);
+                context.setQuery(params);
                 Set<ConstraintViolation<?>> violations = validateParameters(params);
 
                 if (violations.isEmpty()) {
-                    JsonObject response = persistence.fetch(params);
+                    JsonObject response = persistence.fetch(context);
 
                     if (response != null) {
                         Responses.ok(context, cacheControl, response);
@@ -207,7 +211,7 @@ public abstract class JsonApiResource {
                                      @PathParam("id") final String id,
                                      @PathParam("relationship-name") String relationshipName) {
 
-        InternalContext context = new InternalContext(request, uriInfo, resourceType, id, relationshipName);
+        InternalContext context = new InternalContext(request, uriInfo, security, resourceType, id, relationshipName);
         JsonApiHandler<?, ?> handler = findHandler(resourceType, request.getMethod());
 
         try {
@@ -271,7 +275,7 @@ public abstract class JsonApiResource {
                            @PathParam("id") String id,
                            final JsonObject input) {
 
-        InternalContext context = new InternalContext(request, uriInfo, resourceType, id, input);
+        InternalContext context = new InternalContext(request, uriInfo, security, resourceType, id, input);
         JsonApiHandler<?, ?> handler = findHandler(resourceType, request.getMethod());
 
         try {
@@ -305,7 +309,7 @@ public abstract class JsonApiResource {
     @DELETE
     @Path("{resource-type}/{id}")
     public Response delete(@PathParam("resource-type") String resourceType, @PathParam("id") final String id) {
-        InternalContext context = new InternalContext(request, uriInfo, resourceType, id);
+        InternalContext context = new InternalContext(request, uriInfo, security, resourceType, id);
         JsonApiHandler<?, ?> handler = findHandler(resourceType, request.getMethod());
 
         try {
@@ -327,9 +331,10 @@ public abstract class JsonApiResource {
     JsonApiHandler<?, ?> findHandler(String resourceType, String method) {
         for (JsonApiHandler<?, ?> handler : handlers) {
             if (resourceType.equals(handler.getResourceType())) {
+                //TODO: check method should be handled
                 Class<?> type = handler.getClass();
+                return handler;
             }
-
         }
 
         return new DefaultJsonApiHandler(resourceType);

@@ -3,6 +3,7 @@ package io.xlate.jsonapi.rvp;
 import javax.json.JsonObject;
 import javax.ws.rs.core.Request;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.SecurityContext;
 import javax.ws.rs.core.UriInfo;
 
 public interface JsonApiContext {
@@ -10,6 +11,8 @@ public interface JsonApiContext {
     Request getRequest();
 
     UriInfo getUriInfo();
+
+    SecurityContext getSecurity();
 
     String getResourceType();
 

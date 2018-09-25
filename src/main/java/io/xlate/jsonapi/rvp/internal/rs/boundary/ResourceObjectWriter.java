@@ -167,8 +167,7 @@ public class ResourceObjectWriter {
 
     public String getId(Object bean) {
         EntityMeta meta = model.getEntityMeta(bean.getClass());
-        EntityType<Object> model = meta.getEntityType();
-        SingularAttribute<Object, ?> idattr = model.getId(model.getIdType().getJavaType());
+        SingularAttribute<Object, ?> idattr = meta.getExposedIdAttribute();
         Object id = meta.getPropertyValue(bean, idattr.getName());
         return String.valueOf(id);
     }

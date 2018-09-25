@@ -5,6 +5,7 @@ import java.util.Map;
 
 import javax.json.JsonObject;
 import javax.ws.rs.core.Request;
+import javax.ws.rs.core.SecurityContext;
 import javax.ws.rs.core.Response.ResponseBuilder;
 import javax.ws.rs.core.UriInfo;
 
@@ -15,6 +16,7 @@ public class InternalContext implements JsonApiContext {
 
     private final Request request;
     private final UriInfo uriInfo;
+    private final SecurityContext security;
     private final String resourceType;
     private final String resourceId;
     private final String relationshipName;
@@ -26,33 +28,34 @@ public class InternalContext implements JsonApiContext {
     private Map<String, Object> attributes = new HashMap<>();
 
 
-    public InternalContext(Request request, UriInfo uriInfo, String resourceType, String id, String relationshipName, JsonObject requestEntity) {
+    public InternalContext(Request request, UriInfo uriInfo, SecurityContext security, String resourceType, String id, String relationshipName, JsonObject requestEntity) {
         this.request = request;
         this.uriInfo = uriInfo;
+        this.security = security;
         this.resourceType = resourceType;
         this.resourceId = id;
         this.relationshipName = relationshipName;
         this.requestEntity = requestEntity;
     }
 
-    public InternalContext(Request request, UriInfo uriInfo, String resourceType, String id, JsonObject requestEntity) {
-        this(request, uriInfo, resourceType, id, null, requestEntity);
+    public InternalContext(Request request, UriInfo uriInfo, SecurityContext security, String resourceType, String id, JsonObject requestEntity) {
+        this(request, uriInfo, security, resourceType, id, null, requestEntity);
     }
 
-    public InternalContext(Request request, UriInfo uriInfo, String resourceType, String id, String relationshipName) {
-        this(request, uriInfo, resourceType, id, relationshipName, null);
+    public InternalContext(Request request, UriInfo uriInfo, SecurityContext security, String resourceType, String id, String relationshipName) {
+        this(request, uriInfo, security, resourceType, id, relationshipName, null);
     }
 
-    public InternalContext(Request request, UriInfo uriInfo, String resourceType, JsonObject requestEntity) {
-        this(request, uriInfo, resourceType, null, null, requestEntity);
+    public InternalContext(Request request, UriInfo uriInfo, SecurityContext security, String resourceType, JsonObject requestEntity) {
+        this(request, uriInfo, security, resourceType, null, null, requestEntity);
     }
 
-    public InternalContext(Request request, UriInfo uriInfo, String resourceType, String id) {
-        this(request, uriInfo, resourceType, id, null, null);
+    public InternalContext(Request request, UriInfo uriInfo, SecurityContext security, String resourceType, String id) {
+        this(request, uriInfo, security, resourceType, id, null, null);
     }
 
-    public InternalContext(Request request, UriInfo uriInfo, String resourceType) {
-        this(request, uriInfo, resourceType, null, null, null);
+    public InternalContext(Request request, UriInfo uriInfo, SecurityContext security, String resourceType) {
+        this(request, uriInfo, security, resourceType, null, null, null);
     }
 
     @Override
@@ -63,6 +66,11 @@ public class InternalContext implements JsonApiContext {
     @Override
     public UriInfo getUriInfo() {
         return uriInfo;
+    }
+
+    @Override
+    public SecurityContext getSecurity() {
+        return security;
     }
 
     @Override
@@ -83,6 +91,10 @@ public class InternalContext implements JsonApiContext {
     @Override
     public JsonApiQuery getQuery() {
         return query;
+    }
+
+    public void setQuery(JsonApiQuery query) {
+        this.query = query;
     }
 
     @Override

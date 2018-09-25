@@ -24,10 +24,14 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import javax.persistence.metamodel.EntityType;
 import javax.persistence.metamodel.Metamodel;
+import javax.persistence.metamodel.SingularAttribute;
+
+import io.xlate.jsonapi.rvp.JsonApiResourceType;
 
 public class EntityMeta {
 
@@ -47,25 +51,24 @@ public class EntityMeta {
     };
 
     @SuppressWarnings("unchecked")
-    private static <T> Class<T> wrap(Class<T> clazz) {
+    public static <T> Class<T> wrap(Class<T> clazz) {
         return clazz.isPrimitive() ? (Class<T>) wrapperMap.get(clazz) : clazz;
     }
 
+    private final JsonApiResourceType<?> configuredType;
     private final Class<?> resourceClass;
-    private final Class<Object> entityClass;
-    private final String resourceType;
     private final BeanInfo beanInfo;
     private final Map<String, PropertyDescriptor> propertyDescriptors;
-    private final EntityType<Object> entityType;
+    private final EntityType<?> entityType;
 
     public EntityMeta(Class<?> resourceClass,
-                      Class<Object> entityClass,
-                      String resourceType,
+                      JsonApiResourceType<?> configuredType,
                       Metamodel model) {
 
         this.resourceClass = resourceClass;
-        this.entityClass = entityClass;
-        this.resourceType = resourceType;
+        this.configuredType = configuredType;
+
+        final Class<?> entityClass = configuredType.getResourceClass();
 
         try {
             this.beanInfo = Introspector.getBeanInfo(entityClass);
@@ -80,24 +83,66 @@ public class EntityMeta {
                                         descriptor -> descriptor));
     }
 
-    public Class<?> getIdType() {
-        return wrap(entityType.getIdType().getJavaType());
+    @SuppressWarnings("unchecked")
+    public SingularAttribute<Object, ?> getExposedIdAttribute() {
+        final SingularAttribute<?, ?> attr;
+        final String attributeName = configuredType.getExposedIdAttribute();
+
+        if (attributeName != null) {
+            attr = entityType.getSingularAttribute(attributeName);
+        } else {
+            attr = entityType.getId(entityType.getIdType().getJavaType());
+        }
+
+        return (SingularAttribute<Object, ?>) attr;
+    }
+
+    public Object readId(String value) {
+        return configuredType.getIdReader().apply(value);
+    }
+
+    @SuppressWarnings("unchecked")
+    public SingularAttribute<Object, ?> getIdAttribute() {
+        final SingularAttribute<?, ?> attr;
+
+        attr = entityType.getId(entityType.getIdType().getJavaType());
+
+        return (SingularAttribute<Object, ?>) attr;
+    }
+
+    public Object getIdValue(Object bean) {
+        return getPropertyValue(bean, getIdAttribute().getName());
     }
 
     public Class<?> getResourceClass() {
         return resourceClass;
     }
 
+    @SuppressWarnings("unchecked")
     public Class<Object> getEntityClass() {
-        return entityClass;
+        return (Class<Object>) configuredType.getResourceClass();
     }
 
     public String getResourceType() {
-        return resourceType;
+        return configuredType.getName();
     }
 
+    @SuppressWarnings("unchecked")
     public EntityType<Object> getEntityType() {
-        return entityType;
+        return (EntityType<Object>) entityType;
+    }
+
+    public Set<String> getRelationships() {
+        return configuredType.getRelationships();
+    }
+
+    public boolean isRelatedTo(String relationshipName) {
+        Set<String> relationships = getRelationships();
+        return relationships.isEmpty() || relationships.contains(relationshipName);
+    }
+
+    public String getPrincipalNamePath() {
+        return configuredType.getPrincipalNamePath();
     }
 
     public PropertyDescriptor getPropertyDescriptor(String name) {
