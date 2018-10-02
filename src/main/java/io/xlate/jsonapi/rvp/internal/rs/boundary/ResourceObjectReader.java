@@ -44,6 +44,7 @@ import javax.persistence.metamodel.EntityType;
 import javax.ws.rs.BadRequestException;
 import javax.ws.rs.InternalServerErrorException;
 
+import io.xlate.jsonapi.rvp.JsonApiContext;
 import io.xlate.jsonapi.rvp.internal.JsonApiBadRequestException;
 import io.xlate.jsonapi.rvp.internal.persistence.boundary.PersistenceController;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMeta;
@@ -72,17 +73,17 @@ public class ResourceObjectReader {
         this.model = model;
     }
 
-    public void fromJson(PersistenceController persistence, Object target, JsonObject source) {
+    public void fromJson(PersistenceController persistence, JsonApiContext context, Object target, JsonObject source) {
         JsonObject data = source.getJsonObject("data");
 
         putAttributes(target, data.getJsonObject("attributes"));
 
         if (data.containsKey("relationships")) {
-            handleRelationships(persistence, target, data, model.getEntityMeta(target.getClass()).getEntityType());
+            handleRelationships(persistence, context, target, data, model.getEntityMeta(target.getClass()).getEntityType());
         }
     }
 
-    void handleRelationships(PersistenceController persistence, Object entity, JsonObject data, EntityType<Object> rootType) {
+    void handleRelationships(PersistenceController persistence, JsonApiContext context, Object entity, JsonObject data, EntityType<Object> rootType) {
         JsonArrayBuilder errors = Json.createArrayBuilder();
         JsonObject relationships = data.getJsonObject("relationships");
 
@@ -109,7 +110,7 @@ public class ResourceObjectReader {
                     JsonObject relationshipObject = (JsonObject) relationship;
                     String relType = relationshipObject.getString("type");
                     String relId = relationshipObject.getString("id");
-                    Object replacement = persistence.findObject(relType, relId);
+                    Object replacement = persistence.findObject(context, relType, relId);
 
                     if (replacement != null) {
                         replacements.add(replacement);
@@ -138,7 +139,7 @@ public class ResourceObjectReader {
                 JsonObject relationshipObject = (JsonObject) relationshipData;
                 String relType = relationshipObject.getString("type");
                 String relId = relationshipObject.getString("id");
-                Object replacement = persistence.findObject(relType, relId);
+                Object replacement = persistence.findObject(context, relType, relId);
 
                 if (replacement != null) {
                     putRelationship(entity, fieldName, Arrays.asList(replacement));

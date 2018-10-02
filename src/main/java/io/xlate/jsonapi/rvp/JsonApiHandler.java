@@ -4,9 +4,9 @@ import java.util.Set;
 
 import javax.validation.ConstraintViolation;
 
-public interface JsonApiHandler<T, M> {
+public interface JsonApiHandler<T> {
 
-    String getResourceType();
+    boolean isHandler(String resourceType, String httpMethod);
 
     //****************
 
@@ -14,7 +14,11 @@ public interface JsonApiHandler<T, M> {
 
     void afterValidation(JsonApiContext context, Set<ConstraintViolation<?>> violations);
 
-    void beforePersist(JsonApiContext context, T entity);
+    void beforeAdd(JsonApiContext context, T entity);
+
+    void beforeUpdate(JsonApiContext context, T entity);
+
+    void beforeDelete(JsonApiContext context, T entity);
 
     void beforeResponse(JsonApiContext context);
 

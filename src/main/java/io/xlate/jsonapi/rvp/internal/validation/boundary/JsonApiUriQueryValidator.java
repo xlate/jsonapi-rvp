@@ -27,6 +27,7 @@ import javax.validation.ConstraintValidatorContext;
 import javax.ws.rs.core.MultivaluedMap;
 
 import io.xlate.jsonapi.rvp.JsonApiQuery;
+import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMeta;
 import io.xlate.jsonapi.rvp.internal.rs.boundary.ResourceObjectReader;
 
 public class JsonApiUriQueryValidator
@@ -46,7 +47,8 @@ public class JsonApiUriQueryValidator
 
         MultivaluedMap<String, String> params = value.getUriInfo().getQueryParameters();
         //String resourceType = value.getEntityMeta().getResourceType();
-        EntityType<Object> rootType = value.getEntityMeta().getEntityType();
+        EntityMeta meta = value.getEntityMeta();
+        EntityType<Object> rootType =  meta.getEntityType();
         String id = value.getId();
 
         if (params.containsKey(JsonApiQuery.PARAM_INCLUDE)) {

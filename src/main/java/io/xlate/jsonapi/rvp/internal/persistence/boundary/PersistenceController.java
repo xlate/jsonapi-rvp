@@ -17,6 +17,7 @@
 package io.xlate.jsonapi.rvp.internal.persistence.boundary;
 
 import java.lang.reflect.AccessibleObject;
+import java.security.Principal;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -40,11 +41,13 @@ import javax.persistence.OneToMany;
 import javax.persistence.OneToOne;
 import javax.persistence.PersistenceException;
 import javax.persistence.PersistenceUnitUtil;
+import javax.persistence.Query;
 import javax.persistence.Tuple;
 import javax.persistence.TypedQuery;
 import javax.persistence.criteria.CriteriaBuilder;
 import javax.persistence.criteria.CriteriaQuery;
 import javax.persistence.criteria.Expression;
+import javax.persistence.criteria.From;
 import javax.persistence.criteria.Join;
 import javax.persistence.criteria.JoinType;
 import javax.persistence.criteria.Order;
@@ -106,11 +109,9 @@ public class PersistenceController {
         return Collections.emptyList();
     }
 
-    public JsonObject getRelationships(String resourceType,
-                                       UriInfo uriInfo,
-                                       String id,
-                                       String relationshipName) {
+    public JsonObject getRelationships(JsonApiContext context) {
 
+        String resourceType = context.getResourceType();
         EntityMeta meta = model.getEntityMeta(resourceType);
 
         if (meta == null) {
@@ -124,12 +125,19 @@ public class PersistenceController {
         final CriteriaQuery<Object> query = builder.createQuery();
 
         Root<Object> root = query.from(entityClass);
+        String relationshipName = context.getRelationshipName();
         Join<Object, Object> join = root.join(relationshipName);
         EntityMeta joinMeta = model.getEntityMeta(join.getModel().getBindableJavaType());
 
+        final UriInfo uriInfo = context.getUriInfo();
+        final String id = context.getResourceId();
+
         query.select(join.get(joinMeta.getExposedIdAttribute()));
-        final Object key = meta.readId(id);
-        query.where(builder.equal(root.get(meta.getExposedIdAttribute()), key));
+        List<Predicate> predicates = buildPredicates(builder, root, context.getSecurity().getUserPrincipal(), meta, id);
+
+        if (!predicates.isEmpty()) {
+            query.where(predicates.toArray(new Predicate[predicates.size()]));
+        }
 
         TypedQuery<Object> typedQuery = em.createQuery(query);
 
@@ -145,7 +153,7 @@ public class PersistenceController {
     }
 
     @SuppressWarnings("unchecked")
-    public <T> JsonObject create(JsonApiContext context, JsonApiHandler<T, ?> handler) {
+    public <T> JsonObject create(JsonApiContext context, JsonApiHandler<T> handler) {
         String resourceType = context.getResourceType();
         JsonObject input = context.getRequestEntity();
         UriInfo uriInfo = context.getUriInfo();
@@ -166,9 +174,9 @@ public class PersistenceController {
             throw new InternalServerErrorException(e);
         }
 
-        reader.fromJson(this, entity, input);
+        reader.fromJson(this, context, entity, input);
 
-        handler.beforePersist(context, entity);
+        handler.beforeAdd(context, entity);
 
         em.persist(entity);
         em.flush();
@@ -176,23 +184,30 @@ public class PersistenceController {
         return writer.toJsonApiResource(entity, uriInfo);
     }
 
-    public JsonObject update(String resourceType, String id, JsonObject input, UriInfo uriInfo) {
+    public <T> JsonObject update(JsonApiContext context, JsonApiHandler<T> handler) {
+        final String resourceType = context.getResourceType();
         EntityMeta meta = model.getEntityMeta(resourceType);
 
         if (meta == null) {
             return null;
         }
 
+        final String id = context.getResourceId();
+        final JsonObject input = context.getRequestEntity();
+        final UriInfo uriInfo = context.getUriInfo();
+
         EntityType<Object> rootType = meta.getEntityType();
         validateEntityKey(rootType);
 
-        final Object entity = findObject(resourceType, id);
+        final T entity = findObject(context, resourceType, id);
 
         if (entity == null) {
             return null;
         }
 
-        reader.fromJson(this, entity, input);
+        reader.fromJson(this, context, entity, input);
+
+        handler.beforeUpdate(context, entity);
 
         final Object updatedEntity = em.merge(entity);
         em.flush();
@@ -200,7 +215,8 @@ public class PersistenceController {
         return writer.toJsonApiResource(updatedEntity, uriInfo);
     }
 
-    public boolean delete(String resourceType, String id) {
+    public <T> boolean delete(JsonApiContext context, JsonApiHandler<T> handler) {
+        String resourceType = context.getResourceType();
         EntityMeta meta = model.getEntityMeta(resourceType);
 
         if (meta == null) {
@@ -210,11 +226,15 @@ public class PersistenceController {
         EntityType<Object> rootType = meta.getEntityType();
         validateEntityKey(rootType);
 
-        final Object entity = findObject(resourceType, id);
+        String id = context.getResourceId();
+
+        final T entity = findObject(context, resourceType, id);
 
         if (entity == null) {
             return false;
         }
+
+        handler.beforeDelete(context, entity);
 
         try {
             em.remove(entity);
@@ -233,7 +253,35 @@ public class PersistenceController {
         }
     }
 
-    public Object findObject(String resourceType, String id) {
+    static List<Predicate> buildPredicates(CriteriaBuilder builder, Root<?> root, Principal user, EntityMeta meta, String id) {
+        List<Predicate> predicates = new ArrayList<>(2);
+
+        String principalNamePath = meta.getPrincipalNamePath();
+
+        if (principalNamePath != null && principalNamePath.length() > 0) {
+            String[] elements = principalNamePath.split("\\.");
+            From<?, ?> namePath = root;
+
+            for (int i = 0; i < elements.length; i++) {
+                if (i + 1 == elements.length) {
+                    String principalName = user.getName();
+                    predicates.add(builder.equal(namePath.get(elements[i]), principalName));
+                } else {
+                    namePath = namePath.join(elements[i]);
+                }
+            }
+        }
+
+        if (id != null) {
+            final Object key = meta.readId(id);
+            predicates.add(builder.equal(root.get(meta.getExposedIdAttribute()), key));
+        }
+
+        return predicates;
+    }
+
+    @SuppressWarnings("unchecked")
+    public <T> T findObject(JsonApiContext context, String resourceType, String id) {
         EntityMeta meta = model.getEntityMeta(resourceType);
 
         if (meta == null) {
@@ -242,50 +290,42 @@ public class PersistenceController {
 
         EntityType<Object> rootType = meta.getEntityType();
         validateEntityKey(rootType);
-        Class<Object> entityClass = meta.getEntityClass();
+        Class<T> entityClass = (Class<T>) meta.getEntityClass();
         List<Attribute<Object, ?>> fetchedAttributes;
 
         fetchedAttributes = rootType.getAttributes()
                                     .stream()
                                     .collect(Collectors.toList());
 
-        EntityGraph<Object> graph = em.createEntityGraph(entityClass);
-        @SuppressWarnings("unchecked")
-        Attribute<Object, ?>[] attrNodes = new Attribute[fetchedAttributes.size()];
+        EntityGraph<T> graph = em.createEntityGraph(entityClass);
+        Attribute<T, ?>[] attrNodes = new Attribute[fetchedAttributes.size()];
         graph.addAttributeNodes(fetchedAttributes.toArray(attrNodes));
 
         Map<String, Object> hints = new HashMap<>();
         hints.put("javax.persistence.fetchgraph", graph);
 
-        final Object entity;
-        //final SingularAttribute<Object, ?> idAttr = meta.getIdAttribute();
-        //Class<?> keyType = EntityMeta.wrap(idAttr.getJavaType());
+        final T entity;
 
-        //if (keyType != String.class) {
-            //Object convId;
-            try {
-                //Method valueOf = keyType.getMethod("valueOf", String.class);
-                //convId = valueOf.invoke(null, id);
+        try {
+            final CriteriaBuilder builder = em.getCriteriaBuilder();
+            final CriteriaQuery<T> query = (CriteriaQuery<T>) builder.createQuery();
+            Root<T> root = query.from(entityClass);
+            query.select(root.alias("root"));
+            //query.multiselect(root);
 
-                final CriteriaBuilder builder = em.getCriteriaBuilder();
-                final CriteriaQuery<?> query = builder.createQuery();
-                Root<Object> root = query.from(entityClass);
-                query.multiselect(root);
-                final Object key = meta.readId(id);
-                query.where(builder.equal(root.get(meta.getExposedIdAttribute()), key));
+            List<Predicate> predicates = buildPredicates(builder, root, context.getSecurity().getUserPrincipal(), meta, id);
 
-                TypedQuery<?> typedQuery = em.createQuery(query);
-                typedQuery.setHint("javax.persistence.fetchgraph", graph);
-
-                entity = typedQuery.getSingleResult();
-
-                //entity = em.find(entityClass, convId, hints);
-            } catch (Exception e) {
-                throw new InternalServerErrorException(e);
+            if (!predicates.isEmpty()) {
+                query.where(predicates.toArray(new Predicate[predicates.size()]));
             }
-       //} else {
-        //    entity = em.find(entityClass, id, hints);
-        //}
+
+            Query q = em.createQuery(query);
+            q.setHint("javax.persistence.fetchgraph", graph);
+
+            entity = (T) q.getSingleResult();
+        } catch (Exception e) {
+            throw new InternalServerErrorException(e);
+        }
 
         return entity;
     }
@@ -328,15 +368,7 @@ public class PersistenceController {
 
         query.multiselect(selections);
 
-        List<Predicate> predicates = new ArrayList<>(2);
-
-        //String principalName = context.getSecurity().getUserPrincipal().getName();
-        //predicates.add(builder.equal(root.join("users").get("subject"), principalName));
-
-        if (id != null) {
-            final Object key = meta.readId(id);
-            predicates.add(builder.equal(root.get(meta.getExposedIdAttribute()), key));
-        }
+        List<Predicate> predicates = buildPredicates(builder, root, context.getSecurity().getUserPrincipal(), meta, id);
 
         if (!predicates.isEmpty()) {
             query.where(predicates.toArray(new Predicate[predicates.size()]));
