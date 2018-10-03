@@ -16,7 +16,9 @@
  ******************************************************************************/
 package io.xlate.jsonapi.rvp;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.Set;
 
 import javax.annotation.PostConstruct;
@@ -48,6 +50,7 @@ import javax.ws.rs.core.SecurityContext;
 import javax.ws.rs.core.UriInfo;
 
 import io.xlate.jsonapi.rvp.internal.DefaultJsonApiHandler;
+import io.xlate.jsonapi.rvp.internal.JsonApiHandlerChain;
 import io.xlate.jsonapi.rvp.internal.persistence.boundary.PersistenceController;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMeta;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMetamodel;
@@ -385,10 +388,16 @@ public abstract class JsonApiResource {
     }
 
     JsonApiHandler<?> findHandler(String resourceType, String httpMethod) {
+        List<JsonApiHandler<?>> available = new ArrayList<>(2);
+
         for (JsonApiHandler<?> handler : handlers) {
             if (handler.isHandler(resourceType, httpMethod)) {
-                return handler;
+                available.add(handler);
             }
+        }
+
+        if (available.size() > 0) {
+            return new JsonApiHandlerChain(available);
         }
 
         return new DefaultJsonApiHandler();

@@ -20,7 +20,7 @@ public class DefaultJsonApiHandler implements JsonApiHandler<Object> {
 
     @Override
     public boolean isHandler(String resourceType, String httpMethod) {
-        return true;
+        return false;
     }
 
     @Override
