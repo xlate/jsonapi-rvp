@@ -168,7 +168,25 @@ public abstract class JsonApiResource {
     @GET
     @Path("{resource-type}")
     public Response index(@PathParam("resource-type") String resourceType) {
-        return read(resourceType, null);
+        InternalContext context = new InternalContext(request, uriInfo, security, resourceType);
+        JsonApiHandler<?> handler = findHandler(resourceType, request.getMethod());
+
+        try {
+            EntityMeta meta = model.getEntityMeta(resourceType);
+
+            if (meta == null) {
+                Responses.notFound(context);
+            } else {
+                fetch(context, meta, handler);
+            }
+        } catch (WebApplicationException e) {
+            return e.getResponse();
+        } catch (Exception e) {
+            Responses.internalServerError(context, e);
+        }
+
+        handler.beforeResponse(context);
+        return context.getResponseBuilder().build();
     }
 
     @GET
@@ -180,29 +198,10 @@ public abstract class JsonApiResource {
         try {
             EntityMeta meta = model.getEntityMeta(resourceType);
 
-            if (meta == null) {
-                Responses.notFound(context);
-            } else if (meta.readId(id) == null) {
+            if (!isValidId(meta, id)) {
                 Responses.notFound(context);
             } else {
-                JsonApiQuery params = new JsonApiQuery(meta, id, uriInfo);
-                context.setQuery(params);
-
-                handler.onRequest(context);
-
-                Set<ConstraintViolation<?>> violations = validateParameters(params);
-
-                if (violations.isEmpty()) {
-                    JsonObject response = persistence.fetch(context);
-
-                    if (response != null) {
-                        Responses.ok(context, cacheControl, response);
-                    } else {
-                        Responses.notFound(context);
-                    }
-                } else {
-                    Responses.badRequest(context, violations);
-                }
+                fetch(context, meta, handler);
             }
         } catch (WebApplicationException e) {
             return e.getResponse();
@@ -212,6 +211,27 @@ public abstract class JsonApiResource {
 
         handler.beforeResponse(context);
         return context.getResponseBuilder().build();
+    }
+
+    void fetch(InternalContext context, EntityMeta meta, JsonApiHandler<?> handler) {
+        JsonApiQuery params = new JsonApiQuery(meta, context.getResourceId(), context.getUriInfo());
+        context.setQuery(params);
+
+        handler.onRequest(context);
+
+        Set<ConstraintViolation<?>> violations = validateParameters(params);
+
+        if (violations.isEmpty()) {
+            JsonObject response = persistence.fetch(context);
+
+            if (response != null) {
+                Responses.ok(context, cacheControl, response);
+            } else {
+                Responses.notFound(context);
+            }
+        } else {
+            Responses.badRequest(context, violations);
+        }
     }
 
     @GET
@@ -226,9 +246,7 @@ public abstract class JsonApiResource {
         try {
             EntityMeta meta = model.getEntityMeta(resourceType);
 
-            if (meta == null) {
-                Responses.notFound(context);
-            } else if (meta.readId(id) == null) {
+            if (!isValidId(meta, id)) {
                 Responses.notFound(context);
             } else {
                 JsonObject response = persistence.getRelationships(context);
@@ -295,9 +313,7 @@ public abstract class JsonApiResource {
         try {
             EntityMeta meta = model.getEntityMeta(resourceType);
 
-            if (meta == null) {
-                Responses.notFound(context);
-            } else if (meta.readId(id) == null) {
+            if (!isValidId(meta, id)) {
                 Responses.notFound(context);
             } else {
                 handler.onRequest(context);
@@ -339,9 +355,7 @@ public abstract class JsonApiResource {
         try {
             EntityMeta meta = model.getEntityMeta(resourceType);
 
-            if (meta == null) {
-                Responses.notFound(context);
-            } else if (meta.readId(id) == null) {
+            if (!isValidId(meta, id)) {
                 Responses.notFound(context);
             } else {
                 handler.onRequest(context);
@@ -360,6 +374,14 @@ public abstract class JsonApiResource {
 
         handler.beforeResponse(context);
         return context.getResponseBuilder().build();
+    }
+
+    boolean isValidId(EntityMeta meta, String id) {
+        try {
+            return meta != null && meta.readId(id) != null;
+        } catch (@SuppressWarnings("unused") Exception e) {
+            return false;
+        }
     }
 
     JsonApiHandler<?> findHandler(String resourceType, String httpMethod) {
