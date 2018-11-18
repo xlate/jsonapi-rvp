@@ -58,7 +58,6 @@ import io.xlate.jsonapi.rvp.internal.rs.boundary.InternalContext;
 import io.xlate.jsonapi.rvp.internal.rs.boundary.Responses;
 import io.xlate.jsonapi.rvp.internal.rs.entity.JsonApiRequest;
 
-@Path("")
 @Consumes(JsonApiMediaType.APPLICATION_JSONAPI)
 @Produces(JsonApiMediaType.APPLICATION_JSONAPI)
 public abstract class JsonApiResource {
