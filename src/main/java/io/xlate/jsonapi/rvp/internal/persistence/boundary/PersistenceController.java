@@ -36,6 +36,7 @@ import javax.json.JsonObject;
 import javax.json.JsonObjectBuilder;
 import javax.persistence.EntityGraph;
 import javax.persistence.EntityManager;
+import javax.persistence.FlushModeType;
 import javax.persistence.ManyToMany;
 import javax.persistence.OneToMany;
 import javax.persistence.OneToOne;
@@ -58,16 +59,13 @@ import javax.persistence.criteria.Selection;
 import javax.persistence.metamodel.Attribute;
 import javax.persistence.metamodel.Bindable;
 import javax.persistence.metamodel.EntityType;
-import javax.ws.rs.InternalServerErrorException;
-import javax.ws.rs.WebApplicationException;
-import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import javax.ws.rs.core.UriInfo;
 
 import io.xlate.jsonapi.rvp.JsonApiContext;
 import io.xlate.jsonapi.rvp.JsonApiHandler;
 import io.xlate.jsonapi.rvp.JsonApiQuery;
-import io.xlate.jsonapi.rvp.internal.JsonApiBadRequestException;
+import io.xlate.jsonapi.rvp.internal.JsonApiClientErrorException;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMeta;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMetamodel;
 import io.xlate.jsonapi.rvp.internal.rs.boundary.ResourceObjectReader;
@@ -170,8 +168,9 @@ public class PersistenceController {
 
         try {
             entity = (T) entityClass.newInstance();
+            em.setFlushMode(FlushModeType.COMMIT);
         } catch (InstantiationException | IllegalAccessException e) {
-            throw new InternalServerErrorException(e);
+            throw new RuntimeException(e);
         }
 
         reader.fromJson(this, context, entity, input);
@@ -241,19 +240,15 @@ public class PersistenceController {
             em.flush();
             return true;
         } catch (@SuppressWarnings("unused") PersistenceException e) {
-            JsonObject response;
-            response = Json.createObjectBuilder()
-                           .add("errors",
-                                Json.createArrayBuilder()
-                                    .add(Json.createObjectBuilder()
-                                             .add("title", "Unexpected error")))
-                           .build();
-
-            throw new WebApplicationException(Response.status(Status.CONFLICT).entity(response).build());
+            throw new JsonApiClientErrorException(Status.CONFLICT, "Unexpected error", null);
         }
     }
 
-    static List<Predicate> buildPredicates(CriteriaBuilder builder, Root<?> root, Principal user, EntityMeta meta, String id) {
+    static List<Predicate> buildPredicates(CriteriaBuilder builder,
+                                           Root<?> root,
+                                           Principal user,
+                                           EntityMeta meta,
+                                           String id) {
         List<Predicate> predicates = new ArrayList<>(2);
 
         String principalNamePath = meta.getPrincipalNamePath();
@@ -301,8 +296,10 @@ public class PersistenceController {
         Attribute<T, ?>[] attrNodes = new Attribute[fetchedAttributes.size()];
         graph.addAttributeNodes(fetchedAttributes.toArray(attrNodes));
 
-        Map<String, Object> hints = new HashMap<>();
-        hints.put("javax.persistence.fetchgraph", graph);
+        /*
+         * Map<String, Object> hints = new HashMap<>();
+         * hints.put("javax.persistence.fetchgraph", graph);
+         */
 
         final T entity;
 
@@ -313,7 +310,11 @@ public class PersistenceController {
             query.select(root.alias("root"));
             //query.multiselect(root);
 
-            List<Predicate> predicates = buildPredicates(builder, root, context.getSecurity().getUserPrincipal(), meta, id);
+            List<Predicate> predicates = buildPredicates(builder,
+                                                         root,
+                                                         context.getSecurity().getUserPrincipal(),
+                                                         meta,
+                                                         id);
 
             if (!predicates.isEmpty()) {
                 query.where(predicates.toArray(new Predicate[predicates.size()]));
@@ -324,7 +325,7 @@ public class PersistenceController {
 
             entity = (T) q.getSingleResult();
         } catch (Exception e) {
-            throw new InternalServerErrorException(e);
+            throw new RuntimeException(e);
         }
 
         return entity;
@@ -478,10 +479,13 @@ public class PersistenceController {
                                             if (util.isLoaded(e, a.getName())) {
                                                 return model.getEntityMeta(e.getClass())
                                                             .getPropertyValue(e, a.getName());
-                                            } /*else if (!a.isCollection()) {
-                                                return model.getEntityMeta(e.getClass())
-                                                            .getPropertyValue(e, a.getName());
-                                            }*/
+                                            } /*
+                                               * else if (!a.isCollection()) {
+                                               * return
+                                               * model.getEntityMeta(e.getClass(
+                                               * )) .getPropertyValue(e,
+                                               * a.getName()); }
+                                               */
                                             return a;
                                         })));
 
@@ -497,10 +501,11 @@ public class PersistenceController {
 
     void validateEntityKey(EntityType<Object> rootType) {
         if (!rootType.hasSingleIdAttribute()) {
-            throw new JsonApiBadRequestException("Invalid resource",
-                                                 "The requested resource type "
-                                                         + "has an unsupported "
-                                                         + "composite key/ID.");
+            throw new JsonApiClientErrorException(Status.BAD_REQUEST,
+                                                  "Invalid resource",
+                                                  "The requested resource type "
+                                                          + "has an unsupported "
+                                                          + "composite key/ID.");
         }
     }
 
@@ -523,26 +528,29 @@ public class PersistenceController {
         final Root<Object> root = query.from(includedClass);
         final Join<Object, Object> join = root.join(inverseAttribute.getName());
 
-        final List<Attribute<Object, ?>> fetchedAttributes = new ArrayList<>();
-        final EntityGraph<Object> graph = em.createEntityGraph(includedClass);
-
-        model.getEntityMeta(bindable.getBindableJavaType())
-             .getEntityType()
-             .getSingularAttributes()
-             .stream()
-             .filter(a -> !a.isAssociation())
-             .filter(a -> a.getBindableJavaType() != entityClass)
-             .forEach(a -> fetchedAttributes.add(a));
-
-        @SuppressWarnings("unchecked")
-        Attribute<Object, ?>[] attrNodes = new Attribute[fetchedAttributes.size()];
-        graph.addAttributeNodes(fetchedAttributes.toArray(attrNodes));
+        /*
+         * final List<Attribute<Object, ?>> fetchedAttributes = new
+         * ArrayList<>(); final EntityGraph<Object> graph =
+         * em.createEntityGraph(includedClass);
+         */
 
         final List<Selection<?>> selections = new ArrayList<>();
-
-        //final SingularAttribute<Object, ?> rootKey = getId(root.getModel());
         selections.add(join.get(meta.getIdAttribute()).alias("rootKey"));
         selections.add(root.alias("related"));
+
+        /*
+         * model.getEntityMeta(bindable.getBindableJavaType()) .getEntityType()
+         * .getSingularAttributes() .stream() .filter(a -> !a.isAssociation())
+         * .filter(a -> a.getBindableJavaType() != entityClass) .forEach(a ->
+         * selections.add(root.get(a).alias(a.getName())));
+         */
+        //.forEach(a -> fetchedAttributes.add(a));
+
+        //@SuppressWarnings("unchecked")
+        //Attribute<Object, ?>[] attrNodes = new Attribute[fetchedAttributes.size()];
+        //graph.addAttributeNodes(fetchedAttributes.toArray(attrNodes));
+
+        //final SingularAttribute<Object, ?> rootKey = getId(root.getModel());
 
         query.multiselect(selections);
         Set<Object> rootKeys = relationships.keySet();
@@ -554,7 +562,7 @@ public class PersistenceController {
         }
 
         TypedQuery<Tuple> typedQuery = em.createQuery(query);
-        typedQuery.setHint("javax.persistence.fetchgraph", graph);
+        //typedQuery.setHint("javax.persistence.fetchgraph", graph);
 
         for (Tuple result : typedQuery.getResultList()) {
             Object rootEntityKey = result.get("rootKey");

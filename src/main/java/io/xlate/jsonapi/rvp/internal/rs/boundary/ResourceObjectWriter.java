@@ -44,7 +44,6 @@ import javax.persistence.metamodel.Attribute;
 import javax.persistence.metamodel.Attribute.PersistentAttributeType;
 import javax.persistence.metamodel.EntityType;
 import javax.persistence.metamodel.SingularAttribute;
-import javax.ws.rs.InternalServerErrorException;
 import javax.ws.rs.core.UriBuilder;
 import javax.ws.rs.core.UriInfo;
 
@@ -219,7 +218,7 @@ public class ResourceObjectWriter {
                          attributes.addNull(key);
                      }
                  } catch (Exception e) {
-                     throw new InternalServerErrorException(e);
+                     throw new RuntimeException(e);
                  }
              });
 

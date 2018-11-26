@@ -1,15 +1,15 @@
 /*******************************************************************************
  * Copyright (C) 2018 xlate.io LLC, http://www.xlate.io
  *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as published
- * by the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify it under
+ * the terms of the GNU Affero General Public License as published by the Free
+ * Software Foundation, either version 3 of the License, or (at your option) any
+ * later version.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more
+ * details.
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
@@ -41,11 +41,10 @@ import javax.json.JsonValue.ValueType;
 import javax.persistence.metamodel.Attribute;
 import javax.persistence.metamodel.Bindable;
 import javax.persistence.metamodel.EntityType;
-import javax.ws.rs.BadRequestException;
-import javax.ws.rs.InternalServerErrorException;
+import javax.ws.rs.core.Response.Status;
 
 import io.xlate.jsonapi.rvp.JsonApiContext;
-import io.xlate.jsonapi.rvp.internal.JsonApiBadRequestException;
+import io.xlate.jsonapi.rvp.internal.JsonApiClientErrorException;
 import io.xlate.jsonapi.rvp.internal.persistence.boundary.PersistenceController;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMeta;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMetamodel;
@@ -79,11 +78,19 @@ public class ResourceObjectReader {
         putAttributes(target, data.getJsonObject("attributes"));
 
         if (data.containsKey("relationships")) {
-            handleRelationships(persistence, context, target, data, model.getEntityMeta(target.getClass()).getEntityType());
+            handleRelationships(persistence,
+                                context,
+                                target,
+                                data,
+                                model.getEntityMeta(target.getClass()).getEntityType());
         }
     }
 
-    void handleRelationships(PersistenceController persistence, JsonApiContext context, Object entity, JsonObject data, EntityType<Object> rootType) {
+    void handleRelationships(PersistenceController persistence,
+                             JsonApiContext context,
+                             Object entity,
+                             JsonObject data,
+                             EntityType<Object> rootType) {
         JsonArrayBuilder errors = Json.createArrayBuilder();
         JsonObject relationships = data.getJsonObject("relationships");
 
@@ -158,7 +165,7 @@ public class ResourceObjectReader {
         JsonArray errorsArray = errors.build();
 
         if (errorsArray.size() > 0) {
-            throw new JsonApiBadRequestException(errorsArray);
+            throw new JsonApiClientErrorException(Status.BAD_REQUEST, errorsArray);
         }
     }
 
@@ -175,9 +182,10 @@ public class ResourceObjectReader {
                       //TODO: validation
                       //Attribute<Object, ?> a1 = model.getAttribute(fieldName);
 
-                      /*if (a1.getPersistentAttributeType() != PersistentAttributeType.BASIC) {
-                          return;
-                      }*/
+                      /*
+                       * if (a1.getPersistentAttributeType() !=
+                       * PersistentAttributeType.BASIC) { return; }
+                       */
 
                       PropertyDescriptor desc = meta.getPropertyDescriptor(fieldName);
                       JsonValue jsonValue = attributes.get(jsonKey);
@@ -243,7 +251,7 @@ public class ResourceObjectReader {
                                   Method valueOf = propertyType.getMethod("valueOf", String.class);
                                   value = valueOf.invoke(null, jsonString);
                               } catch (Exception e) {
-                                  throw new InternalServerErrorException(e);
+                                  throw new RuntimeException(e);
                               }
                           } else {
                               throw badConversionException(jsonKey, jsonValue);
@@ -261,7 +269,7 @@ public class ResourceObjectReader {
                               try {
                                   value = factory.invoke(null, toInstant(jsonString));
                               } catch (Exception e) {
-                                  throw new InternalServerErrorException(e);
+                                  throw new RuntimeException(e);
                               }
                           } else {
                               throw badConversionException(jsonKey, jsonValue);
@@ -274,8 +282,10 @@ public class ResourceObjectReader {
                   });
     }
 
-    BadRequestException badConversionException(String jsonKey, JsonValue jsonValue) {
-        return new BadRequestException("Unable to map attribute `"+jsonKey+"` with value `" + jsonValue + "`");
+    RuntimeException badConversionException(String jsonKey, JsonValue jsonValue) {
+        return new JsonApiClientErrorException(Status.BAD_REQUEST,
+                                               "Invalid data binding",
+                                               "Unable to map attribute `" + jsonKey + "` with value `" + jsonValue + "`");
     }
 
     public void putRelationship(Object bean, String relationship, Collection<Object> values) {
@@ -315,7 +325,7 @@ public class ResourceObjectReader {
                 }
             }
         } catch (Exception e) {
-            throw new InternalServerErrorException(e);
+            throw new RuntimeException(e);
         }
     }
 
@@ -376,7 +386,7 @@ public class ResourceObjectReader {
         try {
             return (T) descriptor.getReadMethod().invoke(entity);
         } catch (IllegalArgumentException | ReflectiveOperationException e) {
-            throw new InternalServerErrorException(e);
+            throw new RuntimeException(e);
         }
     }
 
@@ -384,7 +394,7 @@ public class ResourceObjectReader {
         try {
             descriptor.getWriteMethod().invoke(entity, value);
         } catch (IllegalArgumentException | ReflectiveOperationException e) {
-            throw new InternalServerErrorException(e);
+            throw new RuntimeException(e);
         }
     }
 

@@ -31,7 +31,6 @@ import javax.persistence.PersistenceContext;
 import javax.validation.ConstraintViolation;
 import javax.validation.ConstraintViolationException;
 import javax.validation.Validator;
-import javax.ws.rs.BadRequestException;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
@@ -51,6 +50,7 @@ import javax.ws.rs.core.SecurityContext;
 import javax.ws.rs.core.UriInfo;
 
 import io.xlate.jsonapi.rvp.internal.DefaultJsonApiHandler;
+import io.xlate.jsonapi.rvp.internal.JsonApiClientErrorException;
 import io.xlate.jsonapi.rvp.internal.JsonApiHandlerChain;
 import io.xlate.jsonapi.rvp.internal.persistence.boundary.PersistenceController;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMeta;
@@ -154,12 +154,8 @@ public abstract class JsonApiResource {
             }
         } catch (ConstraintViolationException e) {
             Responses.unprocessableEntity(context, "Invalid Input", e.getConstraintViolations());
-        } catch (BadRequestException e) {
-            // TODO: don't throw these from internal
-            Responses.badRequest(context, e);
-        } catch (WebApplicationException e) {
-            // TODO: don't throw these from internal
-            return e.getResponse();
+        } catch (JsonApiClientErrorException e) {
+            Responses.clientError(context, e);
         } catch (Exception e) {
             Responses.internalServerError(context, e);
         }
@@ -337,10 +333,8 @@ public abstract class JsonApiResource {
             }
         } catch (ConstraintViolationException e) {
             Responses.unprocessableEntity(context, "Invalid Input", e.getConstraintViolations());
-        } catch (BadRequestException e) {
-            Responses.badRequest(context, e);
-        } catch (WebApplicationException e) {
-            return e.getResponse();
+        } catch (JsonApiClientErrorException e) {
+            Responses.clientError(context, e);
         } catch (Exception e) {
             Responses.internalServerError(context, e);
         }

@@ -11,10 +11,10 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.json.Json;
+import javax.json.JsonArray;
 import javax.json.JsonArrayBuilder;
 import javax.json.JsonObject;
 import javax.validation.ConstraintViolation;
-import javax.ws.rs.BadRequestException;
 import javax.ws.rs.core.CacheControl;
 import javax.ws.rs.core.EntityTag;
 import javax.ws.rs.core.Response;
@@ -24,6 +24,7 @@ import javax.ws.rs.core.UriBuilder;
 import javax.ws.rs.core.UriInfo;
 
 import io.xlate.jsonapi.rvp.JsonApiStatus;
+import io.xlate.jsonapi.rvp.internal.JsonApiClientErrorException;
 
 public class Responses {
 
@@ -72,8 +73,16 @@ public class Responses {
         context.setResponseBuilder(Response.status(notFound).entity(errors));
     }
 
-    public static void badRequest(InternalContext context, BadRequestException e) {
-        error(context, e, Status.BAD_REQUEST, e.getMessage());
+    public static void clientError(InternalContext context, JsonApiClientErrorException e) {
+        JsonArray errors = e.getErrors();
+
+        if (errors != null) {
+            JsonObject jsonErrors = Json.createObjectBuilder().add("errors", errors).build();
+            context.setResponseEntity(jsonErrors);
+            context.setResponseBuilder(Response.status(e.getStatus()).entity(errors));
+        } else {
+            error(context, e, e.getStatus(), e.getMessage());
+        }
     }
 
     public static void badRequest(InternalContext context, Set<?> violationSet) {
