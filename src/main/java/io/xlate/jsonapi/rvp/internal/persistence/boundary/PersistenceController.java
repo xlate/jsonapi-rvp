@@ -175,7 +175,7 @@ public class PersistenceController {
 
         reader.fromJson(this, context, entity, input);
 
-        handler.beforeAdd(context, entity);
+        handler.beforePersist(context, entity);
 
         em.persist(entity);
         em.flush();
@@ -204,9 +204,11 @@ public class PersistenceController {
             return null;
         }
 
+        handler.beforeUpdate(context, entity);
+
         reader.fromJson(this, context, entity, input);
 
-        handler.beforeUpdate(context, entity);
+        handler.beforeMerge(context, entity);
 
         final Object updatedEntity = em.merge(entity);
         em.flush();
@@ -333,7 +335,18 @@ public class PersistenceController {
 
     public JsonObject fetch(JsonApiContext context) {
         JsonApiQuery params = context.getQuery();
-        EntityMeta meta = params.getEntityMeta();
+        final EntityMeta meta;
+        final EntityMeta relatedMeta;
+        final String relationshipName = context.getRelationshipName();
+
+        if (relationshipName != null) {
+            meta = model.getEntityMeta(params.getEntityMeta().getRelatedEntityClass(relationshipName));
+            relatedMeta = params.getEntityMeta();
+        } else {
+            meta = params.getEntityMeta();
+            relatedMeta = null;
+        }
+
         Class<Object> entityClass = meta.getEntityClass();
         EntityType<Object> rootType = meta.getEntityType();
 
@@ -347,6 +360,13 @@ public class PersistenceController {
 
         Root<Object> root = query.from(entityClass);
         root.alias("root");
+        Join<Object, Object> relatedJoin;
+
+        if (relationshipName != null) {
+            relatedJoin = root.join(inverseOf(relatedMeta.getEntityType().getAttribute(relationshipName)).getName());
+        } else {
+            relatedJoin = null;
+        }
 
         Set<String> counted = rootType.getPluralAttributes()
                                       .stream()
@@ -369,7 +389,15 @@ public class PersistenceController {
 
         query.multiselect(selections);
 
-        List<Predicate> predicates = buildPredicates(builder, root, context.getSecurity().getUserPrincipal(), meta, id);
+        final List<Predicate> predicates;
+
+        if (relationshipName != null) {
+            predicates = buildPredicates(builder, root, context.getSecurity().getUserPrincipal(), meta, null);
+            final Object key = meta.readId(id);
+            predicates.add(builder.equal(relatedJoin.get(relatedMeta.getExposedIdAttribute()), key));
+        } else {
+            predicates = buildPredicates(builder, root, context.getSecurity().getUserPrincipal(), meta, id);
+        }
 
         if (!predicates.isEmpty()) {
             query.where(predicates.toArray(new Predicate[predicates.size()]));
@@ -407,12 +435,27 @@ public class PersistenceController {
                                            .stream()
                                            .collect(Collectors.toMap(relName -> relName,
                                                                      relName -> new ArrayList<Object>())));
+
+                   if (relationshipName != null) {
+                       String relatedTo = relatedJoin.getAttribute().getName();
+
+                       if (!params.getInclude().contains(relatedTo)) {
+                           relationships.get(meta.getIdValue(entity)).put(relatedTo, new ArrayList<>());
+                       }
+                   }
                });
 
         /* Only retrieve included records if something was found. */
         if (!results.isEmpty()) {
             for (String included : params.getInclude()) {
                 getIncluded(params, entityClass, relationships, included);
+            }
+            if (relationshipName != null) {
+                String relatedTo = relatedJoin.getAttribute().getName();
+
+                if (!params.getInclude().contains(relatedTo)) {
+                    getIncluded(params, entityClass, relationships, relatedTo);
+                }
             }
         }
 
@@ -430,7 +473,7 @@ public class PersistenceController {
             data.add(writer.toJson(entity, related, params, uriInfo));
         }
 
-        if (id != null) {
+        if (id != null && relationshipName == null) {
             JsonArray singleton = data.build();
 
             if (singleton.isEmpty()) {
@@ -499,6 +542,7 @@ public class PersistenceController {
         return response.build();
     }
 
+    @Deprecated
     void validateEntityKey(EntityType<Object> rootType) {
         if (!rootType.hasSingleIdAttribute()) {
             throw new JsonApiClientErrorException(Status.BAD_REQUEST,

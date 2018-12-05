@@ -30,7 +30,7 @@ public interface JsonApiContext {
 
     void setResponseEntity(JsonObject entity);
 
-    Object getAttribute(String name);
+    <T> T getAttribute(String name);
 
     void setAttribute(String name, Object value);
 }

@@ -27,8 +27,10 @@ import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import javax.persistence.metamodel.Attribute;
 import javax.persistence.metamodel.EntityType;
 import javax.persistence.metamodel.Metamodel;
+import javax.persistence.metamodel.PluralAttribute;
 import javax.persistence.metamodel.SingularAttribute;
 
 import io.xlate.jsonapi.rvp.JsonApiResourceType;
@@ -139,6 +141,21 @@ public class EntityMeta {
     public boolean isRelatedTo(String relationshipName) {
         Set<String> relationships = getRelationships();
         return relationships.isEmpty() || relationships.contains(relationshipName);
+    }
+
+    @SuppressWarnings("unchecked")
+    public Class<Object> getRelatedEntityClass(String relationshipName) {
+        Set<String> relationships = getRelationships();
+
+        if (relationships.isEmpty() || relationships.contains(relationshipName)) {
+            Attribute<?, ?> attr = entityType.getAttribute(relationshipName);
+            if (attr.isCollection()) {
+                return (Class<Object>) ((PluralAttribute<?, ?, ?>) attr).getBindableJavaType();
+            }
+            return (Class<Object>) attr.getJavaType();
+        }
+
+        return null;
     }
 
     public String getPrincipalNamePath() {

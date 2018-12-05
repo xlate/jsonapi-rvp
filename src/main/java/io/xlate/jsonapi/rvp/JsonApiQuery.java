@@ -43,6 +43,7 @@ public class JsonApiQuery {
     private final UriInfo uriInfo;
     private boolean uriProcessed = false;
 
+    //TODO: add filter
     private List<String> include = new ArrayList<>();
     private List<String> count = new ArrayList<>();
     private List<String> sort = new ArrayList<>();

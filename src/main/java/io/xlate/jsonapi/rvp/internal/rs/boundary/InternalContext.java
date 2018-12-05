@@ -5,8 +5,8 @@ import java.util.Map;
 
 import javax.json.JsonObject;
 import javax.ws.rs.core.Request;
-import javax.ws.rs.core.SecurityContext;
 import javax.ws.rs.core.Response.ResponseBuilder;
+import javax.ws.rs.core.SecurityContext;
 import javax.ws.rs.core.UriInfo;
 
 import io.xlate.jsonapi.rvp.JsonApiContext;
@@ -125,6 +125,7 @@ public class InternalContext implements JsonApiContext {
         this.responseEntity = entity;
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public Object getAttribute(String name) {
         return attributes.get(name);

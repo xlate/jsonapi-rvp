@@ -36,15 +36,21 @@ public class DefaultJsonApiHandler implements JsonApiHandler<Object> {
     }
 
     @Override
-    public void beforeAdd(JsonApiContext context, Object entity) {
+    public void beforePersist(JsonApiContext context, Object entity) {
         // No operation
-        logger.trace("Default beforeAdd called");
+        logger.trace("Default beforePersist called");
     }
 
     @Override
     public void beforeUpdate(JsonApiContext context, Object entity) {
         // No operation
         logger.trace("Default beforeUpdate called");
+    }
+
+    @Override
+    public void beforeMerge(JsonApiContext context, Object entity) {
+        // No operation
+        logger.trace("Default beforeMerge called");
     }
 
     @Override

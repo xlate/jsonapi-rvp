@@ -35,13 +35,18 @@ public class JsonApiHandlerChain implements JsonApiHandler<Object> {
     }
 
     @Override
-    public void beforeAdd(JsonApiContext context, Object entity) {
-        chain.stream().forEach(handler -> handler.beforeAdd(context, entity));
+    public void beforePersist(JsonApiContext context, Object entity) {
+        chain.stream().forEach(handler -> handler.beforePersist(context, entity));
     }
 
     @Override
     public void beforeUpdate(JsonApiContext context, Object entity) {
         chain.stream().forEach(handler -> handler.beforeUpdate(context, entity));
+    }
+
+    @Override
+    public void beforeMerge(JsonApiContext context, Object entity) {
+        chain.stream().forEach(handler -> handler.beforeMerge(context, entity));
     }
 
     @Override

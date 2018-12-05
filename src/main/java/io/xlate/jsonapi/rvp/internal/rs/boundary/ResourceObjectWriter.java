@@ -315,28 +315,46 @@ public class ResourceObjectWriter {
     }
 
     public JsonObject getReadLink(UriInfo uriInfo, String resourceType, String id) {
-        return link(uriInfo, "self", "read", model.getEntityMeta(resourceType), resourceType, id);
+        JsonObjectBuilder builder = Json.createObjectBuilder();
+        link(builder, uriInfo, "self", "read", model.getEntityMeta(resourceType), resourceType, id);
+        return builder.build();
     }
 
     public JsonObject getRelationshipLink(UriInfo uriInfo, String resourceType, String id, String relationshipName) {
-        return link(uriInfo,
-                    "self",
-                    "readRelationship",
-                    model.getEntityMeta(resourceType),
-                    resourceType,
-                    id,
-                    relationshipName);
+        JsonObjectBuilder builder = Json.createObjectBuilder();
+
+        link(builder,
+             uriInfo,
+             "self",
+             "readRelationship",
+             model.getEntityMeta(resourceType),
+             resourceType,
+             id,
+             relationshipName);
+
+        EntityMeta relatedMeta = model.getEntityMeta(relationshipName);
+
+        if (relatedMeta != null) {
+            link(builder,
+                 uriInfo,
+                 "related",
+                 "readRelated",
+                 model.getEntityMeta(resourceType),
+                 resourceType,
+                 id,
+                 relationshipName);
+        }
+
+        return builder.build();
     }
 
-    /*public JsonObject getRelationshipLink(UriInfo uriInfo, Object bean, String relationshipName) {
-        EntityMeta meta = model.getEntityMeta(bean.getClass());
-        String resourceType = meta.getResourceType();
-        String id = getId(bean);
+    public void link(JsonObjectBuilder builder,
+                     UriInfo uriInfo,
+                     String linkName,
+                     String methodName,
+                     EntityMeta meta,
+                     Object... params) {
 
-        return link(uriInfo, "self", "readRelationship", meta, resourceType, id, relationshipName);
-    }*/
-
-    public JsonObject link(UriInfo uriInfo, String linkName, String methodName, EntityMeta meta, Object... params) {
         UriBuilder self = uriInfo.getBaseUriBuilder();
         Class<?> resourceClass = meta.getResourceClass();
         self.path(resourceClass);
@@ -344,6 +362,6 @@ public class ResourceObjectWriter {
 
         final URI link = self.build(params);
 
-        return Json.createObjectBuilder().add(linkName, link.toString()).build();
+        builder.add(linkName, link.toString());
     }
 }
