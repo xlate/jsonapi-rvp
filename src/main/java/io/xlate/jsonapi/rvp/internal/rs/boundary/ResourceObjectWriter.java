@@ -242,8 +242,13 @@ public class ResourceObjectWriter {
             String fieldName = entry.getKey();
 
             if (params == null || params.includeField(resourceType, fieldName)) {
-                included++;
                 String relationshipName = toJsonName(fieldName);
+
+                if (!meta.isRelatedTo(relationshipName)) {
+                    continue;
+                }
+
+                included++;
                 JsonObjectBuilder relationshipEntry = Json.createObjectBuilder();
 
                 relationshipEntry.add("links",
@@ -321,25 +326,28 @@ public class ResourceObjectWriter {
     }
 
     public JsonObject getRelationshipLink(UriInfo uriInfo, String resourceType, String id, String relationshipName) {
-        JsonObjectBuilder builder = Json.createObjectBuilder();
+        final JsonObjectBuilder builder = Json.createObjectBuilder();
+        final EntityMeta meta = model.getEntityMeta(resourceType);
 
         link(builder,
              uriInfo,
              "self",
              "readRelationship",
-             model.getEntityMeta(resourceType),
+             meta,
              resourceType,
              id,
              relationshipName);
 
-        EntityMeta relatedMeta = model.getEntityMeta(relationshipName);
+        final Class<?> relatedClass = meta.getRelatedEntityClass(relationshipName);
 
-        if (relatedMeta != null) {
+        if (relatedClass != null) {
+            final EntityMeta relatedMeta = model.getEntityMeta(relatedClass);
+
             link(builder,
                  uriInfo,
                  "related",
                  "readRelated",
-                 model.getEntityMeta(resourceType),
+                 relatedMeta,
                  resourceType,
                  id,
                  relationshipName);
