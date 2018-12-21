@@ -382,6 +382,7 @@ public abstract class JsonApiResource {
                 Responses.notFound(context);
             } else {
                 handler.onRequest(context);
+                handler.afterValidation(context, Collections.emptySet());
 
                 if (persistence.delete(context, handler)) {
                     context.setResponseBuilder(Response.noContent());
