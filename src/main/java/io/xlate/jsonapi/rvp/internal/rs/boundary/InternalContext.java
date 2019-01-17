@@ -5,7 +5,9 @@ import java.util.Map;
 
 import javax.json.JsonObject;
 import javax.ws.rs.core.Request;
+import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.ResponseBuilder;
+import javax.ws.rs.core.Response.StatusType;
 import javax.ws.rs.core.SecurityContext;
 import javax.ws.rs.core.UriInfo;
 
@@ -103,6 +105,18 @@ public class InternalContext implements JsonApiContext {
     }
 
     @Override
+    public void setResponse(int status, JsonObject entity) {
+        this.responseBuilder = Response.status(status).entity(entity);
+        setResponseEntity(entity);
+    }
+
+    @Override
+    public void setResponse(StatusType status, JsonObject entity) {
+        this.responseBuilder = Response.status(status).entity(entity);
+        setResponseEntity(entity);
+    }
+
+    @Override
     public ResponseBuilder getResponseBuilder() {
         if (responseBuilder == null) {
             throw new IllegalStateException("Builder not yet initialized");
@@ -113,6 +127,11 @@ public class InternalContext implements JsonApiContext {
 
     public void setResponseBuilder(ResponseBuilder responseBuilder) {
         this.responseBuilder = responseBuilder;
+    }
+
+    @Override
+    public boolean hasResponse() {
+        return responseBuilder != null;
     }
 
     @Override

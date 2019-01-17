@@ -36,6 +36,12 @@ public class DefaultJsonApiHandler implements JsonApiHandler<Object> {
     }
 
     @Override
+    public void afterFind(JsonApiContext context, Object entity) {
+        // No operation
+        logger.trace("Default afterFind called");
+    }
+
+    @Override
     public void beforePersist(JsonApiContext context, Object entity) {
         // No operation
         logger.trace("Default beforePersist called");

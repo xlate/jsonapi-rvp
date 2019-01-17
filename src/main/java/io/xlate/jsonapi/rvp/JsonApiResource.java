@@ -247,12 +247,14 @@ public abstract class JsonApiResource {
         Set<ConstraintViolation<?>> violations = validateParameters(params);
 
         if (violations.isEmpty()) {
-            JsonObject response = persistence.fetch(context);
+            JsonObject response = persistence.fetch(context, handler);
 
-            if (response != null) {
-                Responses.ok(context, cacheControl, response);
-            } else {
-                Responses.notFound(context);
+            if (!context.hasResponse()) {
+                if (response != null) {
+                    Responses.ok(context, cacheControl, response);
+                } else {
+                    Responses.notFound(context);
+                }
             }
         } else {
             Responses.badRequest(context, violations);
@@ -348,10 +350,12 @@ public abstract class JsonApiResource {
                 if (violations.isEmpty()) {
                     JsonObject response = persistence.update(context, handler);
 
-                    if (response != null) {
-                        Responses.ok(context, cacheControl, response);
-                    } else {
-                        Responses.notFound(context);
+                    if (!context.hasResponse()) {
+                        if (response != null) {
+                            Responses.ok(context, cacheControl, response);
+                        } else {
+                            Responses.notFound(context);
+                        }
                     }
                 } else {
                     Responses.unprocessableEntity(context, "Invalid JSON API Document Structure", violations);
@@ -385,7 +389,9 @@ public abstract class JsonApiResource {
                 handler.afterValidation(context, Collections.emptySet());
 
                 if (persistence.delete(context, handler)) {
-                    context.setResponseBuilder(Response.noContent());
+                    if (!context.hasResponse()) {
+                        context.setResponseBuilder(Response.noContent());
+                    }
                 } else {
                     Responses.notFound(context);
                 }

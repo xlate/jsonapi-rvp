@@ -8,10 +8,32 @@ public interface JsonApiHandler<T> {
 
     boolean isHandler(String resourceType, String httpMethod);
 
+    /**
+     * Called at the beginning of each request prior to validation or any database
+     * operations.
+     *
+     * @param context
+     */
     default void onRequest(JsonApiContext context) {
     }
 
+    /**
+     * Called following a validation operation.
+     *
+     * @param context
+     * @param violations
+     */
     default void afterValidation(JsonApiContext context, Set<ConstraintViolation<?>> violations) {
+    }
+
+    /**
+     * Called after the database has been searched for the requested
+     * entity/entities.
+     *
+     * @param context
+     * @param entity
+     */
+    default void afterFind(JsonApiContext context, T entity) {
     }
 
     /**
@@ -45,9 +67,21 @@ public interface JsonApiHandler<T> {
     default void beforeMerge(JsonApiContext context, T entity) {
     }
 
+    /**
+     * Called prior to an attempt to remove an existing entity from the
+     * persistence context/database.
+     *
+     * @param context
+     * @param entity
+     */
     default void beforeDelete(JsonApiContext context, T entity) {
     }
 
+    /**
+     * Called at the end of each request.
+     *
+     * @param context
+     */
     default void beforeResponse(JsonApiContext context) {
     }
 

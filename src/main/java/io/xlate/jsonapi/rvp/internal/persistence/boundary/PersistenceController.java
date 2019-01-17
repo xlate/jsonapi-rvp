@@ -333,7 +333,7 @@ public class PersistenceController {
         return entity;
     }
 
-    public JsonObject fetch(JsonApiContext context) {
+    public <T> JsonObject fetch(JsonApiContext context, JsonApiHandler<T> handler) {
         JsonApiQuery params = context.getQuery();
         final EntityMeta meta;
         final EntityMeta relatedMeta;
@@ -477,8 +477,13 @@ public class PersistenceController {
             JsonArray singleton = data.build();
 
             if (singleton.isEmpty()) {
+                handler.afterFind(context, null);
                 return null;
             }
+
+            @SuppressWarnings("unchecked")
+            T resultEntity = (T) results.get(0).get("root");
+            handler.afterFind(context, resultEntity);
 
             response.add("data", singleton.get(0));
         } else {
