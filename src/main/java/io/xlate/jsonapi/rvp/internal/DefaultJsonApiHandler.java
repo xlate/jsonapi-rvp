@@ -48,6 +48,12 @@ public class DefaultJsonApiHandler implements JsonApiHandler<Object> {
     }
 
     @Override
+    public void afterPersist(JsonApiContext context, Object entity) {
+        // No operation
+        logger.trace("Default afterPersist called");
+    }
+
+    @Override
     public void beforeUpdate(JsonApiContext context, Object entity) {
         // No operation
         logger.trace("Default beforeUpdate called");
@@ -60,9 +66,21 @@ public class DefaultJsonApiHandler implements JsonApiHandler<Object> {
     }
 
     @Override
+    public void afterMerge(JsonApiContext context, Object entity) {
+        // No operation
+        logger.trace("Default afterMerge called");
+    }
+
+    @Override
     public void beforeDelete(JsonApiContext context, Object entity) {
         // No operation
         logger.trace("Default beforeDelete called");
+    }
+
+    @Override
+    public void afterDelete(JsonApiContext context, Object entity) {
+        // No operation
+        logger.trace("Default afterDelete called");
     }
 
     @Override

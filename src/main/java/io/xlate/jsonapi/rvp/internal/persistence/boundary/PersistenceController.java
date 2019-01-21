@@ -180,6 +180,8 @@ public class PersistenceController {
         em.persist(entity);
         em.flush();
 
+        handler.afterPersist(context, entity);
+
         return writer.toJsonApiResource(entity, uriInfo);
     }
 
@@ -213,6 +215,8 @@ public class PersistenceController {
         final Object updatedEntity = em.merge(entity);
         em.flush();
 
+        handler.afterMerge(context, entity);
+
         return writer.toJsonApiResource(updatedEntity, uriInfo);
     }
 
@@ -240,6 +244,7 @@ public class PersistenceController {
         try {
             em.remove(entity);
             em.flush();
+            handler.afterDelete(context, entity);
             return true;
         } catch (@SuppressWarnings("unused") PersistenceException e) {
             throw new JsonApiClientErrorException(Status.CONFLICT, "Unexpected error", null);
