@@ -81,7 +81,7 @@ public class Responses {
             context.setResponseEntity(jsonErrors);
             context.setResponseBuilder(Response.status(e.getStatus()).entity(errors));
         } else {
-            error(context, e, e.getStatus(), e.getMessage());
+            error(context, e, e.getStatus(), e.getDetail());
         }
     }
 

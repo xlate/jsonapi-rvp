@@ -274,6 +274,24 @@ public class ResourceObjectReader {
                           } else {
                               throw badConversionException(jsonKey, jsonValue);
                           }
+                      } else if (jsonValueType == ValueType.STRING) {
+                          String jsonString = ((JsonString) jsonValue).getString();
+
+                          if ((factory = fromValueMethod(propertyType)) != null) {
+                              try {
+                                  value = factory.invoke(null, jsonString);
+                              } catch (Exception e) {
+                                  throw new RuntimeException(e);
+                              }
+                          } else if ((factory = valueOfMethod(propertyType)) != null) {
+                              try {
+                                  value = factory.invoke(null, jsonString);
+                              } catch (Exception e) {
+                                  throw new RuntimeException(e);
+                              }
+                          } else {
+                              throw badConversionException(jsonKey, jsonValue);
+                          }
                       } else {
                           throw badConversionException(jsonKey, jsonValue);
                       }
@@ -401,6 +419,22 @@ public class ResourceObjectReader {
     static Method fromInstantMethod(Class<?> type) {
         try {
             return type.getMethod("from", Instant.class);
+        } catch (@SuppressWarnings("unused") Exception e) {
+            return null;
+        }
+    }
+
+    static Method fromValueMethod(Class<?> type) {
+        try {
+            return type.getMethod("fromValue", String.class);
+        } catch (@SuppressWarnings("unused") Exception e) {
+            return null;
+        }
+    }
+
+    static Method valueOfMethod(Class<?> type) {
+        try {
+            return type.getMethod("valueOf", String.class);
         } catch (@SuppressWarnings("unused") Exception e) {
             return null;
         }
