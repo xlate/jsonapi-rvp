@@ -319,13 +319,13 @@ public class ResourceObjectWriter {
         return null;
     }
 
-    public JsonObject getReadLink(UriInfo uriInfo, String resourceType, String id) {
+    private JsonObject getReadLink(UriInfo uriInfo, String resourceType, String id) {
         JsonObjectBuilder builder = Json.createObjectBuilder();
         link(builder, uriInfo, "self", "read", model.getEntityMeta(resourceType), resourceType, id);
         return builder.build();
     }
 
-    public JsonObject getRelationshipLink(UriInfo uriInfo, String resourceType, String id, String relationshipName) {
+    private JsonObject getRelationshipLink(UriInfo uriInfo, String resourceType, String id, String relationshipName) {
         final JsonObjectBuilder builder = Json.createObjectBuilder();
         final EntityMeta meta = model.getEntityMeta(resourceType);
 
@@ -356,7 +356,7 @@ public class ResourceObjectWriter {
         return builder.build();
     }
 
-    public void link(JsonObjectBuilder builder,
+    private void link(JsonObjectBuilder builder,
                      UriInfo uriInfo,
                      String linkName,
                      String methodName,
