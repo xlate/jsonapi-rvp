@@ -1,7 +1,6 @@
 package io.xlate.jsonapi.rvp.internal;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 
@@ -16,7 +15,7 @@ public class JsonApiHandlerChain implements JsonApiHandler<Object> {
 
     @SuppressWarnings("unchecked")
     public JsonApiHandlerChain(List<JsonApiHandler<?>> chain) {
-        this.chain.addAll((Collection<? extends JsonApiHandler<Object>>) chain);
+        chain.forEach(h -> this.chain.add((JsonApiHandler<Object>) h));
     }
 
     @Override
