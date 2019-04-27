@@ -27,8 +27,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.Map.Entry;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import javax.json.Json;
 import javax.json.JsonArray;
@@ -51,18 +49,21 @@ import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMetamodel;
 
 public class ResourceObjectReader {
 
-    static Pattern jsonPattern = Pattern.compile("-(.)");
-
     private final EntityMetamodel model;
 
     public static String toAttributeName(String jsonName) {
         StringBuilder attribute = new StringBuilder(jsonName);
-        Matcher m = jsonPattern.matcher(attribute);
 
-        while (m.find()) {
-            char replacement = m.group(1).toUpperCase().charAt(0);
-            attribute.deleteCharAt(m.start());
-            attribute.setCharAt(m.start(), replacement);
+        for (int i = 0, length = attribute.length(); i < length; i++) {
+            if (attribute.charAt(i) == '-') {
+                attribute.deleteCharAt(i);
+                length--;
+
+                if (i < length) {
+                    char curr = Character.toUpperCase(attribute.charAt(i));
+                    attribute.setCharAt(i, curr);
+                }
+            }
         }
 
         return attribute.toString();
