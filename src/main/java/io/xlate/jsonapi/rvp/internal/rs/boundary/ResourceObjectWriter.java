@@ -113,7 +113,7 @@ public class ResourceObjectWriter {
         meta.getEntityType()
             .getAttributes()
             .stream()
-            .filter(a -> a.isAssociation())
+            .filter(a -> meta.isRelatedTo(a.getName()))
             .forEach(a -> {
                 Object value;
 
