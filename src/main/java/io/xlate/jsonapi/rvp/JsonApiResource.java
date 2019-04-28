@@ -16,6 +16,8 @@
  ******************************************************************************/
 package io.xlate.jsonapi.rvp;
 
+import static io.xlate.jsonapi.rvp.JsonApiResourceType.CONFIGURATION_KEY;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -94,8 +96,8 @@ public abstract class JsonApiResource {
     @SuppressWarnings("unchecked")
     @PostConstruct
     private void initialize() {
-        if (config.getProperties().containsKey("io.xlate.jsonapi.rs.resourcetypes")) {
-            resourceTypes = (Set<JsonApiResourceType<?>>) config.getProperty("io.xlate.jsonapi.rs.resourcetypes");
+        if (config.getProperties().containsKey(CONFIGURATION_KEY)) {
+            resourceTypes = (Set<JsonApiResourceType<?>>) config.getProperty(CONFIGURATION_KEY);
         } else {
             resourceTypes = Collections.emptySet();
         }

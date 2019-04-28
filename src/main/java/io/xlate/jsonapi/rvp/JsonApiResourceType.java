@@ -8,6 +8,8 @@ import java.util.function.Function;
 
 public class JsonApiResourceType<T> {
 
+    public static final String CONFIGURATION_KEY = "io.xlate.jsonapi.rs.resourcetypes";
+
     private final String name;
     private final Class<T> klass;
     private final String exposedIdAttribute;
