@@ -30,8 +30,6 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.logging.Logger;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import javax.json.Json;
 import javax.json.JsonArrayBuilder;
@@ -55,19 +53,20 @@ public class ResourceObjectWriter {
 
     private static final Logger logger = Logger.getLogger(ResourceObjectWriter.class.getName());
 
-    static Pattern attributePattern = Pattern.compile("([A-Z])[a-z]");
+//    static Pattern attributePattern = Pattern.compile("([A-Z])[a-z]");
 
     static String toJsonName(String attributeName) {
-        StringBuilder jsonName = new StringBuilder(attributeName);
-        Matcher m = attributePattern.matcher(jsonName);
-
-        while (m.find()) {
-            char replacement = m.group(1).toLowerCase().charAt(0);
-            jsonName.setCharAt(m.start(), replacement);
-            jsonName.insert(m.start(), '-');
-        }
-
-        return jsonName.toString();
+        return attributeName;
+//        StringBuilder jsonName = new StringBuilder(attributeName);
+//        Matcher m = attributePattern.matcher(jsonName);
+//
+//        while (m.find()) {
+//            char replacement = m.group(1).toLowerCase().charAt(0);
+//            jsonName.setCharAt(m.start(), replacement);
+//            jsonName.insert(m.start(), '-');
+//        }
+//
+//        return jsonName.toString();
     }
 
     private final EntityMetamodel model;

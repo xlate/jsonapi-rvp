@@ -52,21 +52,22 @@ public class ResourceObjectReader {
     private final EntityMetamodel model;
 
     public static String toAttributeName(String jsonName) {
-        StringBuilder attribute = new StringBuilder(jsonName);
-
-        for (int i = 0, length = attribute.length(); i < length; i++) {
-            if (attribute.charAt(i) == '-') {
-                attribute.deleteCharAt(i);
-                length--;
-
-                if (i < length) {
-                    char curr = Character.toUpperCase(attribute.charAt(i));
-                    attribute.setCharAt(i, curr);
-                }
-            }
-        }
-
-        return attribute.toString();
+        return jsonName;
+//        StringBuilder attribute = new StringBuilder(jsonName);
+//
+//        for (int i = 0, length = attribute.length(); i < length; i++) {
+//            if (attribute.charAt(i) == '-') {
+//                attribute.deleteCharAt(i);
+//                length--;
+//
+//                if (i < length) {
+//                    char curr = Character.toUpperCase(attribute.charAt(i));
+//                    attribute.setCharAt(i, curr);
+//                }
+//            }
+//        }
+//
+//        return attribute.toString();
     }
 
     public ResourceObjectReader(EntityMetamodel model) {
