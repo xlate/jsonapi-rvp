@@ -91,17 +91,25 @@ public abstract class JsonApiResource {
     private EntityMetamodel model;
     private PersistenceController persistence;
 
-    private Set<JsonApiResourceType<?>> resourceTypes;
-
-    @SuppressWarnings("unchecked")
     @PostConstruct
+    @SuppressWarnings("unchecked")
     private void initialize() {
+        if (config == null) {
+            return;
+        }
+
+        Set<JsonApiResourceType<?>> resourceTypes;
+
         if (config.getProperties().containsKey(CONFIGURATION_KEY)) {
             resourceTypes = (Set<JsonApiResourceType<?>>) config.getProperty(CONFIGURATION_KEY);
         } else {
             resourceTypes = Collections.emptySet();
         }
 
+        initialize(resourceTypes);
+    }
+
+    protected void initialize(Set<JsonApiResourceType<?>> resourceTypes) {
         model = new EntityMetamodel(this.getClass(), resourceTypes, persistenceContext.getMetamodel());
         persistence = new PersistenceController(persistenceContext, model);
     }

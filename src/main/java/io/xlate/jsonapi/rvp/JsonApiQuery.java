@@ -1,15 +1,15 @@
 /*******************************************************************************
  * Copyright (C) 2018 xlate.io LLC, http://www.xlate.io
  *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as published
- * by the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify it under
+ * the terms of the GNU Affero General Public License as published by the Free
+ * Software Foundation, either version 3 of the License, or (at your option) any
+ * later version.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more
+ * details.
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
@@ -50,6 +50,7 @@ public class JsonApiQuery {
     private Integer pageOffset = null;
     private Integer pageLimit;
     private Map<String, List<String>> fields = new HashMap<>();
+    private Map<String, String> filters = new HashMap<>();
 
     public JsonApiQuery(EntityMeta entityMeta, String id, UriInfo uriInfo) {
         super();
@@ -77,6 +78,17 @@ public class JsonApiQuery {
                           addField(this.fields, fieldm.group(1), ResourceObjectReader.toAttributeName(fieldName));
                       }
                   }
+              });
+
+        Pattern filterp = Pattern.compile("filter\\[([^]]+?)\\]");
+
+        params.entrySet()
+              .stream()
+              .filter(p -> p.getKey().matches("filter\\[[^]]+?\\]"))
+              .forEach(p -> {
+                  Matcher filterm = filterp.matcher(p.getKey());
+                  filterm.find();
+                  addFilter(this.filters, filterm.group(1), p.getValue().get(0));
               });
 
         if (params.containsKey(PARAM_INCLUDE)) {
@@ -158,6 +170,10 @@ public class JsonApiQuery {
             fields.put(resourceType, new ArrayList<String>());
         }
         fields.get(resourceType).add(fieldName);
+    }
+
+    public static void addFilter(Map<String, String> filters, String fieldName, String fieldValue) {
+        filters.put(fieldName, fieldValue);
     }
 
     public boolean includeField(String resourceType, String fieldName) {

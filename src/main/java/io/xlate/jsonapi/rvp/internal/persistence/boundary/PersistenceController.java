@@ -74,9 +74,9 @@ import io.xlate.jsonapi.rvp.internal.rs.boundary.ResourceObjectWriter;
 public class PersistenceController {
 
     private final EntityManager em;
-    private EntityMetamodel model;
-    private ResourceObjectReader reader;
-    private ResourceObjectWriter writer;
+    private final EntityMetamodel model;
+    private final ResourceObjectReader reader;
+    private final ResourceObjectWriter writer;
 
     public PersistenceController(EntityManager em, EntityMetamodel model) {
         this.em = em;
