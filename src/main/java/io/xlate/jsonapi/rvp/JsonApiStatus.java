@@ -1,16 +1,16 @@
 /*******************************************************************************
  * Copyright (C) 2018 xlate.io LLC, http://www.xlate.io
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published
  * by the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU Affero General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  ******************************************************************************/
@@ -22,7 +22,7 @@ import javax.ws.rs.core.Response.StatusType;
 public enum JsonApiStatus implements StatusType {
 
     /**
-     * 422 Unprocessable Entity, see {@link <a href="https://tools.ietf.org/html/rfc4918#section-11.2">WebDAV documentation</a>}.
+     * 422 Unprocessable Entity, see <a href="https://tools.ietf.org/html/rfc4918#section-11.2">WebDAV documentation</a>.
      */
     UNPROCESSABLE_ENTITY(422, "Unprocessable Entity");
 
