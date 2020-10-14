@@ -25,6 +25,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
@@ -258,19 +259,12 @@ public class PersistenceController {
                                            String id) {
         List<Predicate> predicates = new ArrayList<>(2);
 
-        String principalNamePath = meta.getPrincipalNamePath();
+        if (user != null) {
+            String namePath = meta.getPrincipalNamePath();
+            Predicate userPredicate = buildPredicate(builder, root, namePath, user.getName());
 
-        if (principalNamePath != null && principalNamePath.length() > 0) {
-            String[] elements = principalNamePath.split("\\.");
-            From<?, ?> namePath = root;
-
-            for (int i = 0; i < elements.length; i++) {
-                if (i + 1 == elements.length) {
-                    String principalName = user.getName();
-                    predicates.add(builder.equal(namePath.get(elements[i]), principalName));
-                } else {
-                    namePath = namePath.join(elements[i]);
-                }
+            if (userPredicate != null) {
+                predicates.add(userPredicate);
             }
         }
 
@@ -280,6 +274,28 @@ public class PersistenceController {
         }
 
         return predicates;
+    }
+
+    static Predicate buildPredicate(CriteriaBuilder builder,
+                                    Root<?> root,
+                                    String path,
+                                    String value) {
+        Predicate p = null;
+
+        if (path != null && path.length() > 0) {
+            String[] elements = path.split("\\.");
+            From<?, ?> namePath = root;
+
+            for (int i = 0; i < elements.length; i++) {
+                if (i + 1 == elements.length) {
+                    p = builder.equal(namePath.get(elements[i]), value);
+                } else {
+                    namePath = namePath.join(elements[i]);
+                }
+            }
+        }
+
+        return p;
     }
 
     @SuppressWarnings("unchecked")
@@ -297,6 +313,7 @@ public class PersistenceController {
 
         fetchedAttributes = rootType.getAttributes()
                                     .stream()
+                                    .filter(a -> !a.isAssociation())
                                     .collect(Collectors.toList());
 
         EntityGraph<T> graph = em.createEntityGraph(entityClass);
@@ -402,6 +419,15 @@ public class PersistenceController {
             predicates.add(builder.equal(relatedJoin.get(relatedMeta.getExposedIdAttribute()), key));
         } else {
             predicates = buildPredicates(builder, root, context.getSecurity().getUserPrincipal(), meta, id);
+        }
+
+        if (!params.getFilters().isEmpty()) {
+            params.getFilters()
+                  .entrySet()
+                  .stream()
+                  .map(e -> buildPredicate(builder, root, e.getKey(), e.getValue()))
+                  .filter(Objects::nonNull)
+                  .forEach(predicates::add);
         }
 
         if (!predicates.isEmpty()) {

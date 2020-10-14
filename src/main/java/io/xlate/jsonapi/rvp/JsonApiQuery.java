@@ -135,6 +135,11 @@ public class JsonApiQuery {
         return uriInfo;
     }
 
+    public Map<String, String> getFilters() {
+        processUri();
+        return filters;
+    }
+
     public List<String> getInclude() {
         processUri();
         return include;

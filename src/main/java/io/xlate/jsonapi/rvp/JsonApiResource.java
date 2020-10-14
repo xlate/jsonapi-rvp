@@ -88,6 +88,7 @@ public abstract class JsonApiResource {
 
     CacheControl cacheControl = new CacheControl();
 
+    private Class<?> resourceClass;
     private EntityMetamodel model;
     private PersistenceController persistence;
 
@@ -110,7 +111,17 @@ public abstract class JsonApiResource {
     }
 
     protected void initialize(Set<JsonApiResourceType<?>> resourceTypes) {
-        model = new EntityMetamodel(this.getClass(), resourceTypes, persistenceContext.getMetamodel());
+        resourceClass = this.getClass();
+
+        while (resourceClass != null && !resourceClass.isAnnotationPresent(Path.class)) {
+            resourceClass = resourceClass.getSuperclass();
+        }
+
+        if (resourceClass == null) {
+            throw new IllegalStateException("Resource class missing @Path annotation");
+        }
+
+        model = new EntityMetamodel(resourceClass, resourceTypes, persistenceContext.getMetamodel());
         persistence = new PersistenceController(persistenceContext, model);
     }
 
@@ -153,7 +164,7 @@ public abstract class JsonApiResource {
 
                     if (response != null) {
                         context.setResponseEntity(response);
-                        Responses.created(context, getClass());
+                        Responses.created(context, resourceClass);
                     } else {
                         Responses.notFound(context);
                     }
