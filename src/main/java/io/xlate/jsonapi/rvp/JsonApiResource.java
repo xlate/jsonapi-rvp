@@ -59,6 +59,7 @@ import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMetamodel;
 import io.xlate.jsonapi.rvp.internal.rs.boundary.InternalContext;
 import io.xlate.jsonapi.rvp.internal.rs.boundary.Responses;
 import io.xlate.jsonapi.rvp.internal.rs.entity.JsonApiRequest;
+import io.xlate.jsonapi.rvp.internal.validation.boundary.TransactionalValidator;
 
 @Consumes(JsonApiMediaType.APPLICATION_JSONAPI)
 @Produces(JsonApiMediaType.APPLICATION_JSONAPI)
@@ -85,6 +86,9 @@ public abstract class JsonApiResource {
 
     @Inject
     protected Validator validator;
+
+    @Inject
+    TransactionalValidator txValidator;
 
     CacheControl cacheControl = new CacheControl();
 
@@ -154,6 +158,7 @@ public abstract class JsonApiResource {
             if (meta == null) {
                 Responses.notFound(context);
             } else {
+                context.setEntityMeta(meta);
                 handler.onRequest(context);
 
                 Set<ConstraintViolation<?>> violations = validateEntity(resourceType, null, input);
@@ -371,6 +376,7 @@ public abstract class JsonApiResource {
             if (!isValidId(meta, id)) {
                 Responses.notFound(context);
             } else {
+                context.setEntityMeta(meta);
                 handler.onRequest(context);
                 Set<ConstraintViolation<?>> violations = validateEntity(resourceType, null, input);
                 handler.afterValidation(context, violations);

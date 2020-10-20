@@ -181,4 +181,8 @@ public class EntityMeta {
             throw new RuntimeException(e);
         }
     }
+
+    public Set<String> getUniqueTuple(String name) {
+        return configuredType.getUniqueTuples().get(name);
+    }
 }

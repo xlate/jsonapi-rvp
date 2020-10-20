@@ -1,10 +1,10 @@
 package io.xlate.jsonapi.rvp;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 
@@ -16,7 +16,7 @@ public class JsonApiResourceType<T> {
     private final Class<T> klass;
     private final String exposedIdAttribute;
     private final Set<String> relationships;
-    private final List<Set<String>> uniqueTuples;
+    private final Map<String, Set<String>> uniqueTuples;
     private final Function<String, Object> idReader;
     private final String principalNamePath;
 
@@ -28,7 +28,7 @@ public class JsonApiResourceType<T> {
         private final String name;
         private final Class<T> klass;
         private Set<String> relationships;
-        private List<Set<String>> uniqueTuples = new ArrayList<>(3);
+        private Map<String, Set<String>> uniqueTuples = new HashMap<>(3);
         private String exposedIdAttribute;
         private Function<String, Object> idReader;
         private String principalNamePath;
@@ -53,8 +53,8 @@ public class JsonApiResourceType<T> {
             return this;
         }
 
-        public Builder<T> unique(String... attributes) {
-            this.uniqueTuples.add(new HashSet<>(Arrays.asList(attributes)));
+        public Builder<T> unique(String name, String... attributes) {
+            this.uniqueTuples.put(name, new HashSet<>(Arrays.asList(attributes)));
             return this;
         }
 
@@ -73,7 +73,7 @@ public class JsonApiResourceType<T> {
     private JsonApiResourceType(String name,
             Class<T> klass,
             Set<String> relationships,
-            List<Set<String>> uniqueTuples,
+            Map<String, Set<String>> uniqueTuples,
             String exposedIdAttribute,
             Function<String, Object> idReader,
             String principalNamePath) {
@@ -135,7 +135,7 @@ public class JsonApiResourceType<T> {
         return relationships;
     }
 
-    public List<Set<String>> getUniqueTuples() {
+    public Map<String, Set<String>> getUniqueTuples() {
         return uniqueTuples;
     }
 

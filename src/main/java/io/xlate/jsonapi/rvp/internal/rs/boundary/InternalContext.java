@@ -13,6 +13,7 @@ import javax.ws.rs.core.UriInfo;
 
 import io.xlate.jsonapi.rvp.JsonApiContext;
 import io.xlate.jsonapi.rvp.JsonApiQuery;
+import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMeta;
 
 public class InternalContext implements JsonApiContext {
 
@@ -23,6 +24,7 @@ public class InternalContext implements JsonApiContext {
     private final String resourceId;
     private final String relationshipName;
     private JsonApiQuery query;
+    private EntityMeta entityMeta;
     private final JsonObject requestEntity;
 
     private ResponseBuilder responseBuilder;
@@ -97,6 +99,14 @@ public class InternalContext implements JsonApiContext {
 
     public void setQuery(JsonApiQuery query) {
         this.query = query;
+    }
+
+    public EntityMeta getEntityMeta() {
+        return entityMeta;
+    }
+
+    public void setEntityMeta(EntityMeta entityMeta) {
+        this.entityMeta = entityMeta;
     }
 
     @Override

@@ -14,6 +14,7 @@ import javax.json.Json;
 import javax.json.JsonArray;
 import javax.json.JsonArrayBuilder;
 import javax.json.JsonObject;
+import javax.json.JsonObjectBuilder;
 import javax.validation.ConstraintViolation;
 import javax.ws.rs.core.CacheControl;
 import javax.ws.rs.core.EntityTag;
@@ -25,6 +26,7 @@ import javax.ws.rs.core.UriInfo;
 
 import io.xlate.jsonapi.rvp.JsonApiStatus;
 import io.xlate.jsonapi.rvp.internal.JsonApiClientErrorException;
+import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMeta;
 
 public class Responses {
 
@@ -130,23 +132,44 @@ public class Responses {
     }
 
     public static void unprocessableEntity(InternalContext context, String title, Set<?> violationSet) {
-        Map<String, List<String>> errorMap = new LinkedHashMap<>();
+        class Error {
+            String message;
+            String status;
+
+            Error(String message, String status) {
+                this.message = message;
+                this.status = status;
+            }
+        }
+        Map<String, List<Error>> errorMap = new LinkedHashMap<>();
         @SuppressWarnings("unchecked")
         Set<ConstraintViolation<?>> violations = (Set<ConstraintViolation<?>>) violationSet;
+        EntityMeta meta = context.getEntityMeta();
 
         for (ConstraintViolation<?> violation : violations) {
             String property = violation.getPropertyPath().toString().replace('.', '/');
 
-            if (!errorMap.containsKey(property)) {
-                errorMap.put(property, new ArrayList<String>(2));
-            }
+            if (meta.getUniqueTuple(property) != null) {
+                for (String constrained : meta.getUniqueTuple(property)) {
+                    if (!errorMap.containsKey(constrained)) {
+                        errorMap.put(constrained, new ArrayList<Error>(2));
+                    }
 
-            errorMap.get(property).add(violation.getMessage());
+                    errorMap.get(constrained).add(new Error("not unique",
+                                                            String.valueOf(Status.CONFLICT.getStatusCode())));
+                }
+            } else {
+                if (!errorMap.containsKey(property)) {
+                    errorMap.put(property, new ArrayList<Error>(2));
+                }
+
+                errorMap.get(property).add(new Error(violation.getMessage(), null));
+            }
         }
 
         JsonArrayBuilder errors = Json.createArrayBuilder();
 
-        for (Entry<String, List<String>> property : errorMap.entrySet()) {
+        for (Entry<String, List<Error>> property : errorMap.entrySet()) {
             final String key = property.getKey();
 
             if (key.isEmpty()) {
@@ -161,11 +184,17 @@ public class Responses {
                 pointer = "/data/attributes/" + key;
             }
 
-            for (String message : property.getValue()) {
-                errors.add(Json.createObjectBuilder()
-                               .add("source", Json.createObjectBuilder().add("pointer", pointer))
-                               .add("title", title)
-                               .add("detail", message));
+            for (Error error : property.getValue()) {
+                JsonObjectBuilder builder = Json.createObjectBuilder()
+                                                .add("source", Json.createObjectBuilder().add("pointer", pointer))
+                                                .add("title", title)
+                                                .add("detail", error.message);
+
+                if (error.status != null) {
+                    builder.add("status", error.status);
+                }
+
+                errors.add(builder);
             }
         }
 

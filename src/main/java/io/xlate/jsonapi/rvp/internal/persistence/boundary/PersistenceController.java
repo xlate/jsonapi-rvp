@@ -30,6 +30,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 
+import javax.enterprise.inject.spi.CDI;
 import javax.json.Json;
 import javax.json.JsonArray;
 import javax.json.JsonArrayBuilder;
@@ -61,6 +62,8 @@ import javax.persistence.criteria.Selection;
 import javax.persistence.metamodel.Attribute;
 import javax.persistence.metamodel.Bindable;
 import javax.persistence.metamodel.EntityType;
+import javax.validation.ConstraintViolation;
+import javax.validation.ConstraintViolationException;
 import javax.ws.rs.core.Response.Status;
 import javax.ws.rs.core.UriInfo;
 
@@ -72,6 +75,7 @@ import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMeta;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMetamodel;
 import io.xlate.jsonapi.rvp.internal.rs.boundary.ResourceObjectReader;
 import io.xlate.jsonapi.rvp.internal.rs.boundary.ResourceObjectWriter;
+import io.xlate.jsonapi.rvp.internal.validation.boundary.TransactionalValidator;
 
 public class PersistenceController {
 
@@ -173,17 +177,21 @@ public class PersistenceController {
         T entity;
 
         try {
-            entity = (T) entityClass.newInstance();
+            entity = (T) entityClass.getConstructor().newInstance();
             em.setFlushMode(FlushModeType.COMMIT);
-        } catch (InstantiationException | IllegalAccessException e) {
+        } catch (Exception e) {
             throw new RuntimeException(e);
         }
 
         reader.fromJson(this, context, entity, input);
 
-        // TODO: Check unique attributes
-
         handler.beforePersist(context, entity);
+
+        TransactionalValidator validator = CDI.current().select(TransactionalValidator.class).get();
+        Set<ConstraintViolation<T>> violations = validator.validate(context.getRequest().getMethod(), entity);
+        if (!violations.isEmpty()) {
+            throw new ConstraintViolationException(violations);
+        }
 
         em.persist(entity);
         em.flush();
@@ -219,6 +227,13 @@ public class PersistenceController {
         reader.fromJson(this, context, entity, input);
 
         handler.beforeMerge(context, entity);
+
+        TransactionalValidator validator = CDI.current().select(TransactionalValidator.class).get();
+        Set<ConstraintViolation<T>> violations = validator.validate(context.getRequest().getMethod(), entity);
+        if (!violations.isEmpty()) {
+            em.detach(entity);
+            throw new ConstraintViolationException(violations);
+        }
 
         final Object updatedEntity = em.merge(entity);
         em.flush();
@@ -394,7 +409,9 @@ public class PersistenceController {
         Join<Object, Object> relatedJoin;
 
         if (relationshipName != null) {
-            relatedJoin = root.join(inverseOf(relatedMeta.getEntityType().getAttribute(relationshipName)).getName());
+            Class<Object> owningType = relatedMeta.getEntityType().getJavaType();
+            Attribute<Object, ?> attribute = relatedMeta.getEntityType().getAttribute(relationshipName);
+            relatedJoin = root.join(inverseOf(owningType, attribute).getName());
         } else {
             relatedJoin = null;
         }
@@ -609,7 +626,7 @@ public class PersistenceController {
         @SuppressWarnings("unchecked")
         Bindable<Object> bindable = (Bindable<Object>) includedAttribute;
         Class<Object> includedClass = bindable.getBindableJavaType();
-        Attribute<Object, ?> inverseAttribute = inverseOf(includedAttribute);
+        Attribute<Object, ?> inverseAttribute = inverseOf(entityType.getJavaType(), includedAttribute);
 
         final CriteriaBuilder builder = em.getCriteriaBuilder();
         final CriteriaQuery<Tuple> query = builder.createTupleQuery();
@@ -663,12 +680,11 @@ public class PersistenceController {
         }
     }
 
-    Attribute<Object, ?> inverseOf(Attribute<Object, ?> attribute) {
+    Attribute<Object, ?> inverseOf(Class<Object> type, Attribute<Object, ?> attribute) {
         @SuppressWarnings("unchecked")
         Bindable<Object> bindable = (Bindable<Object>) attribute;
         String mappedBy = getMappedBy(attribute);
 
-        Class<Object> thisType = attribute.getDeclaringType().getJavaType();
         Class<Object> otherType = bindable.getBindableJavaType();
         EntityType<Object> otherMeta = model.getEntityMeta(otherType).getEntityType();
 
@@ -677,7 +693,7 @@ public class PersistenceController {
                 @SuppressWarnings("unchecked")
                 Bindable<Object> otherBindable = (Bindable<Object>) otherAttribute;
 
-                boolean assignable = thisType.isAssignableFrom(otherBindable.getBindableJavaType());
+                boolean assignable = type.isAssignableFrom(otherBindable.getBindableJavaType());
 
                 if (assignable) {
                     String otherMappedBy = getMappedBy(otherAttribute);
