@@ -392,7 +392,7 @@ public class PersistenceController {
 
         Set<String> counted = rootType.getPluralAttributes()
                                       .stream()
-                                      .map(a -> a.getName())
+                                      .map(Attribute::getName)
                                       .filter(a -> meta.isRelatedTo(a))
                                       .filter(a -> !params.getInclude().contains(a))
                                       .collect(Collectors.toSet());

@@ -94,7 +94,7 @@ public abstract class JsonApiResource {
 
     @PostConstruct
     @SuppressWarnings("unchecked")
-    private void initialize() {
+    void initialize() {
         if (config == null) {
             return;
         }
@@ -451,7 +451,7 @@ public abstract class JsonApiResource {
             }
         }
 
-        if (available.size() > 0) {
+        if (!available.isEmpty()) {
             return new JsonApiHandlerChain(available);
         }
 

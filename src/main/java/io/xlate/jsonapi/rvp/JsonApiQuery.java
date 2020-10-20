@@ -65,6 +65,38 @@ public class JsonApiQuery {
         }
 
         MultivaluedMap<String, String> params = uriInfo.getQueryParameters();
+
+        processFields(params);
+        processFilters(params);
+
+        if (params.containsKey(PARAM_INCLUDE)) {
+            for (String i : params.getFirst(PARAM_INCLUDE).split(",")) {
+                String attribute = ResourceObjectReader.toAttributeName(i);
+                this.include.add(attribute);
+                this.count.remove(attribute);
+            }
+        }
+
+        if (params.containsKey(PARAM_SORT)) {
+            for (String s : params.getFirst(PARAM_SORT).split(",")) {
+                boolean descending = s.startsWith("-");
+                String attribute = ResourceObjectReader.toAttributeName(s.substring(descending ? 1 : 0));
+                this.sort.add(descending ? '-' + attribute : attribute);
+            }
+        }
+
+        if (params.containsKey(PARAM_PAGE_OFFSET)) {
+            this.pageOffset = Integer.parseInt(params.getFirst(PARAM_PAGE_OFFSET));
+        }
+
+        if (params.containsKey(PARAM_PAGE_LIMIT)) {
+            this.pageLimit = Integer.parseInt(params.getFirst(PARAM_PAGE_LIMIT));
+        }
+
+        uriProcessed = true;
+    }
+
+    void processFields(MultivaluedMap<String, String> params) {
         Pattern fieldp = Pattern.compile("fields\\[([^]]+?)\\]");
 
         params.entrySet()
@@ -79,7 +111,9 @@ public class JsonApiQuery {
                       }
                   }
               });
+    }
 
+    void processFilters(MultivaluedMap<String, String> params) {
         Pattern filterp = Pattern.compile("filter\\[([^]]+?)\\]");
 
         params.entrySet()
@@ -90,37 +124,6 @@ public class JsonApiQuery {
                   filterm.find();
                   addFilter(this.filters, filterm.group(1), p.getValue().get(0));
               });
-
-        if (params.containsKey(PARAM_INCLUDE)) {
-            String includeParam = params.getFirst(PARAM_INCLUDE);
-
-            for (String include : includeParam.split(",")) {
-                String attribute = ResourceObjectReader.toAttributeName(include);
-
-                this.include.add(attribute);
-                this.count.remove(attribute);
-            }
-        }
-
-        if (params.containsKey(PARAM_SORT)) {
-            String sortParam = params.getFirst(PARAM_SORT);
-
-            for (String sort : sortParam.split(",")) {
-                boolean descending = sort.startsWith("-");
-                String attribute = ResourceObjectReader.toAttributeName(sort.substring(descending ? 1 : 0));
-                this.sort.add(descending ? '-' + attribute : attribute);
-            }
-        }
-
-        if (params.containsKey(PARAM_PAGE_OFFSET)) {
-            this.pageOffset = Integer.parseInt(params.getFirst(PARAM_PAGE_OFFSET));
-        }
-
-        if (params.containsKey(PARAM_PAGE_LIMIT)) {
-            this.pageLimit = Integer.parseInt(params.getFirst(PARAM_PAGE_LIMIT));
-        }
-
-        uriProcessed = true;
     }
 
     public EntityMeta getEntityMeta() {
