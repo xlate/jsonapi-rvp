@@ -166,7 +166,7 @@ public class ResourceObjectReader {
 
         JsonArray errorsArray = errors.build();
 
-        if (errorsArray.size() > 0) {
+        if (!errorsArray.isEmpty()) {
             throw new JsonApiClientErrorException(Status.BAD_REQUEST, errorsArray);
         }
     }

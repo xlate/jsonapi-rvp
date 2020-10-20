@@ -18,6 +18,8 @@ package io.xlate.jsonapi.rvp.internal.validation.boundary;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map.Entry;
+import java.util.NoSuchElementException;
 import java.util.Set;
 
 import javax.persistence.metamodel.Attribute;
@@ -28,6 +30,7 @@ import javax.ws.rs.core.MultivaluedMap;
 
 import io.xlate.jsonapi.rvp.JsonApiQuery;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMeta;
+import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMetamodel;
 import io.xlate.jsonapi.rvp.internal.rs.boundary.ResourceObjectReader;
 
 public class JsonApiUriQueryValidator
@@ -51,96 +54,161 @@ public class JsonApiUriQueryValidator
         EntityType<Object> rootType =  meta.getEntityType();
         String id = value.getId();
 
+        valid = validateFilters(value, context, valid);
+
         if (params.containsKey(JsonApiQuery.PARAM_INCLUDE)) {
-            List<String> includeParams = params.get(JsonApiQuery.PARAM_INCLUDE);
-            valid = validateSingle(JsonApiQuery.PARAM_INCLUDE, includeParams, context, valid);
-
-            String includeParam = includeParams.get(0);
-            Set<String> includes = new HashSet<>();
-            //Map<String, List<String>> fields = new HashMap<>();
-
-            for (String include : includeParam.split(",")) {
-                String attribute = ResourceObjectReader.toAttributeName(include);
-
-                if (includes.contains(attribute)) {
-                    valid = false;
-                    context.buildConstraintViolationWithTemplate(""
-                            + "The relationshop path `" + include + "` is listed multiple times.")
-                           .addPropertyNode(JsonApiQuery.PARAM_INCLUDE)
-                           .addConstraintViolation();
-                } else {
-                    try {
-                        Attribute<?, ?> attr = rootType.getAttribute(attribute);
-
-                        if (!attr.isAssociation()) {
-                            valid = false;
-                            context.buildConstraintViolationWithTemplate(""
-                                    + "Attribute `" + include + "` is not a relationship.")
-                                   .addPropertyNode(JsonApiQuery.PARAM_INCLUDE)
-                                   .addConstraintViolation();
-                        } else {
-                            /*if (!FetchParameters.includeField(fields, resourceType, attribute)) {
-                                valid = false;
-                                context.buildConstraintViolationWithTemplate(""
-                                        + "Cannot include relationshop `" + include
-                                        + "` not selected by parameter `field[" + resourceType + "]`.")
-                                       .addPropertyNode(FetchParameters.PARAM_INCLUDE)
-                                       .addConstraintViolation();
-                            }*/
-                        }
-                    } catch (@SuppressWarnings("unused") IllegalArgumentException e) {
-                        valid = false;
-                        context.buildConstraintViolationWithTemplate(""
-                                + "The resource does not have a `" + include + "` relationship path.")
-                               .addPropertyNode(JsonApiQuery.PARAM_INCLUDE)
-                               .addConstraintViolation();
-                    }
-
-                    //FetchParameters.addField(fields, resourceType, attribute);
-                }
-            }
+            valid = validateInclude(rootType, params, context, valid);
         }
 
         if (params.containsKey(JsonApiQuery.PARAM_SORT)) {
-            if (id != null) {
-                valid = false;
-                context.buildConstraintViolationWithTemplate(""
-                        + "Cannot sort a single resource, `" + id + "`")
-                       .addPropertyNode(JsonApiQuery.PARAM_SORT)
-                       .addConstraintViolation();
-            } else {
-                List<String> sortParams = params.get(JsonApiQuery.PARAM_SORT);
-                valid = validateSingle(JsonApiQuery.PARAM_SORT, sortParams, context, valid);
-
-                String sortParam = sortParams.get(0);
-
-                for (String sort : sortParam.split(",")) {
-                    boolean descending = sort.startsWith("-");
-                    String attribute = ResourceObjectReader.toAttributeName(sort.substring(descending ? 1 : 0));
-
-                    try {
-                        Attribute<?, ?> attr = rootType.getAttribute(attribute);
-
-                        if (attr.isAssociation()) {
-                            valid = false;
-                            context.buildConstraintViolationWithTemplate(""
-                                    + "Sort key `" + sort + "` is not an attribute.")
-                                   .addPropertyNode(JsonApiQuery.PARAM_SORT)
-                                   .addConstraintViolation();
-                        }
-                    } catch (@SuppressWarnings("unused") IllegalArgumentException e) {
-                        valid = false;
-                        context.buildConstraintViolationWithTemplate(""
-                                + "The resource does not have a `" + sort + "` attribute.")
-                               .addPropertyNode(JsonApiQuery.PARAM_SORT)
-                               .addConstraintViolation();
-                    }
-                }
-            }
+            valid = validateSort(rootType, id, params, context, valid);
         }
 
         valid = validatePaging(id, JsonApiQuery.PARAM_PAGE_OFFSET, params, context, valid);
         valid = validatePaging(id, JsonApiQuery.PARAM_PAGE_LIMIT, params, context, valid);
+
+        return valid;
+    }
+
+    boolean validateInclude(EntityType<Object> rootType,
+                            MultivaluedMap<String, String> params,
+                            ConstraintValidatorContext context,
+                            boolean valid) {
+
+        List<String> includeParams = params.get(JsonApiQuery.PARAM_INCLUDE);
+        valid = validateSingle(JsonApiQuery.PARAM_INCLUDE, includeParams, context, valid);
+
+        String includeParam = includeParams.get(0);
+        Set<String> includes = new HashSet<>();
+        //Map<String, List<String>> fields = new HashMap<>();
+
+        for (String include : includeParam.split(",")) {
+            String attribute = ResourceObjectReader.toAttributeName(include);
+
+            if (includes.contains(attribute)) {
+                valid = false;
+                context.buildConstraintViolationWithTemplate(""
+                        + "The relationshop path `" + include + "` is listed multiple times.")
+                       .addPropertyNode(JsonApiQuery.PARAM_INCLUDE)
+                       .addConstraintViolation();
+            } else {
+                try {
+                    Attribute<?, ?> attr = rootType.getAttribute(attribute);
+
+                    if (!attr.isAssociation()) {
+                        valid = false;
+                        context.buildConstraintViolationWithTemplate(""
+                                + "Attribute `" + include + "` is not a relationship.")
+                               .addPropertyNode(JsonApiQuery.PARAM_INCLUDE)
+                               .addConstraintViolation();
+                    } else {
+                        /*if (!FetchParameters.includeField(fields, resourceType, attribute)) {
+                            valid = false;
+                            context.buildConstraintViolationWithTemplate(""
+                                    + "Cannot include relationshop `" + include
+                                    + "` not selected by parameter `field[" + resourceType + "]`.")
+                                   .addPropertyNode(FetchParameters.PARAM_INCLUDE)
+                                   .addConstraintViolation();
+                        }*/
+                    }
+                } catch (@SuppressWarnings("unused") IllegalArgumentException e) {
+                    valid = false;
+                    context.buildConstraintViolationWithTemplate(""
+                            + "The resource does not have a `" + include + "` relationship path.")
+                           .addPropertyNode(JsonApiQuery.PARAM_INCLUDE)
+                           .addConstraintViolation();
+                }
+
+                //FetchParameters.addField(fields, resourceType, attribute);
+            }
+        }
+
+        return valid;
+    }
+
+    boolean validateFilters(JsonApiQuery value, ConstraintValidatorContext context, boolean valid) {
+        EntityMeta meta = value.getEntityMeta();
+        EntityMetamodel model = value.getModel();
+
+        for (Entry<String, String> filter : value.getFilters().entrySet()) {
+            String path = filter.getKey();
+            String paramName = "filter[" + path + "]";
+            String[] elements = path.split("\\.");
+            boolean validFilter = true;
+
+            for (int i = 0; i < elements.length && validFilter; i++) {
+                if (i + 1 == elements.length) {
+                    String attributeName = elements[i];
+
+                    try {
+                        meta.getPropertyDescriptor(attributeName);
+                    } catch (NoSuchElementException e) {
+                        validFilter = valid = false;
+                        context.buildConstraintViolationWithTemplate(""
+                                + "Filter path `" + path + "` is not valid.")
+                               .addPropertyNode(paramName)
+                               .addConstraintViolation();
+                    }
+                } else {
+                    String relationshipName = elements[i];
+
+                    if (meta.isRelatedTo(relationshipName)) {
+                        meta = model.getEntityMeta(meta.getRelatedEntityClass(relationshipName));
+                    } else {
+                        validFilter = valid = false;
+                        context.buildConstraintViolationWithTemplate(""
+                                + "Filter path `" + path + "` is not valid.")
+                               .addPropertyNode(paramName)
+                               .addConstraintViolation();
+                    }
+                }
+            }
+        }
+
+        return valid;
+    }
+
+    boolean validateSort(EntityType<Object> rootType,
+                         String id,
+                         MultivaluedMap<String, String> params,
+                         ConstraintValidatorContext context,
+                         boolean valid) {
+
+        if (id != null) {
+            valid = false;
+            context.buildConstraintViolationWithTemplate(""
+                    + "Cannot sort a single resource, `" + id + "`")
+                   .addPropertyNode(JsonApiQuery.PARAM_SORT)
+                   .addConstraintViolation();
+        } else {
+            List<String> sortParams = params.get(JsonApiQuery.PARAM_SORT);
+            valid = validateSingle(JsonApiQuery.PARAM_SORT, sortParams, context, valid);
+
+            String sortParam = sortParams.get(0);
+
+            for (String sort : sortParam.split(",")) {
+                boolean descending = sort.startsWith("-");
+                String attribute = ResourceObjectReader.toAttributeName(sort.substring(descending ? 1 : 0));
+
+                try {
+                    Attribute<?, ?> attr = rootType.getAttribute(attribute);
+
+                    if (attr.isAssociation()) {
+                        valid = false;
+                        context.buildConstraintViolationWithTemplate(""
+                                + "Sort key `" + sort + "` is not an attribute.")
+                               .addPropertyNode(JsonApiQuery.PARAM_SORT)
+                               .addConstraintViolation();
+                    }
+                } catch (@SuppressWarnings("unused") IllegalArgumentException e) {
+                    valid = false;
+                    context.buildConstraintViolationWithTemplate(""
+                            + "The resource does not have a `" + sort + "` attribute.")
+                           .addPropertyNode(JsonApiQuery.PARAM_SORT)
+                           .addConstraintViolation();
+                }
+            }
+        }
 
         return valid;
     }

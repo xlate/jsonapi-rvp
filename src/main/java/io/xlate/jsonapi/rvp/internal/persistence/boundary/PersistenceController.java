@@ -39,6 +39,7 @@ import javax.persistence.EntityGraph;
 import javax.persistence.EntityManager;
 import javax.persistence.FlushModeType;
 import javax.persistence.ManyToMany;
+import javax.persistence.NoResultException;
 import javax.persistence.OneToMany;
 import javax.persistence.OneToOne;
 import javax.persistence.PersistenceException;
@@ -84,6 +85,10 @@ public class PersistenceController {
         this.model = model;
         this.reader = new ResourceObjectReader(model);
         this.writer = new ResourceObjectWriter(model);
+    }
+
+    public static <T> java.util.function.Predicate<T> not(java.util.function.Predicate<T> t) {
+        return t.negate();
     }
 
     List<Order> getOrderBy(CriteriaBuilder builder, Root<Object> root, JsonApiQuery params) {
@@ -175,6 +180,8 @@ public class PersistenceController {
         }
 
         reader.fromJson(this, context, entity, input);
+
+        // TODO: Check unique attributes
 
         handler.beforePersist(context, entity);
 
@@ -348,6 +355,8 @@ public class PersistenceController {
             q.setHint("javax.persistence.fetchgraph", graph);
 
             entity = (T) q.getSingleResult();
+        } catch (NoResultException e) {
+            return null;
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -393,8 +402,8 @@ public class PersistenceController {
         Set<String> counted = rootType.getPluralAttributes()
                                       .stream()
                                       .map(Attribute::getName)
-                                      .filter(a -> meta.isRelatedTo(a))
-                                      .filter(a -> !params.getInclude().contains(a))
+                                      .filter(meta::isRelatedTo)
+                                      .filter(not(params.getInclude()::contains))
                                       .collect(Collectors.toSet());
 
         /*
@@ -492,7 +501,7 @@ public class PersistenceController {
 
         JsonObjectBuilder response = writer.topLevelBuilder();
         JsonArrayBuilder data = Json.createArrayBuilder();
-        Map<String, Object> related = new TreeMap<String, Object>();
+        Map<String, Object> related = new TreeMap<>();
 
         for (Tuple result : results) {
             Object entity = result.get("root");
@@ -553,8 +562,8 @@ public class PersistenceController {
                                         .getEntityType()
                                         .getAttributes()
                                         .stream()
-                                        .filter(a -> a.isAssociation())
-                                        .collect(Collectors.toMap(a -> a.getName(), a -> {
+                                        .filter(Attribute::isAssociation)
+                                        .collect(Collectors.toMap(Attribute::getName, a -> {
                                             if (util.isLoaded(e, a.getName())) {
                                                 return model.getEntityMeta(e.getClass())
                                                             .getPropertyValue(e, a.getName());

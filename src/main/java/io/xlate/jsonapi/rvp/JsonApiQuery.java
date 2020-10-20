@@ -27,6 +27,7 @@ import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.UriInfo;
 
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMeta;
+import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMetamodel;
 import io.xlate.jsonapi.rvp.internal.rs.boundary.ResourceObjectReader;
 import io.xlate.jsonapi.rvp.internal.validation.boundary.ValidJsonApiQuery;
 
@@ -38,6 +39,7 @@ public class JsonApiQuery {
     public static final String PARAM_PAGE_OFFSET = "page[offset]";
     public static final String PARAM_PAGE_LIMIT = "page[limit]";
 
+    private final EntityMetamodel model;
     private final EntityMeta entityMeta;
     private final String id;
     private final UriInfo uriInfo;
@@ -52,8 +54,9 @@ public class JsonApiQuery {
     private Map<String, List<String>> fields = new HashMap<>();
     private Map<String, String> filters = new HashMap<>();
 
-    public JsonApiQuery(EntityMeta entityMeta, String id, UriInfo uriInfo) {
+    public JsonApiQuery(EntityMetamodel model, EntityMeta entityMeta, String id, UriInfo uriInfo) {
         super();
+        this.model = model;
         this.entityMeta = entityMeta;
         this.id = id;
         this.uriInfo = uriInfo;
@@ -122,8 +125,39 @@ public class JsonApiQuery {
               .forEach(p -> {
                   Matcher filterm = filterp.matcher(p.getKey());
                   filterm.find();
-                  addFilter(this.filters, filterm.group(1), p.getValue().get(0));
+                  addFilter(this.filters, replaceIdentifier(filterm.group(1)), p.getValue().get(0));
               });
+    }
+
+    String replaceIdentifier(String fieldPath) {
+        boolean validFilter = true;
+        String[] elements = fieldPath.split("\\.");
+        EntityMeta meta = entityMeta;
+
+        for (int i = 0; i < elements.length && validFilter; i++) {
+            if (i + 1 == elements.length) {
+                String attributeName = elements[i];
+
+                if ("id".equals(attributeName)) {
+                    elements[i] = entityMeta.getExposedIdAttribute().getName();
+                    fieldPath = String.join(".", elements);
+                }
+            } else {
+                String relationshipName = elements[i];
+
+                if (meta.isRelatedTo(relationshipName)) {
+                    meta = model.getEntityMeta(meta.getRelatedEntityClass(relationshipName));
+                } else {
+                    validFilter = false;
+                }
+            }
+        }
+
+        return fieldPath;
+    }
+
+    public EntityMetamodel getModel() {
+        return model;
     }
 
     public EntityMeta getEntityMeta() {

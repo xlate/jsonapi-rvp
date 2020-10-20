@@ -1,8 +1,10 @@
 package io.xlate.jsonapi.rvp;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.function.Function;
 
@@ -14,17 +16,19 @@ public class JsonApiResourceType<T> {
     private final Class<T> klass;
     private final String exposedIdAttribute;
     private final Set<String> relationships;
+    private final List<Set<String>> uniqueTuples;
     private final Function<String, Object> idReader;
     private final String principalNamePath;
 
     public static <T> Builder<T> define(String name, Class<T> klass) {
-        return new Builder<T>(name, klass);
+        return new Builder<>(name, klass);
     }
 
     public static class Builder<T> {
         private final String name;
         private final Class<T> klass;
         private Set<String> relationships;
+        private List<Set<String>> uniqueTuples = new ArrayList<>(3);
         private String exposedIdAttribute;
         private Function<String, Object> idReader;
         private String principalNamePath;
@@ -35,16 +39,22 @@ public class JsonApiResourceType<T> {
         }
 
         public JsonApiResourceType<T> build() {
-            return new JsonApiResourceType<T>(name,
-                                              klass,
-                                              relationships,
-                                              exposedIdAttribute,
-                                              idReader,
-                                              principalNamePath);
+            return new JsonApiResourceType<>(name,
+                                             klass,
+                                             relationships,
+                                             uniqueTuples,
+                                             exposedIdAttribute,
+                                             idReader,
+                                             principalNamePath);
         }
 
         public Builder<T> relationships(String... relationships) {
             this.relationships = new HashSet<>(Arrays.asList(relationships));
+            return this;
+        }
+
+        public Builder<T> unique(String... attributes) {
+            this.uniqueTuples.add(new HashSet<>(Arrays.asList(attributes)));
             return this;
         }
 
@@ -63,6 +73,7 @@ public class JsonApiResourceType<T> {
     private JsonApiResourceType(String name,
             Class<T> klass,
             Set<String> relationships,
+            List<Set<String>> uniqueTuples,
             String exposedIdAttribute,
             Function<String, Object> idReader,
             String principalNamePath) {
@@ -76,13 +87,14 @@ public class JsonApiResourceType<T> {
             this.relationships = Collections.emptySet();
         }
 
+        this.uniqueTuples = uniqueTuples;
         this.exposedIdAttribute = exposedIdAttribute;
         this.principalNamePath = principalNamePath;
 
         if (idReader != null) {
             this.idReader = idReader;
         } else {
-            this.idReader = (id) -> id;
+            this.idReader = id -> id;
         }
     }
 
@@ -121,6 +133,10 @@ public class JsonApiResourceType<T> {
 
     public Set<String> getRelationships() {
         return relationships;
+    }
+
+    public List<Set<String>> getUniqueTuples() {
+        return uniqueTuples;
     }
 
     public String getExposedIdAttribute() {

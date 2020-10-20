@@ -93,7 +93,7 @@ public class EntityMeta {
         if (attributeName != null) {
             attr = entityType.getSingularAttribute(attributeName);
         } else {
-            attr = entityType.getId(entityType.getIdType().getJavaType());
+            attr = getIdAttribute();
         }
 
         return (SingularAttribute<Object, ?>) attr;
