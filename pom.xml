@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>io.xlate</groupId>
   <artifactId>jsonapi-rvp</artifactId>
-  <version>0.0.3</version>
+  <version>0.0.4-SNAPSHOT</version>
 
   <name>JSON:API - REST, Validation, Persistence</name>
   <description>JSON API server implementation Java using JAX-RS, Bean Validation, and Java Persistence (JPA)</description>
@@ -17,7 +17,7 @@
     <url>https://github.com/xlate/jsonapi-rvp</url>
     <connection>scm:git:https://github.com/xlate/jsonapi-rvp.git</connection>
     <developerConnection>scm:git:ssh://git@github.com/xlate/jsonapi-rvp.git</developerConnection>
-    <tag>v0.0.3</tag>
+    <tag>HEAD</tag>
   </scm>
 
   <licenses>
