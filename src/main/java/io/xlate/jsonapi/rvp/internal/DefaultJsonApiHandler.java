@@ -1,18 +1,16 @@
 package io.xlate.jsonapi.rvp.internal;
 
 import java.util.Set;
+import java.util.logging.Logger;
 
 import javax.validation.ConstraintViolation;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import io.xlate.jsonapi.rvp.JsonApiContext;
 import io.xlate.jsonapi.rvp.JsonApiHandler;
 
 public class DefaultJsonApiHandler implements JsonApiHandler<Object> {
 
-    private static final Logger logger = LoggerFactory.getLogger(DefaultJsonApiHandler.class);
+    private static final Logger logger = Logger.getLogger(DefaultJsonApiHandler.class.getName());
 
     public DefaultJsonApiHandler() {
         super();
@@ -26,66 +24,66 @@ public class DefaultJsonApiHandler implements JsonApiHandler<Object> {
     @Override
     public void onRequest(JsonApiContext context) {
         // No operation
-        logger.trace("Default onRequest called");
+        logger.finest("Default onRequest called");
     }
 
     @Override
     public void afterValidation(JsonApiContext context, Set<ConstraintViolation<?>> violations) {
         // No operation
-        logger.trace("Default afterValidation called");
+        logger.finest("Default afterValidation called");
     }
 
     @Override
     public void afterFind(JsonApiContext context, Object entity) {
         // No operation
-        logger.trace("Default afterFind called");
+        logger.finest("Default afterFind called");
     }
 
     @Override
     public void beforePersist(JsonApiContext context, Object entity) {
         // No operation
-        logger.trace("Default beforePersist called");
+        logger.finest("Default beforePersist called");
     }
 
     @Override
     public void afterPersist(JsonApiContext context, Object entity) {
         // No operation
-        logger.trace("Default afterPersist called");
+        logger.finest("Default afterPersist called");
     }
 
     @Override
     public void beforeUpdate(JsonApiContext context, Object entity) {
         // No operation
-        logger.trace("Default beforeUpdate called");
+        logger.finest("Default beforeUpdate called");
     }
 
     @Override
     public void beforeMerge(JsonApiContext context, Object entity) {
         // No operation
-        logger.trace("Default beforeMerge called");
+        logger.finest("Default beforeMerge called");
     }
 
     @Override
     public void afterMerge(JsonApiContext context, Object entity) {
         // No operation
-        logger.trace("Default afterMerge called");
+        logger.finest("Default afterMerge called");
     }
 
     @Override
     public void beforeDelete(JsonApiContext context, Object entity) {
         // No operation
-        logger.trace("Default beforeDelete called");
+        logger.finest("Default beforeDelete called");
     }
 
     @Override
     public void afterDelete(JsonApiContext context, Object entity) {
         // No operation
-        logger.trace("Default afterDelete called");
+        logger.finest("Default afterDelete called");
     }
 
     @Override
     public void beforeResponse(JsonApiContext context) {
         // No operation
-        logger.trace("Default beforeResponse called");
+        logger.finest("Default beforeResponse called");
     }
 }
