@@ -31,7 +31,6 @@ import javax.ws.rs.core.MultivaluedMap;
 import io.xlate.jsonapi.rvp.JsonApiQuery;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMeta;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMetamodel;
-import io.xlate.jsonapi.rvp.internal.rs.boundary.ResourceObjectReader;
 
 public class JsonApiUriQueryValidator
         implements ConstraintValidator<ValidJsonApiQuery, JsonApiQuery> {
@@ -64,6 +63,9 @@ public class JsonApiUriQueryValidator
             valid = validateSort(rootType, id, params, context, valid);
         }
 
+        valid = validatePaging(id, JsonApiQuery.PARAM_PAGE_NUMBER, params, context, valid);
+        valid = validatePaging(id, JsonApiQuery.PARAM_PAGE_SIZE, params, context, valid);
+
         valid = validatePaging(id, JsonApiQuery.PARAM_PAGE_OFFSET, params, context, valid);
         valid = validatePaging(id, JsonApiQuery.PARAM_PAGE_LIMIT, params, context, valid);
 
@@ -83,7 +85,7 @@ public class JsonApiUriQueryValidator
         //Map<String, List<String>> fields = new HashMap<>();
 
         for (String include : includeParam.split(",")) {
-            String attribute = ResourceObjectReader.toAttributeName(include);
+            String attribute = include;
 
             if (includes.contains(attribute)) {
                 valid = false;
@@ -188,7 +190,7 @@ public class JsonApiUriQueryValidator
 
             for (String sort : sortParam.split(",")) {
                 boolean descending = sort.startsWith("-");
-                String attribute = ResourceObjectReader.toAttributeName(sort.substring(descending ? 1 : 0));
+                String attribute = sort.substring(descending ? 1 : 0);
 
                 try {
                     Attribute<?, ?> attr = rootType.getAttribute(attribute);

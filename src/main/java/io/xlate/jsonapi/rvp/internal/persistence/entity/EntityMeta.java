@@ -1,15 +1,15 @@
 /*******************************************************************************
  * Copyright (C) 2018 xlate.io LLC, http://www.xlate.io
  *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as published
- * by the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify it under
+ * the terms of the GNU Affero General Public License as published by the Free
+ * Software Foundation, either version 3 of the License, or (at your option) any
+ * later version.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more
+ * details.
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
@@ -32,6 +32,7 @@ import javax.persistence.metamodel.EntityType;
 import javax.persistence.metamodel.Metamodel;
 import javax.persistence.metamodel.PluralAttribute;
 import javax.persistence.metamodel.SingularAttribute;
+import javax.persistence.metamodel.Attribute.PersistentAttributeType;
 
 import io.xlate.jsonapi.rvp.JsonApiResourceType;
 
@@ -61,11 +62,13 @@ public class EntityMeta {
     private final Class<?> resourceClass;
     private final BeanInfo beanInfo;
     private final Map<String, PropertyDescriptor> propertyDescriptors;
+
     private final EntityType<?> entityType;
+    private final Set<String> attributeNames;
 
     public EntityMeta(Class<?> resourceClass,
-                      JsonApiResourceType<?> configuredType,
-                      Metamodel model) {
+            JsonApiResourceType<?> configuredType,
+            Metamodel model) {
 
         this.resourceClass = resourceClass;
         this.configuredType = configuredType;
@@ -80,9 +83,17 @@ public class EntityMeta {
 
         this.entityType = model.entity(entityClass);
 
+        this.attributeNames = entityType.getSingularAttributes()
+                                        .stream()
+                                        .filter(a -> !a.isId()
+                                                && !a.getName().equals(configuredType.getExposedIdAttribute())
+                                                && a.getPersistentAttributeType() == PersistentAttributeType.BASIC)
+                                        .map(Attribute::getName)
+                                        .collect(Collectors.toSet());
+
         this.propertyDescriptors = Arrays.stream(beanInfo.getPropertyDescriptors())
-              .collect(Collectors.toMap(descriptor -> descriptor.getName(),
-                                        descriptor -> descriptor));
+                                         .collect(Collectors.toMap(descriptor -> descriptor.getName(),
+                                                                   descriptor -> descriptor));
     }
 
     @SuppressWarnings("unchecked")
@@ -99,21 +110,26 @@ public class EntityMeta {
         return (SingularAttribute<Object, ?>) attr;
     }
 
+    public Set<String> getAttributeNames() {
+        return attributeNames;
+    }
+
     public Object readId(String value) {
         return configuredType.getIdReader().apply(value);
     }
 
     @SuppressWarnings("unchecked")
     public SingularAttribute<Object, ?> getIdAttribute() {
-        final SingularAttribute<?, ?> attr;
-
-        attr = entityType.getId(entityType.getIdType().getJavaType());
-
-        return (SingularAttribute<Object, ?>) attr;
+        Class<?> type = entityType.getIdType().getJavaType();
+        return (SingularAttribute<Object, ?>) entityType.getId(type);
     }
 
     public Object getIdValue(Object bean) {
         return getPropertyValue(bean, getIdAttribute().getName());
+    }
+
+    public Object getExposedIdValue(Object bean) {
+        return getPropertyValue(bean, getExposedIdAttribute().getName());
     }
 
     public Class<?> getResourceClass() {

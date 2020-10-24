@@ -51,25 +51,6 @@ public class ResourceObjectReader {
 
     private final EntityMetamodel model;
 
-    public static String toAttributeName(String jsonName) {
-        return jsonName;
-//        StringBuilder attribute = new StringBuilder(jsonName);
-//
-//        for (int i = 0, length = attribute.length(); i < length; i++) {
-//            if (attribute.charAt(i) == '-') {
-//                attribute.deleteCharAt(i);
-//                length--;
-//
-//                if (i < length) {
-//                    char curr = Character.toUpperCase(attribute.charAt(i));
-//                    attribute.setCharAt(i, curr);
-//                }
-//            }
-//        }
-//
-//        return attribute.toString();
-    }
-
     public ResourceObjectReader(EntityMetamodel model) {
         this.model = model;
     }
@@ -98,7 +79,7 @@ public class ResourceObjectReader {
 
         for (Entry<String, JsonValue> entry : relationships.entrySet()) {
             String jsonKey = entry.getKey();
-            String fieldName = toAttributeName(jsonKey);
+            String fieldName = jsonKey;
             JsonValue value = entry.getValue();
             JsonValue relationshipData = ((JsonObject) value).get("data");
             Attribute<Object, ?> entityAttribute = rootType.getAttribute(fieldName);
@@ -179,7 +160,7 @@ public class ResourceObjectReader {
                   .stream()
                   .forEach(attribute -> {
                       String jsonKey = attribute.getKey();
-                      String fieldName = toAttributeName(jsonKey);
+                      String fieldName = jsonKey;
 
                       //TODO: validation
                       //Attribute<Object, ?> a1 = model.getAttribute(fieldName);

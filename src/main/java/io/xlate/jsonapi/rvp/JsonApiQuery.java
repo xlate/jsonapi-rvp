@@ -17,6 +17,7 @@
 package io.xlate.jsonapi.rvp;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,7 +29,6 @@ import javax.ws.rs.core.UriInfo;
 
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMeta;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMetamodel;
-import io.xlate.jsonapi.rvp.internal.rs.boundary.ResourceObjectReader;
 import io.xlate.jsonapi.rvp.internal.validation.boundary.ValidJsonApiQuery;
 
 @ValidJsonApiQuery
@@ -36,8 +36,12 @@ public class JsonApiQuery {
 
     public static final String PARAM_INCLUDE = "include";
     public static final String PARAM_SORT = "sort";
+
     public static final String PARAM_PAGE_OFFSET = "page[offset]";
     public static final String PARAM_PAGE_LIMIT = "page[limit]";
+
+    public static final String PARAM_PAGE_NUMBER = "page[number]";
+    public static final String PARAM_PAGE_SIZE = "page[size]";
 
     private final EntityMetamodel model;
     private final EntityMeta entityMeta;
@@ -45,14 +49,15 @@ public class JsonApiQuery {
     private final UriInfo uriInfo;
     private boolean uriProcessed = false;
 
-    //TODO: add filter
+    private Map<String, List<String>> fields = new HashMap<>();
+    private Map<String, String> filters = new HashMap<>();
+
     private List<String> include = new ArrayList<>();
     private List<String> count = new ArrayList<>();
     private List<String> sort = new ArrayList<>();
-    private Integer pageOffset = null;
-    private Integer pageLimit;
-    private Map<String, List<String>> fields = new HashMap<>();
-    private Map<String, String> filters = new HashMap<>();
+
+    private Integer firstResult = null;
+    private Integer maxResults;
 
     public JsonApiQuery(EntityMetamodel model, EntityMeta entityMeta, String id, UriInfo uriInfo) {
         super();
@@ -71,29 +76,17 @@ public class JsonApiQuery {
 
         processFields(params);
         processFilters(params);
+        processPaging(params);
 
         if (params.containsKey(PARAM_INCLUDE)) {
-            for (String i : params.getFirst(PARAM_INCLUDE).split(",")) {
-                String attribute = ResourceObjectReader.toAttributeName(i);
+            for (String attribute : params.getFirst(PARAM_INCLUDE).split(",")) {
                 this.include.add(attribute);
                 this.count.remove(attribute);
             }
         }
 
         if (params.containsKey(PARAM_SORT)) {
-            for (String s : params.getFirst(PARAM_SORT).split(",")) {
-                boolean descending = s.startsWith("-");
-                String attribute = ResourceObjectReader.toAttributeName(s.substring(descending ? 1 : 0));
-                this.sort.add(descending ? '-' + attribute : attribute);
-            }
-        }
-
-        if (params.containsKey(PARAM_PAGE_OFFSET)) {
-            this.pageOffset = Integer.parseInt(params.getFirst(PARAM_PAGE_OFFSET));
-        }
-
-        if (params.containsKey(PARAM_PAGE_LIMIT)) {
-            this.pageLimit = Integer.parseInt(params.getFirst(PARAM_PAGE_LIMIT));
+            this.sort.addAll(Arrays.asList(params.getFirst(PARAM_SORT).split(",")));
         }
 
         uriProcessed = true;
@@ -110,7 +103,7 @@ public class JsonApiQuery {
                   fieldm.find();
                   for (String fieldl : p.getValue()) {
                       for (String fieldName : fieldl.split(",")) {
-                          addField(this.fields, fieldm.group(1), ResourceObjectReader.toAttributeName(fieldName));
+                          addField(this.fields, fieldm.group(1), fieldName);
                       }
                   }
               });
@@ -156,6 +149,43 @@ public class JsonApiQuery {
         return fieldPath;
     }
 
+    void processPaging(MultivaluedMap<String, String> params) {
+        if (params.containsKey(PARAM_PAGE_OFFSET)) {
+            this.firstResult = tryParseInt(params.getFirst(PARAM_PAGE_OFFSET), 0);
+
+            if (params.containsKey(PARAM_PAGE_LIMIT)) {
+                int limit = tryParseInt(params.getFirst(PARAM_PAGE_LIMIT), this.firstResult + 10);
+                this.maxResults = limit - this.firstResult;
+            } else {
+                this.maxResults = 10;
+            }
+        } else if (params.containsKey(PARAM_PAGE_NUMBER)) {
+            int pageNumber = tryParseInt(params.getFirst(PARAM_PAGE_NUMBER), 1);
+
+            if (params.containsKey(PARAM_PAGE_SIZE)) {
+                this.maxResults = tryParseInt(params.getFirst(PARAM_PAGE_SIZE), 10);
+            } else {
+                this.maxResults = 10;
+            }
+
+            this.firstResult = (pageNumber - 1 ) + this.maxResults;
+        } else if (params.containsKey(PARAM_PAGE_LIMIT)) {
+            this.maxResults = tryParseInt(params.getFirst(PARAM_PAGE_LIMIT), 10);
+        } else if (params.containsKey(PARAM_PAGE_SIZE)) {
+            this.maxResults = tryParseInt(params.getFirst(PARAM_PAGE_SIZE), 10);
+        } else {
+            this.firstResult = 0;
+        }
+    }
+
+    Integer tryParseInt(String value, Integer defaultValue) {
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            return defaultValue;
+        }
+    }
+
     public EntityMetamodel getModel() {
         return model;
     }
@@ -192,14 +222,14 @@ public class JsonApiQuery {
         return sort;
     }
 
-    public Integer getPageOffset() {
+    public Integer getFirstResult() {
         processUri();
-        return pageOffset;
+        return firstResult;
     }
 
-    public Integer getPageLimit() {
+    public Integer getMaxResults() {
         processUri();
-        return pageLimit;
+        return maxResults;
     }
 
     public void addField(String resourceType, String fieldName) {

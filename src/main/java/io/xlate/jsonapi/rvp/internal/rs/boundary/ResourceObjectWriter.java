@@ -39,35 +39,17 @@ import javax.json.JsonValue;
 import javax.persistence.Persistence;
 import javax.persistence.PersistenceUtil;
 import javax.persistence.metamodel.Attribute;
-import javax.persistence.metamodel.Attribute.PersistentAttributeType;
-import javax.persistence.metamodel.EntityType;
-import javax.persistence.metamodel.SingularAttribute;
 import javax.ws.rs.core.UriBuilder;
 import javax.ws.rs.core.UriInfo;
 
 import io.xlate.jsonapi.rvp.JsonApiQuery;
+import io.xlate.jsonapi.rvp.internal.persistence.entity.Entity;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMeta;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMetamodel;
 
 public class ResourceObjectWriter {
 
     private static final Logger logger = Logger.getLogger(ResourceObjectWriter.class.getName());
-
-//    static Pattern attributePattern = Pattern.compile("([A-Z])[a-z]");
-
-    static String toJsonName(String attributeName) {
-        return attributeName;
-//        StringBuilder jsonName = new StringBuilder(attributeName);
-//        Matcher m = attributePattern.matcher(jsonName);
-//
-//        while (m.find()) {
-//            char replacement = m.group(1).toLowerCase().charAt(0);
-//            jsonName.setCharAt(m.start(), replacement);
-//            jsonName.insert(m.start(), '-');
-//        }
-//
-//        return jsonName.toString();
-    }
 
     private final EntityMetamodel model;
 
@@ -103,9 +85,9 @@ public class ResourceObjectWriter {
         return response.build();
     }
 
-    public JsonObject toJsonApiResource(Object bean, UriInfo uriInfo) {
-        EntityMeta meta = model.getEntityMeta(bean.getClass());
-        Map<String, Object> related = new TreeMap<String, Object>();
+    public JsonObject toJsonApiResource(Entity bean, UriInfo uriInfo) {
+        EntityMeta meta = bean.getEntityMeta();
+        Map<String, Object> related = new TreeMap<>();
 
         PersistenceUtil util = Persistence.getPersistenceUtil();
 
@@ -131,21 +113,21 @@ public class ResourceObjectWriter {
                                 .build();
     }
 
-    public JsonObject toJson(Object bean, UriInfo uriInfo) {
+    public JsonObject toJson(Entity bean, UriInfo uriInfo) {
         return toJson(bean, null, uriInfo);
     }
 
-    public JsonObject toJson(Object bean, JsonApiQuery params, UriInfo uriInfo) {
+    public JsonObject toJson(Entity bean, JsonApiQuery params, UriInfo uriInfo) {
         return toJson(bean, Collections.emptyMap(), params, uriInfo);
     }
 
-    public JsonObject toJson(Object bean,
+    public JsonObject toJson(Entity bean,
                              Map<String, Object> related,
                              JsonApiQuery params,
                              UriInfo uriInfo) {
 
-        String resourceType = model.getResourceType(bean.getClass());
-        String id = getId(bean);
+        String resourceType = bean.getType();
+        String id = bean.getStringId();
         JsonObjectBuilder builder = Json.createObjectBuilder();
 
         builder.add("type", resourceType);
@@ -163,77 +145,77 @@ public class ResourceObjectWriter {
         return builder.build();
     }
 
-    public String getId(Object bean) {
+    /*public String getId(Object bean) {
         EntityMeta meta = model.getEntityMeta(bean.getClass());
         SingularAttribute<Object, ?> idattr = meta.getExposedIdAttribute();
-        Object id = meta.getPropertyValue(bean, idattr.getName());
+        Object id;
+        if (bean instanceof Map) {
+            id = Map.class.cast(bean).get(idattr.getName());
+        } else {
+            id = meta.getPropertyValue(bean, idattr.getName());
+        }
         return String.valueOf(id);
-    }
+    }*/
 
-    public JsonObject getAttributes(JsonApiQuery params, Object bean) {
+    public JsonObject getAttributes(JsonApiQuery params, Entity bean) {
         JsonObjectBuilder attributes = Json.createObjectBuilder();
-        EntityMeta meta = model.getEntityMeta(bean.getClass());
-        String resourceType = meta.getResourceType();
-        EntityType<Object> model = meta.getEntityType();
 
-        model.getSingularAttributes()
-             .stream()
-             .filter(a -> !a.isId() &&
-                     a.getPersistentAttributeType() == PersistentAttributeType.BASIC &&
-                     (params == null || params.includeField(resourceType, a.getName())))
-             .sorted((a1, a2) -> a1.getName().compareTo(a2.getName()))
-             .forEach(a -> {
-                 try {
-                     String propertyName = a.getName();
-                     Object value = meta.getPropertyValue(bean, propertyName);
-                     String key = toJsonName(propertyName);
+        bean.getEntityMeta()
+            .getAttributeNames()
+            .stream()
+            .filter(name -> params == null || params.includeField(bean.getType(), name))
+            .sorted()
+            .forEach(name -> {
+                try {
+                    Object value = bean.getAttribute(name);
+                    String key = name;
 
-                     if (value != null) {
-                         if (Date.class.isAssignableFrom(value.getClass())) {
-                             OffsetDateTime odt = ((Date) value).toInstant().atOffset(ZoneOffset.UTC);
-                             attributes.add(key, odt.format(DateTimeFormatter.ISO_DATE_TIME));
-                         } else if (OffsetDateTime.class.isAssignableFrom(value.getClass())) {
-                             OffsetDateTime odt = ((OffsetDateTime) value).toInstant().atOffset(ZoneOffset.UTC);
-                             attributes.add(key, odt.format(DateTimeFormatter.ISO_DATE_TIME));
-                         } else if (Boolean.class.isAssignableFrom(value.getClass())) {
-                             attributes.add(key, (Boolean) value);
-                         } else if (BigDecimal.class.isAssignableFrom(value.getClass())) {
-                             attributes.add(key, (BigDecimal) value);
-                         } else if (BigInteger.class.isAssignableFrom(value.getClass())) {
-                             attributes.add(key, (BigInteger) value);
-                         } else if (Long.class.isAssignableFrom(value.getClass())) {
-                             attributes.add(key, (Long) value);
-                         } else if (Integer.class.isAssignableFrom(value.getClass())) {
-                             attributes.add(key, (Integer) value);
-                         } else if (Double.class.isAssignableFrom(value.getClass())) {
-                             attributes.add(key, (Double) value);
-                         } else if (Float.class.isAssignableFrom(value.getClass())) {
-                             attributes.add(key, (Float) value);
-                         } else {
-                             // TODO: Things other than string?
-                             attributes.add(key, String.valueOf(value));
-                         }
-                     } else {
-                         attributes.addNull(key);
-                     }
-                 } catch (Exception e) {
-                     throw new RuntimeException(e);
-                 }
-             });
+                    if (value != null) {
+                        if (Date.class.isAssignableFrom(value.getClass())) {
+                            OffsetDateTime odt = ((Date) value).toInstant().atOffset(ZoneOffset.UTC);
+                            attributes.add(key, odt.format(DateTimeFormatter.ISO_DATE_TIME));
+                        } else if (OffsetDateTime.class.isAssignableFrom(value.getClass())) {
+                            OffsetDateTime odt = ((OffsetDateTime) value).toInstant().atOffset(ZoneOffset.UTC);
+                            attributes.add(key, odt.format(DateTimeFormatter.ISO_DATE_TIME));
+                        } else if (Boolean.class.isAssignableFrom(value.getClass())) {
+                            attributes.add(key, (Boolean) value);
+                        } else if (BigDecimal.class.isAssignableFrom(value.getClass())) {
+                            attributes.add(key, (BigDecimal) value);
+                        } else if (BigInteger.class.isAssignableFrom(value.getClass())) {
+                            attributes.add(key, (BigInteger) value);
+                        } else if (Long.class.isAssignableFrom(value.getClass())) {
+                            attributes.add(key, (Long) value);
+                        } else if (Integer.class.isAssignableFrom(value.getClass())) {
+                            attributes.add(key, (Integer) value);
+                        } else if (Double.class.isAssignableFrom(value.getClass())) {
+                            attributes.add(key, (Double) value);
+                        } else if (Float.class.isAssignableFrom(value.getClass())) {
+                            attributes.add(key, (Float) value);
+                        } else {
+                            // TODO: Things other than string?
+                            attributes.add(key, String.valueOf(value));
+                        }
+                    } else {
+                        attributes.addNull(key);
+                    }
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            });
 
         return attributes.build();
     }
 
-    public JsonObject getRelationships(Object bean,
+    public JsonObject getRelationships(Entity bean,
                                        Map<String, Object> related,
                                        JsonApiQuery params,
                                        UriInfo uriInfo) {
 
         JsonObjectBuilder jsonRelationships = Json.createObjectBuilder();
 
-        EntityMeta meta = model.getEntityMeta(bean.getClass());
-        String resourceType = meta.getResourceType();
-        String rootEntityId = getId(bean);
+        EntityMeta meta = bean.getEntityMeta();
+        String resourceType = bean.getType();
+        String rootEntityId = bean.getStringId();
         boolean exclusions = false;
         int included = 0;
 
@@ -241,7 +223,7 @@ public class ResourceObjectWriter {
             String fieldName = entry.getKey();
 
             if (params == null || params.includeField(resourceType, fieldName)) {
-                String relationshipName = toJsonName(fieldName);
+                String relationshipName = fieldName;
 
                 if (!meta.isRelatedTo(relationshipName)) {
                     continue;
@@ -260,22 +242,22 @@ public class ResourceObjectWriter {
                 boolean many = meta.getEntityType().getAttribute(fieldName).isCollection();
 
                 if (entryValue instanceof Attribute) {
-                    // No operation
+                    // No operation - only links were given
                 } else if (entryValue instanceof Long) {
                     Long count = (Long) entryValue;
                     relationshipEntry.add("meta", Json.createObjectBuilder().add("count", count));
                 } else if (entryValue instanceof Collection) {
                     JsonValue relationshipData;
                     @SuppressWarnings("unchecked")
-                    Collection<Object> relatedEntities = (Collection<Object>) entryValue;
+                    Collection<Entity> relatedEntities = (Collection<Entity>) entryValue;
 
                     if (many) {
                         JsonArrayBuilder relationshipArray = Json.createArrayBuilder();
 
-                        for (Object relatedEntity : relatedEntities) {
+                        for (Entity relatedEntity : relatedEntities) {
                             JsonObjectBuilder relatedId = Json.createObjectBuilder();
-                            relatedId.add("type", model.getResourceType(relatedEntity.getClass()));
-                            relatedId.add("id", getId(relatedEntity));
+                            relatedId.add("type", relatedEntity.getType());
+                            relatedId.add("id", relatedEntity.getStringId());
                             relationshipArray.add(relatedId);
                         }
 
@@ -283,11 +265,11 @@ public class ResourceObjectWriter {
                     } else {
                         final int count = relatedEntities.size();
                         if (count == 1) {
-                            final Object relatedEntity;
+                            final Entity relatedEntity;
                             relatedEntity = relatedEntities.iterator().next();
                             JsonObjectBuilder relatedId = Json.createObjectBuilder();
-                            relatedId.add("type", model.getResourceType(relatedEntity.getClass()));
-                            relatedId.add("id", getId(relatedEntity));
+                            relatedId.add("type", relatedEntity.getType());
+                            relatedId.add("id", relatedEntity.getStringId());
                             relationshipData = relatedId.build();
                         } else {
                             logger.warning("Non-collection-valued relationship `" + fieldName + "` with " + count
@@ -297,11 +279,11 @@ public class ResourceObjectWriter {
                     }
 
                     relationshipEntry.add("data", relationshipData);
-                } else if (entryValue != null && !many) {
-                    final Object relatedEntity = entryValue;
+                } else if (entryValue instanceof Entity && !many) {
+                    final Entity relatedEntity = (Entity) entryValue;
                     JsonObjectBuilder relatedId = Json.createObjectBuilder();
-                    relatedId.add("type", model.getResourceType(relatedEntity.getClass()));
-                    relatedId.add("id", getId(relatedEntity));
+                    relatedId.add("type", relatedEntity.getType());
+                    relatedId.add("id", relatedEntity.getStringId());
                     relationshipEntry.add("data", relatedId);
                 }
 
@@ -356,11 +338,11 @@ public class ResourceObjectWriter {
     }
 
     private void link(JsonObjectBuilder builder,
-                     UriInfo uriInfo,
-                     String linkName,
-                     String methodName,
-                     EntityMeta meta,
-                     Object... params) {
+                      UriInfo uriInfo,
+                      String linkName,
+                      String methodName,
+                      EntityMeta meta,
+                      Object... params) {
 
         UriBuilder self = uriInfo.getBaseUriBuilder();
         Class<?> resourceClass = meta.getResourceClass();

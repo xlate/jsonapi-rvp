@@ -22,9 +22,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
@@ -44,7 +44,6 @@ import javax.persistence.NoResultException;
 import javax.persistence.OneToMany;
 import javax.persistence.OneToOne;
 import javax.persistence.PersistenceException;
-import javax.persistence.PersistenceUnitUtil;
 import javax.persistence.Query;
 import javax.persistence.Tuple;
 import javax.persistence.TypedQuery;
@@ -62,6 +61,7 @@ import javax.persistence.criteria.Selection;
 import javax.persistence.metamodel.Attribute;
 import javax.persistence.metamodel.Bindable;
 import javax.persistence.metamodel.EntityType;
+import javax.persistence.metamodel.SingularAttribute;
 import javax.validation.ConstraintViolation;
 import javax.validation.ConstraintViolationException;
 import javax.ws.rs.core.Response.Status;
@@ -71,6 +71,7 @@ import io.xlate.jsonapi.rvp.JsonApiContext;
 import io.xlate.jsonapi.rvp.JsonApiHandler;
 import io.xlate.jsonapi.rvp.JsonApiQuery;
 import io.xlate.jsonapi.rvp.internal.JsonApiClientErrorException;
+import io.xlate.jsonapi.rvp.internal.persistence.entity.Entity;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMeta;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMetamodel;
 import io.xlate.jsonapi.rvp.internal.rs.boundary.ResourceObjectReader;
@@ -198,7 +199,7 @@ public class PersistenceController {
 
         handler.afterPersist(context, entity);
 
-        return writer.toJsonApiResource(entity, uriInfo);
+        return writer.toJsonApiResource(new Entity(meta, entity), uriInfo);
     }
 
     public <T> JsonObject update(JsonApiContext context, JsonApiHandler<T> handler) {
@@ -240,7 +241,7 @@ public class PersistenceController {
 
         handler.afterMerge(context, entity);
 
-        return writer.toJsonApiResource(updatedEntity, uriInfo);
+        return writer.toJsonApiResource(new Entity(meta, updatedEntity), uriInfo);
     }
 
     public <T> boolean delete(JsonApiContext context, JsonApiHandler<T> handler) {
@@ -313,6 +314,7 @@ public class PersistenceController {
                     p = builder.equal(namePath.get(elements[i]), value);
                 } else {
                     namePath = namePath.join(elements[i]);
+                    namePath.alias(elements[i]);
                 }
             }
         }
@@ -416,6 +418,13 @@ public class PersistenceController {
             relatedJoin = null;
         }
 
+        /*Set<String> counted = rootType.getAttributes().stream()
+                                      .filter(Attribute::isAssociation)
+                                      .map(Attribute::getName)
+                                      .filter(meta::isRelatedTo)
+                                      .filter(not(params.getInclude()::contains))
+                                      .collect(Collectors.toSet());*/
+
         Set<String> counted = rootType.getPluralAttributes()
                                       .stream()
                                       .map(Attribute::getName)
@@ -461,24 +470,43 @@ public class PersistenceController {
         }
 
         /*
-         * Group by the root entity (supports counting relationships). TODO:
-         * Check this method is supported for platforms other than MySQL.
+         * Group by the root entity (supports counting relationships).
          */
         query.groupBy(root);
         query.orderBy(getOrderBy(builder, root, params));
 
         TypedQuery<Tuple> typedQuery = em.createQuery(query);
 
-        if (params.getPageOffset() != null) {
-            typedQuery.setFirstResult(params.getPageOffset());
+        if (params.getFirstResult() != null) {
+            typedQuery.setFirstResult(params.getFirstResult());
         }
 
-        if (params.getPageLimit() != null) {
-            typedQuery.setMaxResults(params.getPageLimit());
+        TypedQuery<Long> countQuery;
+
+        if (params.getMaxResults() != null) {
+            typedQuery.setMaxResults(params.getMaxResults());
+
+            CriteriaQuery<Long> countBuilder = builder.createQuery(Long.class);
+            Root<Object> countRoot = countBuilder.from(entityClass);
+            countRoot.alias("root");
+
+            for (String collection : counted) {
+                countRoot.join(collection, JoinType.LEFT).alias(collection);
+            }
+
+            if (!predicates.isEmpty()) {
+                countBuilder.where(predicates.toArray(new Predicate[predicates.size()]));
+            }
+            Expression<Long> count = builder.countDistinct(countRoot);
+            countBuilder.select(count);
+            countQuery = em.createQuery(countBuilder);
+        } else {
+            countQuery = null;
         }
 
         final List<Tuple> results = typedQuery.getResultList();
-        final Map<Object, Map<String, List<Object>>> relationships = new HashMap<>();
+        final Map<Object, Map<String, List<Entity>>> relationships = new HashMap<>();
+        final Long totalResults = countQuery != null ? countQuery.getSingleResult() : null;
 
         /*
          * Build empty map to hold relationships based on those requested by the
@@ -491,7 +519,7 @@ public class PersistenceController {
                                      params.getInclude()
                                            .stream()
                                            .collect(Collectors.toMap(relName -> relName,
-                                                                     relName -> new ArrayList<Object>())));
+                                                                     relName -> new ArrayList<Entity>())));
 
                    if (relationshipName != null) {
                        String relatedTo = relatedJoin.getAttribute().getName();
@@ -507,16 +535,19 @@ public class PersistenceController {
             for (String included : params.getInclude()) {
                 getIncluded(params, entityClass, relationships, included);
             }
-            if (relationshipName != null) {
+            /*if (relationshipName != null) {
                 String relatedTo = relatedJoin.getAttribute().getName();
 
                 if (!params.getInclude().contains(relatedTo)) {
                     getIncluded(params, entityClass, relationships, relatedTo);
                 }
-            }
+            }*/
         }
 
         JsonObjectBuilder response = writer.topLevelBuilder();
+        if (totalResults != null) {
+            response.add("meta", Json.createObjectBuilder().add("totalResults", totalResults));
+        }
         JsonArrayBuilder data = Json.createArrayBuilder();
         Map<String, Object> related = new TreeMap<>();
 
@@ -527,7 +558,7 @@ public class PersistenceController {
             related.clear();
             related.putAll(relationships.get(resultId));
             counted.forEach(relationship -> related.put(relationship, result.get(relationship)));
-            data.add(writer.toJson(entity, related, params, uriInfo));
+            data.add(writer.toJson(new Entity(meta, entity), related, params, uriInfo));
         }
 
         if (id != null && relationshipName == null) {
@@ -548,18 +579,18 @@ public class PersistenceController {
         }
 
         // Get unique set of included objects
-        Map<String, Set<Object>> included;
+        Map<String, Set<Entity>> included;
         included = relationships.entrySet()
                                 .stream()
                                 .flatMap(e -> e.getValue().entrySet().stream())
                                 .filter(e -> !e.getValue().isEmpty())
-                                .collect(HashMap<String, Set<Object>>::new,
+                                .collect(HashMap<String, Set<Entity>>::new,
                                          (map, entry) -> {
                                              String key = entry.getKey();
-                                             List<Object> value = entry.getValue();
+                                             List<Entity> value = entry.getValue();
 
                                              if (!map.containsKey(key)) {
-                                                 Set<Object> unique = new HashSet<>();
+                                                 Set<Entity> unique = new HashSet<>();
                                                  unique.addAll(value);
                                                  map.put(key, unique);
                                              } else {
@@ -570,31 +601,23 @@ public class PersistenceController {
 
         if (!included.isEmpty()) {
             JsonArrayBuilder incl = Json.createArrayBuilder();
-            PersistenceUnitUtil util = em.getEntityManagerFactory().getPersistenceUnitUtil();
 
-            for (Entry<String, Set<Object>> rel : included.entrySet()) {
-                for (Object e : rel.getValue()) {
+            /*
+             * For each of the included resources related to the primary resource type,
+             * create the list of their own internal relationships and convert to JSON.
+             * */
+            for (Set<Entity> includedType : included.values()) {
+                for (Entity includedEntity : includedType) {
                     related.clear();
-                    related.putAll(model.getEntityMeta(e.getClass())
-                                        .getEntityType()
-                                        .getAttributes()
-                                        .stream()
-                                        .filter(Attribute::isAssociation)
-                                        .collect(Collectors.toMap(Attribute::getName, a -> {
-                                            if (util.isLoaded(e, a.getName())) {
-                                                return model.getEntityMeta(e.getClass())
-                                                            .getPropertyValue(e, a.getName());
-                                            } /*
-                                               * else if (!a.isCollection()) {
-                                               * return
-                                               * model.getEntityMeta(e.getClass(
-                                               * )) .getPropertyValue(e,
-                                               * a.getName()); }
-                                               */
-                                            return a;
-                                        })));
 
-                    incl.add(writer.toJson(e, related, params, uriInfo));
+                    includedEntity.getEntityMeta()
+                                  .getEntityType()
+                                  .getAttributes()
+                                  .stream()
+                                  .filter(Attribute::isAssociation)
+                                  .forEach(relationship -> related.put(relationship.getName(), relationship));
+
+                    incl.add(writer.toJson(includedEntity, related, params, uriInfo));
                 }
             }
 
@@ -616,17 +639,18 @@ public class PersistenceController {
     }
 
     void getIncluded(@SuppressWarnings("unused") JsonApiQuery params,
-                     Class<Object> entityClass,
-                     Map<Object, Map<String, List<Object>>> relationships,
-                     String attribute) {
+                     Class<Object> primaryClass,
+                     Map<Object, Map<String, List<Entity>>> relationships,
+                     String includedName) {
 
-        EntityMeta meta = model.getEntityMeta(entityClass);
-        EntityType<Object> entityType = meta.getEntityType();
-        Attribute<Object, ?> includedAttribute = entityType.getAttribute(attribute);
+        EntityMeta primaryMeta = model.getEntityMeta(primaryClass);
+        EntityType<Object> primaryType = primaryMeta.getEntityType();
+
+        Attribute<Object, ?> includedAttribute = primaryType.getAttribute(includedName);
         @SuppressWarnings("unchecked")
-        Bindable<Object> bindable = (Bindable<Object>) includedAttribute;
-        Class<Object> includedClass = bindable.getBindableJavaType();
-        Attribute<Object, ?> inverseAttribute = inverseOf(entityType.getJavaType(), includedAttribute);
+        Class<Object> includedClass = ((Bindable<Object>) includedAttribute).getBindableJavaType();
+        EntityMeta includedMeta = model.getEntityMeta(includedClass);
+        Attribute<Object, ?> inverseAttribute = inverseOf(primaryType.getJavaType(), includedAttribute);
 
         final CriteriaBuilder builder = em.getCriteriaBuilder();
         final CriteriaQuery<Tuple> query = builder.createTupleQuery();
@@ -634,49 +658,42 @@ public class PersistenceController {
         final Root<Object> root = query.from(includedClass);
         final Join<Object, Object> join = root.join(inverseAttribute.getName());
 
-        /*
-         * final List<Attribute<Object, ?>> fetchedAttributes = new
-         * ArrayList<>(); final EntityGraph<Object> graph =
-         * em.createEntityGraph(includedClass);
-         */
+        @SuppressWarnings("unchecked")
+        final List<Selection<?>> selections = model.getEntityMeta(includedClass)
+                                                   .getEntityType()
+                                                   .getAttributes()
+                                                   .stream()
+                                                   .filter(not(Attribute::isAssociation))
+                                                   .filter(SingularAttribute.class::isInstance)
+                                                   .map(SingularAttribute.class::cast)
+                                                   .filter(attr -> !attr.equals(includedMeta.getExposedIdAttribute()))
+                                                   .map(attr -> root.get(attr).alias(attr.getName()))
+                                                   .collect(Collectors.toCollection(LinkedList::new));
 
-        final List<Selection<?>> selections = new ArrayList<>();
-        selections.add(join.get(meta.getIdAttribute()).alias("rootKey"));
-        selections.add(root.alias("related"));
+        final Path<?> primaryId = join.get(primaryMeta.getIdAttribute());
+        final Path<?> includedId = root.get(includedMeta.getExposedIdAttribute());
 
-        /*
-         * model.getEntityMeta(bindable.getBindableJavaType()) .getEntityType()
-         * .getSingularAttributes() .stream() .filter(a -> !a.isAssociation())
-         * .filter(a -> a.getBindableJavaType() != entityClass) .forEach(a ->
-         * selections.add(root.get(a).alias(a.getName())));
-         */
-        //.forEach(a -> fetchedAttributes.add(a));
+        selections.add(0, primaryId.alias("primaryId"));
+        selections.add(1, includedId.alias("includedId"));
 
-        //@SuppressWarnings("unchecked")
-        //Attribute<Object, ?>[] attrNodes = new Attribute[fetchedAttributes.size()];
-        //graph.addAttributeNodes(fetchedAttributes.toArray(attrNodes));
-
-        //final SingularAttribute<Object, ?> rootKey = getId(root.getModel());
-
-        query.multiselect(selections);
-        Set<Object> rootKeys = relationships.keySet();
-        if (rootKeys.size() == 1) {
-            Object singleKey = rootKeys.iterator().next();
-            query.where(builder.equal(join.get(meta.getIdAttribute()), singleKey));
-        } else {
-            query.where(join.get(meta.getIdAttribute()).in(rootKeys));
-        }
+        query.multiselect(selections)
+             .where(primaryId.in(relationships.keySet()));
 
         TypedQuery<Tuple> typedQuery = em.createQuery(query);
-        //typedQuery.setHint("javax.persistence.fetchgraph", graph);
 
         for (Tuple result : typedQuery.getResultList()) {
-            Object rootEntityKey = result.get("rootKey");
-            Object relatedEntity = result.get("related");
+            Object primaryIdValue = result.get("primaryId");
+            Object includedIdValue = result.get("includedId");
 
-            relationships.get(rootEntityKey)
-                         .get(attribute)
-                         .add(relatedEntity);
+            Map<String, Object> includedAttributes = new HashMap<>();
+
+            result.getElements()
+                  .subList(2, result.getElements().size())
+                  .forEach(e -> includedAttributes.put(e.getAlias(), result.get(e)));
+
+            relationships.get(primaryIdValue)
+                         .get(includedName)
+                         .add(new Entity(includedMeta, includedIdValue, includedAttributes));
         }
     }
 
@@ -711,26 +728,21 @@ public class PersistenceController {
     }
 
     String getMappedBy(Attribute<Object, ?> attribute) {
+        final String mappedBy;
         AccessibleObject member = (AccessibleObject) attribute.getJavaMember();
-        String mappedBy = "";
 
         switch (attribute.getPersistentAttributeType()) {
-        case MANY_TO_MANY: {
-            ManyToMany annotation = member.getAnnotation(ManyToMany.class);
-            mappedBy = annotation.mappedBy();
+        case MANY_TO_MANY:
+            mappedBy = member.getAnnotation(ManyToMany.class).mappedBy();
             break;
-        }
-        case ONE_TO_MANY: {
-            OneToMany annotation = member.getAnnotation(OneToMany.class);
-            mappedBy = annotation.mappedBy();
+        case ONE_TO_MANY:
+            mappedBy = member.getAnnotation(OneToMany.class).mappedBy();
             break;
-        }
-        case ONE_TO_ONE: {
-            OneToOne annotation = member.getAnnotation(OneToOne.class);
-            mappedBy = annotation.mappedBy();
+        case ONE_TO_ONE:
+            mappedBy = member.getAnnotation(OneToOne.class).mappedBy();
             break;
-        }
         default:
+            mappedBy = "";
             break;
         }
 
