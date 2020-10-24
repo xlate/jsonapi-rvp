@@ -22,7 +22,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -61,7 +60,6 @@ import javax.persistence.criteria.Selection;
 import javax.persistence.metamodel.Attribute;
 import javax.persistence.metamodel.Bindable;
 import javax.persistence.metamodel.EntityType;
-import javax.persistence.metamodel.SingularAttribute;
 import javax.validation.ConstraintViolation;
 import javax.validation.ConstraintViolationException;
 import javax.ws.rs.core.Response.Status;
@@ -658,23 +656,17 @@ public class PersistenceController {
         final Root<Object> root = query.from(includedClass);
         final Join<Object, Object> join = root.join(inverseAttribute.getName());
 
-        @SuppressWarnings("unchecked")
-        final List<Selection<?>> selections = model.getEntityMeta(includedClass)
-                                                   .getEntityType()
-                                                   .getAttributes()
-                                                   .stream()
-                                                   .filter(not(Attribute::isAssociation))
-                                                   .filter(SingularAttribute.class::isInstance)
-                                                   .map(SingularAttribute.class::cast)
-                                                   .filter(attr -> !attr.equals(includedMeta.getExposedIdAttribute()))
-                                                   .map(attr -> root.get(attr).alias(attr.getName()))
-                                                   .collect(Collectors.toCollection(LinkedList::new));
-
         final Path<?> primaryId = join.get(primaryMeta.getIdAttribute());
         final Path<?> includedId = root.get(includedMeta.getExposedIdAttribute());
 
-        selections.add(0, primaryId.alias("primaryId"));
-        selections.add(1, includedId.alias("includedId"));
+        final List<Selection<?>> selections = new ArrayList<>(2 + includedMeta.getAttributes().size());
+
+        selections.add(primaryId.alias("primaryId"));
+        selections.add(includedId.alias("includedId"));
+        selections.addAll(includedMeta.getAttributeNames()
+                                      .stream()
+                                      .map(attr -> root.get(attr).alias(attr))
+                                      .collect(Collectors.toList()));
 
         query.multiselect(selections)
              .where(primaryId.in(relationships.keySet()));

@@ -64,6 +64,7 @@ public class EntityMeta {
     private final Map<String, PropertyDescriptor> propertyDescriptors;
 
     private final EntityType<?> entityType;
+    private final Set<SingularAttribute<?, ?>> attributes;
     private final Set<String> attributeNames;
 
     public EntityMeta(Class<?> resourceClass,
@@ -83,13 +84,16 @@ public class EntityMeta {
 
         this.entityType = model.entity(entityClass);
 
-        this.attributeNames = entityType.getSingularAttributes()
-                                        .stream()
-                                        .filter(a -> !a.isId()
-                                                && !a.getName().equals(configuredType.getExposedIdAttribute())
-                                                && a.getPersistentAttributeType() == PersistentAttributeType.BASIC)
-                                        .map(Attribute::getName)
-                                        .collect(Collectors.toSet());
+        this.attributes = entityType.getSingularAttributes()
+                .stream()
+                .filter(a -> !a.isId()
+                        && !a.getName().equals(configuredType.getExposedIdAttribute())
+                        && !a.isAssociation()
+                        && a.getPersistentAttributeType() == PersistentAttributeType.BASIC)
+                // TODO: allow configuration via JsonApiResourceType
+                .collect(Collectors.toSet());
+
+        this.attributeNames = attributes.stream().map(Attribute::getName).collect(Collectors.toSet());
 
         this.propertyDescriptors = Arrays.stream(beanInfo.getPropertyDescriptors())
                                          .collect(Collectors.toMap(descriptor -> descriptor.getName(),
@@ -108,6 +112,10 @@ public class EntityMeta {
         }
 
         return (SingularAttribute<Object, ?>) attr;
+    }
+
+    public Set<SingularAttribute<?, ?>> getAttributes() {
+        return attributes;
     }
 
     public Set<String> getAttributeNames() {
