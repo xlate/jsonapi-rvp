@@ -64,8 +64,12 @@ public class EntityMeta {
     private final Map<String, PropertyDescriptor> propertyDescriptors;
 
     private final EntityType<?> entityType;
+
     private final Set<SingularAttribute<?, ?>> attributes;
     private final Set<String> attributeNames;
+
+    private final Set<Attribute<?, ?>> relationships;
+    private final Set<String> relationshipNames;
 
     public EntityMeta(Class<?> resourceClass,
             JsonApiResourceType<?> configuredType,
@@ -85,15 +89,24 @@ public class EntityMeta {
         this.entityType = model.entity(entityClass);
 
         this.attributes = entityType.getSingularAttributes()
-                .stream()
-                .filter(a -> !a.isId()
-                        && !a.getName().equals(configuredType.getExposedIdAttribute())
-                        && !a.isAssociation()
-                        && a.getPersistentAttributeType() == PersistentAttributeType.BASIC)
-                // TODO: allow configuration via JsonApiResourceType
-                .collect(Collectors.toSet());
+                                    .stream()
+                                    .filter(a -> !a.isId()
+                                            && !a.getName().equals(configuredType.getExposedIdAttribute())
+                                            && !a.isAssociation()
+                                            && a.getPersistentAttributeType() == PersistentAttributeType.BASIC)
+                                    // TODO: allow configuration via JsonApiResourceType
+                                    .collect(Collectors.toSet());
 
         this.attributeNames = attributes.stream().map(Attribute::getName).collect(Collectors.toSet());
+
+        this.relationships = entityType.getAttributes()
+                                       .stream()
+                                       .filter(Attribute::isAssociation)
+                                       .filter(a -> this.configuredType.getRelationships().isEmpty()
+                                               || this.configuredType.getRelationships().contains(a.getName()))
+                                       .collect(Collectors.toSet());
+
+        this.relationshipNames = relationships.stream().map(Attribute::getName).collect(Collectors.toSet());
 
         this.propertyDescriptors = Arrays.stream(beanInfo.getPropertyDescriptors())
                                          .collect(Collectors.toMap(descriptor -> descriptor.getName(),
@@ -120,6 +133,14 @@ public class EntityMeta {
 
     public Set<String> getAttributeNames() {
         return attributeNames;
+    }
+
+    public Set<Attribute<?, ?>> getRelationships() {
+        return relationships;
+    }
+
+    public Set<String> getRelationshipNames() {
+        return relationshipNames;
     }
 
     public Object readId(String value) {
@@ -158,20 +179,13 @@ public class EntityMeta {
         return (EntityType<Object>) entityType;
     }
 
-    public Set<String> getRelationships() {
-        return configuredType.getRelationships();
-    }
-
     public boolean isRelatedTo(String relationshipName) {
-        Set<String> relationships = getRelationships();
-        return relationships.isEmpty() || relationships.contains(relationshipName);
+        return getRelationshipNames().contains(relationshipName);
     }
 
     @SuppressWarnings("unchecked")
     public Class<Object> getRelatedEntityClass(String relationshipName) {
-        Set<String> relationships = getRelationships();
-
-        if (relationships.isEmpty() || relationships.contains(relationshipName)) {
+        if (isRelatedTo(relationshipName)) {
             Attribute<?, ?> attr = entityType.getAttribute(relationshipName);
             if (attr.isCollection()) {
                 return (Class<Object>) ((PluralAttribute<?, ?, ?>) attr).getBindableJavaType();

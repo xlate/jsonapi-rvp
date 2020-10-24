@@ -76,4 +76,16 @@ public class Entity {
 
         throw new IllegalStateException("Entity instance has not been set");
     }
+
+    public Object getRelationship(String name) {
+        if (!entityMeta.getRelationshipNames().contains(name)) {
+            throw new IllegalArgumentException("No such relationship: " + name);
+        }
+
+        if (instance != null) {
+            return entityMeta.getPropertyValue(instance, name);
+        }
+
+        throw new IllegalStateException("Entity instance has not been set");
+    }
 }

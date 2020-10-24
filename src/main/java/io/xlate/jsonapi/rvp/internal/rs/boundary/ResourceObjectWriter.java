@@ -36,8 +36,6 @@ import javax.json.JsonArrayBuilder;
 import javax.json.JsonObject;
 import javax.json.JsonObjectBuilder;
 import javax.json.JsonValue;
-import javax.persistence.Persistence;
-import javax.persistence.PersistenceUtil;
 import javax.persistence.metamodel.Attribute;
 import javax.ws.rs.core.UriBuilder;
 import javax.ws.rs.core.UriInfo;
@@ -89,28 +87,19 @@ public class ResourceObjectWriter {
         EntityMeta meta = bean.getEntityMeta();
         Map<String, Object> related = new TreeMap<>();
 
-        PersistenceUtil util = Persistence.getPersistenceUtil();
+        meta.getRelationships().forEach(a -> {
+            Object value;
 
-        meta.getEntityType()
-            .getAttributes()
-            .stream()
-            .filter(a -> meta.isRelatedTo(a.getName()))
-            .forEach(a -> {
-                Object value;
+            if (!a.isCollection()) {
+                value = bean.getRelationship(a.getName());
+            } else {
+                value = a;
+            }
 
-                if (util.isLoaded(bean, a.getName())) {
-                    value = meta.getPropertyValue(bean, a.getName());
-                } else if (!a.isCollection()) {
-                    value = meta.getPropertyValue(bean, a.getName());
-                } else {
-                    value = a;
-                }
+            related.put(a.getName(), value);
+        });
 
-                related.put(a.getName(), value);
-            });
-
-        return topLevelBuilder().add("data", toJson(bean, related, null, uriInfo))
-                                .build();
+        return topLevelBuilder().add("data", toJson(bean, related, null, uriInfo)).build();
     }
 
     public JsonObject toJson(Entity bean, UriInfo uriInfo) {
