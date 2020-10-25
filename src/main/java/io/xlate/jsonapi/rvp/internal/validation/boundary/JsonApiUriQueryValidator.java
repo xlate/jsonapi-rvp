@@ -118,7 +118,8 @@ public class JsonApiUriQueryValidator
 
             for (int i = 0; i < elements.length && validFilter; i++) {
                 if (i + 1 == elements.length) {
-                    validFilter = meta.getAttributeNames().contains(elements[i]);
+                    validFilter = meta.getAttributeNames().contains(elements[i])
+                            || meta.getExposedIdAttribute().getName().equals(elements[i]);
                 } else {
                     meta = model.getEntityMeta(meta.getRelatedEntityClass(elements[i]));
                     validFilter = meta != null;
