@@ -1,19 +1,26 @@
 package io.xlate.jsonapi.rvp;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 
+import javax.ws.rs.DELETE;
+import javax.ws.rs.GET;
+import javax.ws.rs.PATCH;
+import javax.ws.rs.POST;
+import javax.ws.rs.PUT;
+
 public class JsonApiResourceType<T> {
 
     public static final String CONFIGURATION_KEY = "io.xlate.jsonapi.rs.resourcetypes";
+    static final Set<Class<?>> ALL_METHODS = Set.of(GET.class, POST.class, PUT.class, PATCH.class, DELETE.class);
 
     private final String name;
     private final Class<T> klass;
+    private final Set<Class<?>> methods;
     private final String exposedIdAttribute;
     private final Set<String> relationships;
     private final Map<String, Set<String>> uniqueTuples;
@@ -27,6 +34,7 @@ public class JsonApiResourceType<T> {
     public static class Builder<T> {
         private final String name;
         private final Class<T> klass;
+        private final Set<Class<?>> methods = new HashSet<>();
         private Set<String> relationships;
         private Map<String, Set<String>> uniqueTuples = new HashMap<>(3);
         private String exposedIdAttribute;
@@ -41,6 +49,7 @@ public class JsonApiResourceType<T> {
         public JsonApiResourceType<T> build() {
             return new JsonApiResourceType<>(name,
                                              klass,
+                                             methods,
                                              relationships,
                                              uniqueTuples,
                                              exposedIdAttribute,
@@ -48,13 +57,23 @@ public class JsonApiResourceType<T> {
                                              principalNamePath);
         }
 
+        public Builder<T> methods(Class<?>... methods) {
+            for (Class<?> method : methods) {
+                if (ALL_METHODS.stream().noneMatch(method::equals)) {
+                    throw new IllegalArgumentException("Unsupported method: " + method);
+                }
+                this.methods.add(method);
+            }
+            return this;
+        }
+
         public Builder<T> relationships(String... relationships) {
             this.relationships = new HashSet<>(Arrays.asList(relationships));
             return this;
         }
 
-        public Builder<T> unique(String name, String... attributes) {
-            this.uniqueTuples.put(name, new HashSet<>(Arrays.asList(attributes)));
+        public Builder<T> unique(String name, Set<String> attributes) {
+            this.uniqueTuples.put(name, Set.copyOf(attributes));
             return this;
         }
 
@@ -70,8 +89,10 @@ public class JsonApiResourceType<T> {
         }
     }
 
+    @SuppressWarnings("java:S107")
     private JsonApiResourceType(String name,
             Class<T> klass,
+            Set<Class<?>> methods,
             Set<String> relationships,
             Map<String, Set<String>> uniqueTuples,
             String exposedIdAttribute,
@@ -81,13 +102,19 @@ public class JsonApiResourceType<T> {
         this.name = name;
         this.klass = klass;
 
-        if (relationships != null) {
-            this.relationships = Collections.unmodifiableSet(relationships);
+        if (methods.isEmpty()) {
+            this.methods = ALL_METHODS;
         } else {
-            this.relationships = Collections.emptySet();
+            this.methods = Set.copyOf(methods);
         }
 
-        this.uniqueTuples = uniqueTuples;
+        if (relationships != null) {
+            this.relationships = Set.copyOf(relationships);
+        } else {
+            this.relationships = Set.of(); // Empty
+        }
+
+        this.uniqueTuples = Map.copyOf(uniqueTuples);
         this.exposedIdAttribute = exposedIdAttribute;
         this.principalNamePath = principalNamePath;
 
@@ -129,6 +156,10 @@ public class JsonApiResourceType<T> {
 
     public Class<?> getResourceClass() {
         return klass;
+    }
+
+    public Set<Class<?>> getMethods() {
+        return methods;
     }
 
     public Set<String> getRelationships() {

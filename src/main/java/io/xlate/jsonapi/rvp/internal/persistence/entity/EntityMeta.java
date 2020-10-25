@@ -32,6 +32,7 @@ import javax.persistence.metamodel.EntityType;
 import javax.persistence.metamodel.Metamodel;
 import javax.persistence.metamodel.PluralAttribute;
 import javax.persistence.metamodel.SingularAttribute;
+import javax.ws.rs.HttpMethod;
 
 import io.xlate.jsonapi.rvp.JsonApiResourceType;
 
@@ -67,6 +68,7 @@ public class EntityMeta {
     private final Map<String, PropertyDescriptor> propertyDescriptors;
 
     private final EntityType<?> entityType;
+    private final Set<String> methodsAllowed;
 
     private final Set<SingularAttribute<?, ?>> attributes;
     private final Set<String> attributeNames;
@@ -90,6 +92,9 @@ public class EntityMeta {
         }
 
         this.entityType = model.entity(entityClass);
+        this.methodsAllowed = configuredType.getMethods().stream().map(method -> {
+            return method.getAnnotation(HttpMethod.class).value();
+        }).collect(Collectors.toSet());
 
         this.attributes = entityType.getSingularAttributes()
                                     .stream()
@@ -114,6 +119,10 @@ public class EntityMeta {
         this.propertyDescriptors = Arrays.stream(beanInfo.getPropertyDescriptors())
                                          .collect(Collectors.toMap(descriptor -> descriptor.getName(),
                                                                    descriptor -> descriptor));
+    }
+
+    public boolean isMethodAllowed(String method) {
+        return this.methodsAllowed.contains(method);
     }
 
     @SuppressWarnings("unchecked")

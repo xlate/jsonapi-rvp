@@ -75,6 +75,22 @@ public class Responses {
         context.setResponseBuilder(Response.status(notFound).entity(errors));
     }
 
+    public static void methodNotAllowed(InternalContext context) {
+        Status notAllowed = Status.METHOD_NOT_ALLOWED;
+
+        JsonObject errors = Json.createObjectBuilder()
+                                .add("errors",
+                                     Json.createArrayBuilder()
+                                         .add(Json.createObjectBuilder()
+                                                  .add("status", String.valueOf(notAllowed.getStatusCode()))
+                                                  .add("title", notAllowed.getReasonPhrase())
+                                                  .add("detail", "Method not allowed for this resource.")))
+                                .build();
+
+        context.setResponseEntity(errors);
+        context.setResponseBuilder(Response.status(notAllowed).entity(errors));
+    }
+
     public static void clientError(InternalContext context, JsonApiClientErrorException e) {
         JsonArray errors = e.getErrors();
 

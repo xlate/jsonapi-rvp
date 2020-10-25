@@ -157,6 +157,8 @@ public abstract class JsonApiResource {
 
             if (meta == null) {
                 Responses.notFound(context);
+            } else if (!meta.isMethodAllowed(request.getMethod())) {
+                Responses.methodNotAllowed(context);
             } else {
                 context.setEntityMeta(meta);
                 handler.onRequest(context);
@@ -200,6 +202,8 @@ public abstract class JsonApiResource {
 
             if (meta == null) {
                 Responses.notFound(context);
+            } else if (!meta.isMethodAllowed(request.getMethod())) {
+                Responses.methodNotAllowed(context);
             } else {
                 fetch(context, meta, handler);
             }
@@ -224,6 +228,8 @@ public abstract class JsonApiResource {
 
             if (!isValidId(meta, id)) {
                 Responses.notFound(context);
+            } else if (!meta.isMethodAllowed(request.getMethod())) {
+                Responses.methodNotAllowed(context);
             } else {
                 fetch(context, meta, handler);
             }
@@ -251,6 +257,8 @@ public abstract class JsonApiResource {
 
             if (!isValidId(meta, id)) {
                 Responses.notFound(context);
+            } else if (!meta.isMethodAllowed(request.getMethod())) {
+                Responses.methodNotAllowed(context);
             } else {
                 fetch(context, meta, handler);
             }
@@ -301,6 +309,8 @@ public abstract class JsonApiResource {
 
             if (!isValidId(meta, id)) {
                 Responses.notFound(context);
+            } else if (!meta.isMethodAllowed(request.getMethod())) {
+                Responses.methodNotAllowed(context);
             } else {
                 JsonObject response = persistence.getRelationships(context);
 
@@ -375,6 +385,8 @@ public abstract class JsonApiResource {
 
             if (!isValidId(meta, id)) {
                 Responses.notFound(context);
+            } else if (!meta.isMethodAllowed(request.getMethod())) {
+                Responses.methodNotAllowed(context);
             } else {
                 context.setEntityMeta(meta);
                 handler.onRequest(context);
@@ -418,6 +430,8 @@ public abstract class JsonApiResource {
 
             if (!isValidId(meta, id)) {
                 Responses.notFound(context);
+            } else if (!meta.isMethodAllowed(request.getMethod())) {
+                Responses.methodNotAllowed(context);
             } else {
                 handler.onRequest(context);
                 handler.afterValidation(context, Collections.emptySet());
