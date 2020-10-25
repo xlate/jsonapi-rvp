@@ -24,57 +24,42 @@ import javax.persistence.metamodel.Metamodel;
 
 import io.xlate.jsonapi.rvp.JsonApiResourceType;
 
-public class EntityMetamodel extends HashMap<String, EntityMeta> {
-
-    private static final long serialVersionUID = 1L;
+public class EntityMetamodel {
 
     private final Map<Class<?>, EntityMeta> classMetaMap;
+    private final Map<String, EntityMeta> typeMetaMap;
 
     public EntityMetamodel(Class<?> resourceClass,
             Set<JsonApiResourceType<?>> resourceTypes,
             Metamodel model) {
 
-        super(resourceTypes.size());
         classMetaMap = new HashMap<>(resourceTypes.size());
+        typeMetaMap = new HashMap<>(resourceTypes.size());
 
         for (JsonApiResourceType<?> entry : resourceTypes) {
             EntityMeta meta = new EntityMeta(resourceClass, entry, model);
 
-            this.put(entry.getName(), meta);
+            typeMetaMap.put(entry.getName(), meta);
             classMetaMap.put(entry.getResourceClass(), meta);
         }
     }
 
     public EntityMeta getEntityMeta(String resourceType) {
-        return super.get(resourceType);
+        return typeMetaMap.get(resourceType);
     }
 
     public EntityMeta getEntityMeta(Class<?> entityClass) {
-        EntityMeta meta = classMetaMap.get(entityClass);
-
-        if (meta != null) {
-            return meta;
+        if (!classMetaMap.containsKey(entityClass)) {
+            // Deal with JPA proxy classes. Find alternate and add new cross reference
+            classMetaMap.keySet()
+                        .stream()
+                        .filter(key -> key.isAssignableFrom(entityClass)
+                                || entityClass.getSuperclass().isAssignableFrom(key))
+                        .findFirst()
+                        .ifPresent(alternate -> classMetaMap.put(entityClass, classMetaMap.get(alternate)));
         }
 
-        // Deal with JPA proxy classes
-        return classMetaMap.entrySet()
-                           .stream()
-                           .filter(entry -> {
-                               Class<?> key = entry.getKey();
-
-                               if (!key.isAssignableFrom(entityClass)) {
-                                   return false;
-                               }
-
-                               if (!entityClass.getSuperclass().isAssignableFrom(key)) {
-                                   return false;
-                               }
-
-                               return true;
-                           })
-                           .map(entry -> entry.getValue())
-                           .findFirst()
-                           .orElseGet(() -> null);
+        return classMetaMap.get(entityClass);
     }
 
     public String getResourceType(Class<?> entityClass) {
