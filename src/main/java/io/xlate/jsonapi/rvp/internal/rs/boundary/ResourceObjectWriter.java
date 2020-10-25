@@ -134,18 +134,6 @@ public class ResourceObjectWriter {
         return builder.build();
     }
 
-    /*public String getId(Object bean) {
-        EntityMeta meta = model.getEntityMeta(bean.getClass());
-        SingularAttribute<Object, ?> idattr = meta.getExposedIdAttribute();
-        Object id;
-        if (bean instanceof Map) {
-            id = Map.class.cast(bean).get(idattr.getName());
-        } else {
-            id = meta.getPropertyValue(bean, idattr.getName());
-        }
-        return String.valueOf(id);
-    }*/
-
     public JsonObject getAttributes(JsonApiQuery params, Entity bean) {
         JsonObjectBuilder attributes = Json.createObjectBuilder();
 
@@ -244,36 +232,24 @@ public class ResourceObjectWriter {
                         JsonArrayBuilder relationshipArray = Json.createArrayBuilder();
 
                         for (Entity relatedEntity : relatedEntities) {
-                            JsonObjectBuilder relatedId = Json.createObjectBuilder();
-                            relatedId.add("type", relatedEntity.getType());
-                            relatedId.add("id", relatedEntity.getStringId());
-                            relationshipArray.add(relatedId);
+                            relationshipArray.add(getResourceIdentifier(relatedEntity));
                         }
 
                         relationshipData = relationshipArray.build();
                     } else {
                         final int count = relatedEntities.size();
+
                         if (count == 1) {
-                            final Entity relatedEntity;
-                            relatedEntity = relatedEntities.iterator().next();
-                            JsonObjectBuilder relatedId = Json.createObjectBuilder();
-                            relatedId.add("type", relatedEntity.getType());
-                            relatedId.add("id", relatedEntity.getStringId());
-                            relationshipData = relatedId.build();
+                            relationshipData = getResourceIdentifier(relatedEntities.iterator().next()).build();
                         } else {
-                            logger.warning("Non-collection-valued relationship `" + fieldName + "` with " + count
-                                    + " could not be mapped.");
+                            logger.warning(() -> String.format("Non-collection-valued relationship `%s` with %d could not be mapped.", fieldName, count));
                             continue;
                         }
                     }
 
                     relationshipEntry.add("data", relationshipData);
                 } else if (entryValue instanceof Entity && !many) {
-                    final Entity relatedEntity = (Entity) entryValue;
-                    JsonObjectBuilder relatedId = Json.createObjectBuilder();
-                    relatedId.add("type", relatedEntity.getType());
-                    relatedId.add("id", relatedEntity.getStringId());
-                    relationshipEntry.add("data", relatedId);
+                    relationshipEntry.add("data", getResourceIdentifier((Entity) entryValue));
                 }
 
                 jsonRelationships.add(relationshipName, relationshipEntry);
@@ -293,6 +269,13 @@ public class ResourceObjectWriter {
         JsonObjectBuilder builder = Json.createObjectBuilder();
         link(builder, uriInfo, "self", "read", model.getEntityMeta(resourceType), resourceType, id);
         return builder.build();
+    }
+
+    JsonObjectBuilder getResourceIdentifier(Entity resource) {
+        JsonObjectBuilder identifier = Json.createObjectBuilder();
+        identifier.add("type", resource.getType());
+        identifier.add("id", resource.getStringId());
+        return identifier;
     }
 
     private JsonObject getRelationshipLink(UriInfo uriInfo, String resourceType, String id, String relationshipName) {

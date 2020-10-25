@@ -21,37 +21,40 @@ import java.beans.IntrospectionException;
 import java.beans.Introspector;
 import java.beans.PropertyDescriptor;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 import javax.persistence.metamodel.Attribute;
+import javax.persistence.metamodel.Attribute.PersistentAttributeType;
 import javax.persistence.metamodel.EntityType;
 import javax.persistence.metamodel.Metamodel;
 import javax.persistence.metamodel.PluralAttribute;
 import javax.persistence.metamodel.SingularAttribute;
-import javax.persistence.metamodel.Attribute.PersistentAttributeType;
 
 import io.xlate.jsonapi.rvp.JsonApiResourceType;
 
 public class EntityMeta {
 
-    private static final Map<Class<?>, Class<?>> wrapperMap = new HashMap<Class<?>, Class<?>>() {
-        private static final long serialVersionUID = 1L;
-        {
-            put(boolean.class, Boolean.class);
-            put(byte.class, Byte.class);
-            put(char.class, Character.class);
-            put(double.class, Double.class);
-            put(float.class, Float.class);
-            put(int.class, Integer.class);
-            put(long.class, Long.class);
-            put(short.class, Short.class);
-            put(void.class, Void.class);
-        }
-    };
+    private static final Map<Class<?>, Class<?>> wrapperMap = Map.of(boolean.class,
+                                                                     Boolean.class,
+                                                                     byte.class,
+                                                                     Byte.class,
+                                                                     char.class,
+                                                                     Character.class,
+                                                                     double.class,
+                                                                     Double.class,
+                                                                     float.class,
+                                                                     Float.class,
+                                                                     int.class,
+                                                                     Integer.class,
+                                                                     long.class,
+                                                                     Long.class,
+                                                                     short.class,
+                                                                     Short.class,
+                                                                     void.class,
+                                                                     Void.class);
 
     @SuppressWarnings("unchecked")
     public static <T> Class<T> wrap(Class<T> clazz) {
