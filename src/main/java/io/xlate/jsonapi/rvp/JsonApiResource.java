@@ -16,14 +16,11 @@
  ******************************************************************************/
 package io.xlate.jsonapi.rvp;
 
-import static io.xlate.jsonapi.rvp.JsonApiResourceType.CONFIGURATION_KEY;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
-import javax.annotation.PostConstruct;
 import javax.enterprise.inject.Any;
 import javax.enterprise.inject.Instance;
 import javax.inject.Inject;
@@ -43,7 +40,6 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.CacheControl;
-import javax.ws.rs.core.Configuration;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Request;
 import javax.ws.rs.core.Response;
@@ -78,9 +74,6 @@ public abstract class JsonApiResource {
     @Context
     protected SecurityContext security;
 
-    @Context
-    protected Configuration config;
-
     @PersistenceContext
     protected EntityManager persistenceContext;
 
@@ -95,24 +88,6 @@ public abstract class JsonApiResource {
     private Class<?> resourceClass;
     private EntityMetamodel model;
     private PersistenceController persistence;
-
-    @PostConstruct
-    @SuppressWarnings("unchecked")
-    void initialize() {
-        if (config == null) {
-            return;
-        }
-
-        Set<JsonApiResourceType<?>> resourceTypes;
-
-        if (config.getProperties().containsKey(CONFIGURATION_KEY)) {
-            resourceTypes = (Set<JsonApiResourceType<?>>) config.getProperty(CONFIGURATION_KEY);
-        } else {
-            resourceTypes = Collections.emptySet();
-        }
-
-        initialize(resourceTypes);
-    }
 
     protected void initialize(Set<JsonApiResourceType<?>> resourceTypes) {
         resourceClass = this.getClass();

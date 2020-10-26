@@ -32,6 +32,9 @@ public class Responses {
 
     private static final Logger logger = Logger.getLogger(Responses.class.getName());
 
+    private Responses() {
+    }
+
     public static void ok(InternalContext context, CacheControl cacheControl, JsonObject entity) {
         EntityTag etag = new EntityTag(Integer.toString(entity.hashCode()));
         ResponseBuilder builder;
@@ -61,15 +64,8 @@ public class Responses {
 
     public static void notFound(InternalContext context) {
         Status notFound = Status.NOT_FOUND;
-
-        JsonObject errors = Json.createObjectBuilder()
-                                .add("errors",
-                                     Json.createArrayBuilder()
-                                         .add(Json.createObjectBuilder()
-                                                  .add("status", String.valueOf(notFound.getStatusCode()))
-                                                  .add("title", notFound.getReasonPhrase())
-                                                  .add("detail", "The requested resource can not be found.")))
-                                .build();
+        JsonApiError error = new JsonApiError(notFound, "The requested resource can not be found.");
+        JsonObject errors = errorsObject(Json.createArrayBuilder().add(error.toJson())).build();
 
         context.setResponseEntity(errors);
         context.setResponseBuilder(Response.status(notFound).entity(errors));
@@ -77,15 +73,8 @@ public class Responses {
 
     public static void methodNotAllowed(InternalContext context) {
         Status notAllowed = Status.METHOD_NOT_ALLOWED;
-
-        JsonObject errors = Json.createObjectBuilder()
-                                .add("errors",
-                                     Json.createArrayBuilder()
-                                         .add(Json.createObjectBuilder()
-                                                  .add("status", String.valueOf(notAllowed.getStatusCode()))
-                                                  .add("title", notAllowed.getReasonPhrase())
-                                                  .add("detail", "Method not allowed for this resource.")))
-                                .build();
+        JsonApiError error = new JsonApiError(notAllowed, "Method not allowed for this resource.");
+        JsonObject errors = errorsObject(Json.createArrayBuilder().add(error.toJson())).build();
 
         context.setResponseEntity(errors);
         context.setResponseBuilder(Response.status(notAllowed).entity(errors));
@@ -133,15 +122,12 @@ public class Responses {
             }
 
             for (String message : property.getValue()) {
-                errors.add(Json.createObjectBuilder()
-                               .add("source", Json.createObjectBuilder().add("parameter", key))
-                               .add("title", "Invalid Query Parameter")
-                               .add("detail", message));
+                JsonApiError error = new JsonApiError("Invalid Query Parameter", message, JsonApiError.Source.forParameter(key));
+                errors.add(error.toJson());
             }
         }
 
-        JsonObject jsonErrors = Json.createObjectBuilder().add("errors", errors).build();
-
+        JsonObject jsonErrors = errorsObject(errors).build();
         context.setResponseEntity(jsonErrors);
         context.setResponseBuilder(Response.status(Status.BAD_REQUEST).entity(jsonErrors));
 
@@ -201,20 +187,16 @@ public class Responses {
             }
 
             for (Error error : property.getValue()) {
-                JsonObjectBuilder builder = Json.createObjectBuilder()
-                                                .add("source", Json.createObjectBuilder().add("pointer", pointer))
-                                                .add("title", title)
-                                                .add("detail", error.message);
+                JsonApiError jsonError = new JsonApiError(error.status,
+                                                          title,
+                                                          error.message,
+                                                          JsonApiError.Source.forPointer(pointer));
 
-                if (error.status != null) {
-                    builder.add("status", error.status);
-                }
-
-                errors.add(builder);
+                errors.add(jsonError.toJson());
             }
         }
 
-        JsonObject jsonErrors = Json.createObjectBuilder().add("errors", errors).build();
+        JsonObject jsonErrors = errorsObject(errors).build();
 
         context.setResponseEntity(jsonErrors);
         context.setResponseBuilder(Response.status(JsonApiStatus.UNPROCESSABLE_ENTITY).entity(jsonErrors));
@@ -242,16 +224,14 @@ public class Responses {
     private static void error(InternalContext context, Exception e, Status statusCode, String message) {
         logger.log(Level.WARNING, statusCode.getReasonPhrase(), e);
 
-        JsonObject errors = Json.createObjectBuilder()
-                                .add("errors",
-                                     Json.createArrayBuilder()
-                                         .add(Json.createObjectBuilder()
-                                                  .add("status", String.valueOf(statusCode.getStatusCode()))
-                                                  .add("title", statusCode.getReasonPhrase())
-                                                  .add("detail", message)))
-                                .build();
+        JsonApiError error = new JsonApiError(statusCode, message);
+        JsonObject errors = errorsObject(Json.createArrayBuilder().add(error.toJson())).build();
 
         context.setResponseEntity(errors);
         context.setResponseBuilder(Response.status(statusCode).entity(errors));
+    }
+
+    private static JsonObjectBuilder errorsObject(JsonArrayBuilder errors) {
+        return Json.createObjectBuilder().add("errors", errors);
     }
 }

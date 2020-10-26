@@ -1,15 +1,15 @@
 /*******************************************************************************
  * Copyright (C) 2018 xlate.io LLC, http://www.xlate.io
  *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as published
- * by the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify it under
+ * the terms of the GNU Affero General Public License as published by the Free
+ * Software Foundation, either version 3 of the License, or (at your option) any
+ * later version.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more
+ * details.
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
@@ -21,6 +21,7 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map.Entry;
 import java.util.regex.Pattern;
 
 import javax.json.JsonObject;
@@ -31,18 +32,31 @@ import javax.validation.ConstraintValidator;
 import javax.validation.ConstraintValidatorContext;
 import javax.ws.rs.HttpMethod;
 
-import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMeta;
+import io.xlate.jsonapi.rvp.internal.rs.boundary.JsonApiError;
 import io.xlate.jsonapi.rvp.internal.rs.entity.JsonApiRequest;
 
 public class JsonApiRequestValidator implements ConstraintValidator<ValidJsonApiRequest, JsonApiRequest> {
 
-    private static final List<String> topLevelRequiredKeys = Arrays.asList("data",
-                                                                           "errors",
-                                                                           "meta");
+    public static final String KEY_DATA = "data";
+    public static final String KEY_ERRORS = "errors";
+    public static final String KEY_META = "meta";
 
-    private static final List<String> topLevelOptionalKeys = Arrays.asList("jsonapi",
-                                                                           "links",
-                                                                           "included");
+    public static final String KEY_JSONAPI = "jsonapi";
+    public static final String KEY_LINKS = "links";
+    public static final String KEY_INCLUDED = "included";
+
+    public static final String KEY_ID = "id";
+    public static final String KEY_TYPE = "type";
+    public static final String KEY_ATTRIBUTES = "attributes";
+    public static final String KEY_RELATIONSHIPS = "relationships";
+
+    private static final List<String> topLevelRequiredKeys = Arrays.asList(KEY_DATA,
+                                                                           KEY_ERRORS,
+                                                                           KEY_META);
+
+    private static final List<String> topLevelOptionalKeys = Arrays.asList(KEY_JSONAPI,
+                                                                           KEY_LINKS,
+                                                                           KEY_INCLUDED);
 
     private static final List<String> topLevelKeys = new ArrayList<>(6);
 
@@ -128,7 +142,7 @@ public class JsonApiRequestValidator implements ConstraintValidator<ValidJsonApi
     boolean validTopLevelExclusive(JsonApiRequest value, ConstraintValidatorContext context, boolean validStructure) {
         JsonObject document = value.getDocument();
 
-        if (document.containsKey("data") && document.containsKey("errors")) {
+        if (document.containsKey(KEY_DATA) && document.containsKey(KEY_ERRORS)) {
             validStructure = false;
             context.buildConstraintViolationWithTemplate(""
                     + "The members `data` and `errors` MUST NOT coexist in the same document.")
@@ -142,17 +156,17 @@ public class JsonApiRequestValidator implements ConstraintValidator<ValidJsonApi
     boolean validLinks(JsonApiRequest value, ConstraintValidatorContext context, boolean validStructure) {
         JsonObject document = value.getDocument();
 
-        if (!document.containsKey("links")) {
+        if (!document.containsKey(KEY_LINKS)) {
             return validStructure;
         }
 
-        JsonValue links = document.get("links");
+        JsonValue links = document.get(KEY_LINKS);
 
         if (links.getValueType() != ValueType.OBJECT) {
             validStructure = false;
             context.buildConstraintViolationWithTemplate(""
                     + "The value of each links member MUST be an object.")
-                   .addPropertyNode("/links")
+                   .addPropertyNode("/" + KEY_LINKS)
                    .addConstraintViolation();
         } else {
             for (String key : ((JsonObject) links).keySet()) {
@@ -182,155 +196,169 @@ public class JsonApiRequestValidator implements ConstraintValidator<ValidJsonApi
     boolean validData(JsonApiRequest value, ConstraintValidatorContext context, boolean validStructure) {
         JsonObject document = value.getDocument();
 
-        if (!document.containsKey("data")) {
+        if (!document.containsKey(KEY_DATA)) {
             return validStructure;
         }
 
         // `data` must always be a single resource for client update operations in JSON API 1.0
-        JsonValue data = document.get("data");
+        JsonValue data = document.get(KEY_DATA);
 
         // TODO: Allow 'null' for relationship updates
         if (data.getValueType() != ValueType.OBJECT) {
-            validStructure = false;
             context.buildConstraintViolationWithTemplate(""
                     + "Primary data MUST be a single resource object, a single resource identifier object, or null, "
                     + "for requests that target single resources")
                    .addPropertyNode("/data")
                    .addConstraintViolation();
-        } else {
-            JsonObject resource = (JsonObject) data;
 
-            for (String key : resource.keySet()) {
-                switch (key) {
-                case "id":
-                case "type":
-                case "attributes":
-                case "relationships":
-                case "links":
-                case "meta":
-                    break;
-                default:
-                    validStructure = false;
-                    context.buildConstraintViolationWithTemplate(""
-                            + "A resource object may only contain these top-level members: "
-                            + "`id`, `type`, `attributes`, `relationships`, `links`, `meta`")
-                           .addPropertyNode("/data/" + key)
-                           .addConstraintViolation();
-                    break;
-                }
-            }
+            return false;
+        }
 
-            JsonValue type = resource.get("type");
-            JsonValue id = resource.get("id");
+        JsonObject resource = (JsonObject) data;
 
-            if (type == null
-                    || (id == null && !value.isRequestMethod(HttpMethod.POST))) {
+        for (String key : resource.keySet()) {
+            switch (key) {
+            case KEY_ID:
+            case KEY_TYPE:
+            case KEY_ATTRIBUTES:
+            case KEY_RELATIONSHIPS:
+            case KEY_LINKS:
+            case KEY_META:
+                break;
+            default:
                 validStructure = false;
                 context.buildConstraintViolationWithTemplate(""
-                        + "A resource object MUST contain at least the following top-level members: "
-                        + "`id`, `type`")
-                       .addPropertyNode("/data")
+                        + "A resource object may only contain these top-level members: "
+                        + "`id`, `type`, `attributes`, `relationships`, `links`, `meta`")
+                       .addPropertyNode("/data/" + key)
                        .addConstraintViolation();
+                break;
             }
+        }
 
-            if (type != null && type.getValueType() != ValueType.STRING) {
-                validStructure = false;
-                context.buildConstraintViolationWithTemplate(""
-                        + "The value of the type member MUST be a string.")
-                       .addPropertyNode("/data/type")
-                       .addConstraintViolation();
-            }
+        JsonValue type = resource.get(KEY_TYPE);
+        JsonValue id = resource.get(KEY_ID);
 
-            if (id != null && id.getValueType() != ValueType.STRING) {
-                validStructure = false;
-                context.buildConstraintViolationWithTemplate(""
-                        + "The value of the id member MUST be a string.")
-                       .addPropertyNode("/data/id")
-                       .addConstraintViolation();
-            }
+        if (type == null
+                || (id == null && !value.isRequestMethod(HttpMethod.POST))) {
+            validStructure = false;
+            context.buildConstraintViolationWithTemplate(""
+                    + "A resource object MUST contain at least the following top-level members: "
+                    + "`id`, `type`")
+                   .addPropertyNode("/data")
+                   .addConstraintViolation();
+        }
+
+        if (type != null && type.getValueType() != ValueType.STRING) {
+            validStructure = false;
+            context.buildConstraintViolationWithTemplate(""
+                    + "The value of the type member MUST be a string.")
+                   .addPropertyNode("/data/type")
+                   .addConstraintViolation();
+        }
+
+        if (id != null && id.getValueType() != ValueType.STRING) {
+            validStructure = false;
+            context.buildConstraintViolationWithTemplate(""
+                    + "The value of the id member MUST be a string.")
+                   .addPropertyNode("/data/id")
+                   .addConstraintViolation();
         }
 
         return validStructure;
     }
 
     boolean validAttributes(JsonApiRequest value, ConstraintValidatorContext context, boolean validStructure) {
-        JsonObject data = value.getDocument().getJsonObject("data");
+        JsonObject data = value.getDocument().getJsonObject(KEY_DATA);
 
-        if (!data.containsKey("attributes")) {
+        if (!data.containsKey(KEY_ATTRIBUTES)) {
             return validStructure;
         }
 
-        JsonValue attributesValue = data.get("attributes");
+        JsonValue attributesValue = data.get(KEY_ATTRIBUTES);
 
         if (attributesValue.getValueType() != ValueType.OBJECT) {
-            validStructure = false;
             context.buildConstraintViolationWithTemplate(""
                     + "The value of the `attributes` key MUST be an object (an \"attributes object\").")
-                   .addPropertyNode("/data/attributes")
+                   .addPropertyNode(JsonApiError.DATA_ATTRIBUTES_POINTER)
                    .addConstraintViolation();
-        } else {
-            JsonObject attributes = (JsonObject) attributesValue;
-            EntityMeta meta = value.getEntityMeta();
-            //lass<Object> entityClass = value.getEntityMeta().getEntityClass();
+            return false;
+        }
 
-            for (String attributeKey : attributes.keySet()) {
-                if (validMemberName(attributeKey)) {
-                    PropertyDescriptor property = meta.getPropertyDescriptor(attributeKey);
-                    Class<?> propertyType = property.getPropertyType();
-                    JsonValue attributeValue = attributes.get(attributeKey);
+        JsonObject attributes = (JsonObject) attributesValue;
 
-                    switch (attributeValue.getValueType()) {
-                    case ARRAY:
-                    case OBJECT:
-                        // TODO: Add support for object and array attributes
-                        context.buildConstraintViolationWithTemplate(""
-                                + "Array and Object attributes not supported.")
-                               .addPropertyNode("/data/attributes/" + attributeKey)
-                               .addConstraintViolation();
-                        break;
-                    case FALSE:
-                    case TRUE:
-                        if (!Boolean.class.isAssignableFrom(propertyType)) {
-                            context.buildConstraintViolationWithTemplate(""
-                                    + "Incompatible data type")
-                                   .addPropertyNode("/data/attributes/" + attributeKey)
-                                   .addConstraintViolation();
-                        }
-                        break;
-                    case NULL:
-                        break;
-                    case NUMBER:
-                        if (!Number.class.isAssignableFrom(propertyType)) {
-                            context.buildConstraintViolationWithTemplate(""
-                                    + "Incompatible data type")
-                                   .addPropertyNode("/data/attributes/" + attributeKey)
-                                   .addConstraintViolation();
-                        }
-                        break;
-                    case STRING:
-                        String jsonString = ((JsonString) attributeValue).getString();
-                        try {
-                            Method valueOf = propertyType.getMethod("valueOf", String.class);
-                            valueOf.invoke(null, jsonString);
-                        } catch (@SuppressWarnings("unused") Exception e) {
-                            context.buildConstraintViolationWithTemplate(""
-                                    + "Incompatible data type")
-                                   .addPropertyNode("/data/attributes/" + attributeKey)
-                                   .addConstraintViolation();
-                        }
-                        break;
-                    }
-                } else {
-                    validStructure = false;
-                    context.buildConstraintViolationWithTemplate(""
-                            + "Attribute name `" + attributeKey + "` contains in invalid character.")
-                           .addPropertyNode("/data/attributes/" + attributeKey)
-                           .addConstraintViolation();
-                }
+        return attributes.entrySet()
+                         .stream()
+                         .map(attribute -> validAttribute(value, attribute, context, validStructure))
+                         .filter(Boolean.FALSE::equals)
+                         .findFirst()
+                         .orElse(validStructure);
+    }
+
+    boolean validAttribute(JsonApiRequest value,
+                           Entry<String, JsonValue> attribute,
+                           ConstraintValidatorContext context,
+                           boolean validStructure) {
+
+        final String attributeKey = attribute.getKey();
+
+        if (!validMemberName(attributeKey)) {
+            context.buildConstraintViolationWithTemplate(""
+                    + "Attribute name `" + attributeKey + "` contains in invalid character.")
+                   .addPropertyNode(JsonApiError.DATA_ATTRIBUTES_POINTER + attributeKey)
+                   .addConstraintViolation();
+            return false;
+        }
+
+        PropertyDescriptor property = value.getEntityMeta().getPropertyDescriptor(attributeKey);
+        Class<?> propertyType = property.getPropertyType();
+        JsonValue attributeValue = attribute.getValue();
+
+        switch (attributeValue.getValueType()) {
+        case ARRAY:
+        case OBJECT:
+            // TODO: Add support for object and array attributes
+            validStructure = false;
+            context.buildConstraintViolationWithTemplate(""
+                    + "Array and Object attributes not supported.")
+                   .addPropertyNode(JsonApiError.attributePointer(attributeKey))
+                   .addConstraintViolation();
+            break;
+        case FALSE:
+        case TRUE:
+            if (!Boolean.class.isAssignableFrom(propertyType)) {
+                validStructure = false;
+                addIncompatibleDataError(context, attributeKey);
             }
+            break;
+        case NULL:
+            break;
+        case NUMBER:
+            if (!Number.class.isAssignableFrom(propertyType)) {
+                validStructure = false;
+                addIncompatibleDataError(context, attributeKey);
+            }
+            break;
+        case STRING:
+            String jsonString = ((JsonString) attributeValue).getString();
+            try {
+                Method valueOf = propertyType.getMethod("valueOf", String.class);
+                valueOf.invoke(null, jsonString);
+            } catch (@SuppressWarnings("unused") Exception e) {
+                validStructure = false;
+                addIncompatibleDataError(context, attributeKey);
+            }
+            break;
         }
 
         return validStructure;
+    }
+
+    void addIncompatibleDataError(ConstraintValidatorContext context, String attributeKey) {
+        context.buildConstraintViolationWithTemplate(""
+                + "Incompatible data type")
+               .addPropertyNode(JsonApiError.attributePointer(attributeKey))
+               .addConstraintViolation();
     }
 
     boolean validMemberName(String name) {

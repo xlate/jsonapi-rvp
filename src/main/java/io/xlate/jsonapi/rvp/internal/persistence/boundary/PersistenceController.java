@@ -155,7 +155,7 @@ public class PersistenceController {
                                              joinMeta.getResourceType(),
                                              typedQuery.getResultList()
                                                        .stream()
-                                                       .map(relatedId -> String.valueOf(relatedId))
+                                                       .map(String::valueOf)
                                                        .collect(Collectors.toSet()));
     }
 
@@ -342,11 +342,6 @@ public class PersistenceController {
         Attribute<T, ?>[] attrNodes = new Attribute[fetchedAttributes.size()];
         graph.addAttributeNodes(fetchedAttributes.toArray(attrNodes));
 
-        /*
-         * Map<String, Object> hints = new HashMap<>();
-         * hints.put("javax.persistence.fetchgraph", graph);
-         */
-
         final T entity;
 
         try {
@@ -354,7 +349,6 @@ public class PersistenceController {
             final CriteriaQuery<T> query = (CriteriaQuery<T>) builder.createQuery();
             Root<T> root = query.from(entityClass);
             query.select(root.alias("root"));
-            //query.multiselect(root);
 
             List<Predicate> predicates = buildPredicates(builder,
                                                          root,

@@ -117,7 +117,7 @@ public class EntityMeta {
         this.relationshipNames = relationships.stream().map(Attribute::getName).collect(Collectors.toSet());
 
         this.propertyDescriptors = Arrays.stream(beanInfo.getPropertyDescriptors())
-                                         .collect(Collectors.toMap(descriptor -> descriptor.getName(),
+                                         .collect(Collectors.toMap(PropertyDescriptor::getName,
                                                                    descriptor -> descriptor));
     }
 
