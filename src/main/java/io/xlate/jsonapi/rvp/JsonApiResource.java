@@ -63,7 +63,7 @@ public abstract class JsonApiResource {
 
     @Inject
     @Any
-    private Instance<JsonApiHandler<?>> handlers;
+    Instance<JsonApiHandler<?>> handlers;
 
     @Context
     protected Request request;

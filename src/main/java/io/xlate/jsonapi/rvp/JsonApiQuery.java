@@ -21,6 +21,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -42,6 +43,9 @@ public class JsonApiQuery {
 
     public static final String PARAM_PAGE_NUMBER = "page[number]";
     public static final String PARAM_PAGE_SIZE = "page[size]";
+
+    private static final Pattern PATTERN_FIELDS = Pattern.compile("fields\\[([^]]+?)\\]");
+    private static final Pattern PATTERN_FILTER = Pattern.compile("filter\\[([^]]+?)\\]");
 
     private final EntityMetamodel model;
     private final EntityMeta entityMeta;
@@ -74,8 +78,9 @@ public class JsonApiQuery {
 
         MultivaluedMap<String, String> params = uriInfo.getQueryParameters();
 
-        processFields(params);
-        processFilters(params);
+        processParamMatches(params, PATTERN_FIELDS, this::processFields);
+        processParamMatches(params, PATTERN_FILTER, this::processFilters);
+
         processPaging(params);
 
         if (params.containsKey(PARAM_INCLUDE)) {
@@ -92,34 +97,31 @@ public class JsonApiQuery {
         uriProcessed = true;
     }
 
-    void processFields(MultivaluedMap<String, String> params) {
-        Pattern fieldp = Pattern.compile("fields\\[([^]]+?)\\]");
+    void processParamMatches(MultivaluedMap<String, String> params,
+                             Pattern fieldPattern,
+                             Consumer<Map.Entry<Matcher, List<String>>> handler) {
 
         params.entrySet()
               .stream()
-              .filter(p -> p.getKey().matches("fields\\[[^]]+?\\]"))
-              .forEach(p -> {
-                  Matcher fieldm = fieldp.matcher(p.getKey());
-                  fieldm.find();
-                  for (String fieldl : p.getValue()) {
-                      for (String fieldName : fieldl.split(",")) {
-                          addField(this.fields, fieldm.group(1), fieldName);
-                      }
-                  }
-              });
+              .map(entry -> Map.entry(fieldPattern.matcher(entry.getKey()), entry.getValue()))
+              .filter(entry -> entry.getKey().matches())
+              .forEach(handler);
     }
 
-    void processFilters(MultivaluedMap<String, String> params) {
-        Pattern filterp = Pattern.compile("filter\\[([^]]+?)\\]");
+    void processFields(Map.Entry<Matcher, List<String>> fields) {
+        final String resourceType = fields.getKey().group(1);
 
-        params.entrySet()
+        fields.getValue()
               .stream()
-              .filter(p -> p.getKey().matches("filter\\[[^]]+?\\]"))
-              .forEach(p -> {
-                  Matcher filterm = filterp.matcher(p.getKey());
-                  filterm.find();
-                  addFilter(this.filters, replaceIdentifier(filterm.group(1)), p.getValue().get(0));
-              });
+              .flatMap(field -> Arrays.stream(field.split(",")))
+              .forEach(fieldName -> addField(this.fields, resourceType, fieldName));
+    }
+
+    void processFilters(Map.Entry<Matcher, List<String>> filters) {
+        final String filterField = replaceIdentifier(filters.getKey().group(1));
+
+        filters.getValue()
+               .forEach(value -> addFilter(this.filters, filterField, value));
     }
 
     String replaceIdentifier(String fieldPath) {
@@ -168,7 +170,7 @@ public class JsonApiQuery {
                 this.maxResults = 10;
             }
 
-            this.firstResult = (pageNumber - 1 ) + this.maxResults;
+            this.firstResult = (pageNumber - 1) + this.maxResults;
         } else if (params.containsKey(PARAM_PAGE_LIMIT)) {
             this.maxResults = tryParseInt(params.getFirst(PARAM_PAGE_LIMIT), 10);
         } else if (params.containsKey(PARAM_PAGE_SIZE)) {
