@@ -78,6 +78,8 @@ import io.xlate.jsonapi.rvp.internal.validation.boundary.TransactionalValidator;
 
 public class PersistenceController {
 
+    private static final String ALIAS_PRE = "io_xlate_jsonapi_rvp_";
+
     private final EntityManager em;
     private final EntityMetamodel model;
     private final ResourceObjectReader reader;
@@ -273,11 +275,11 @@ public class PersistenceController {
         }
     }
 
-    static List<Predicate> buildPredicates(CriteriaBuilder builder,
-                                           Root<?> root,
-                                           Principal user,
-                                           EntityMeta meta,
-                                           String id) {
+    static <T> List<Predicate> buildPredicates(CriteriaBuilder builder,
+                                               Root<T> root,
+                                               Principal user,
+                                               EntityMeta meta,
+                                               String id) {
         List<Predicate> predicates = new ArrayList<>(2);
 
         if (user != null) {
@@ -297,10 +299,10 @@ public class PersistenceController {
         return predicates;
     }
 
-    static Predicate buildPredicate(CriteriaBuilder builder,
-                                    Root<?> root,
-                                    String path,
-                                    String value) {
+    static <T> Predicate buildPredicate(CriteriaBuilder builder,
+                                        Root<T> root,
+                                        String path,
+                                        String value) {
         Predicate p = null;
 
         if (path != null && path.length() > 0) {
@@ -311,13 +313,28 @@ public class PersistenceController {
                 if (i + 1 == elements.length) {
                     p = builder.equal(namePath.get(elements[i]), value);
                 } else {
-                    namePath = namePath.join(elements[i]);
-                    namePath.alias(elements[i]);
+                    namePath = join(namePath, elements[i]);
                 }
             }
         }
 
         return p;
+    }
+
+    static <Z, X> Join<X, ?> join(From<Z, X> from, String attribute) {
+        final String targetAliasName = ALIAS_PRE + attribute;
+
+        return from.getJoins()
+                   .stream()
+                   .filter(j -> targetAliasName.equals(j.getAlias()))
+                   .findFirst()
+                   .orElseGet(() -> newJoin(from, attribute));
+    }
+
+    static <Z, X> Join<X, ?> newJoin(From<Z, X> from, String attribute) {
+        Join<X, ?> joined = from.join(attribute);
+        joined.alias(ALIAS_PRE + attribute);
+        return joined;
     }
 
     @SuppressWarnings("unchecked")
@@ -433,7 +450,7 @@ public class PersistenceController {
         for (String collection : counted) {
             Join<Object, Object> countJoin = root.join(collection, JoinType.LEFT);
             Expression<Long> count = builder.countDistinct(countJoin);
-            selections.add(count.alias(collection));
+            selections.add(count.alias(ALIAS_PRE + collection));
         }
 
         query.multiselect(selections);
@@ -549,7 +566,7 @@ public class PersistenceController {
 
             related.clear();
             related.putAll(relationships.get(resultId));
-            counted.forEach(relationship -> related.put(relationship, result.get(relationship)));
+            counted.forEach(relationship -> related.put(relationship, result.get(ALIAS_PRE + relationship)));
             data.add(writer.toJson(new Entity(meta, entity), related, params, uriInfo));
         }
 
