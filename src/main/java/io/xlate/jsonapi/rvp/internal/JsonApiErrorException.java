@@ -16,28 +16,54 @@
  ******************************************************************************/
 package io.xlate.jsonapi.rvp.internal;
 
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+
+import javax.json.Json;
 import javax.json.JsonArray;
+import javax.json.JsonReader;
 import javax.ws.rs.core.Response.Status;
 
-public class JsonApiClientErrorException extends RuntimeException {
+public class JsonApiErrorException extends RuntimeException {
     private static final long serialVersionUID = 1L;
+
     private final Status status;
-    private final JsonArray errors;
     private final String title;
     private final String detail;
+    private JsonArray errors; // NOSONAR: non-final for de-serialization
 
-    public JsonApiClientErrorException(Status status, JsonArray errors) {
+    public JsonApiErrorException(Status status, JsonArray errors) {
         this.status = status;
-        this.errors = errors;
         this.title = null;
         this.detail = null;
+        this.errors = errors;
     }
 
-    public JsonApiClientErrorException(Status status, String title, String detail) {
+    public JsonApiErrorException(Status status, String title, String detail) {
         this.status = status;
-        this.errors = null;
         this.title = title;
         this.detail = detail;
+        this.errors = null;
+    }
+
+    private void writeObject(ObjectOutputStream out) throws IOException {
+        out.defaultWriteObject();
+        out.writeBoolean(errors != null);
+
+        if (errors != null) {
+            out.writeUTF(errors.toString());
+        }
+    }
+
+    private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
+        in.defaultReadObject();
+
+        if (in.readBoolean()) {
+            try (JsonReader reader = Json.createReader(in)) {
+                this.errors = reader.readArray();
+            }
+        }
     }
 
     public Status getStatus() {

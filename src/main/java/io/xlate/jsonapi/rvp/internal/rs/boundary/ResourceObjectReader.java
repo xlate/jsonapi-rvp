@@ -44,7 +44,7 @@ import javax.persistence.metamodel.EntityType;
 import javax.ws.rs.core.Response.Status;
 
 import io.xlate.jsonapi.rvp.JsonApiContext;
-import io.xlate.jsonapi.rvp.internal.JsonApiClientErrorException;
+import io.xlate.jsonapi.rvp.internal.JsonApiErrorException;
 import io.xlate.jsonapi.rvp.internal.persistence.boundary.PersistenceController;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMeta;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMetamodel;
@@ -137,7 +137,7 @@ public class ResourceObjectReader {
         JsonArray errorsArray = errors.build();
 
         if (!errorsArray.isEmpty()) {
-            throw new JsonApiClientErrorException(Status.BAD_REQUEST, errorsArray);
+            throw new JsonApiErrorException(Status.BAD_REQUEST, errorsArray);
         }
     }
 
@@ -279,7 +279,7 @@ public class ResourceObjectReader {
     }
 
     RuntimeException badConversionException(String jsonKey, JsonValue jsonValue) {
-        return new JsonApiClientErrorException(Status.BAD_REQUEST,
+        return new JsonApiErrorException(Status.BAD_REQUEST,
                                                "Invalid data binding",
                                                "Unable to map attribute `" + jsonKey + "` with value `" + jsonValue + "`");
     }

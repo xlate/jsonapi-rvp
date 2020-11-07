@@ -9,6 +9,12 @@ import javax.ws.rs.core.UriInfo;
 
 public interface JsonApiContext {
 
+    public static class Attributes {
+        private Attributes() {}
+
+        public static final String VALIDATION_GROUPS = Attributes.class.getPackageName() + ".VALIDATION_GROUPS";
+    }
+
     Request getRequest();
 
     UriInfo getUriInfo();

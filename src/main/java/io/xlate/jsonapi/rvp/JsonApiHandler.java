@@ -37,6 +37,27 @@ public interface JsonApiHandler<T> {
     }
 
     /**
+     * Called prior to an existing entity being updated with new values
+     * submitted by the client.
+     *
+     * @param context
+     * @param entity
+     */
+    default void beforeUpdate(JsonApiContext context, T entity) {
+    }
+
+    /**
+     * Called after an entity has been updated with values submitted by
+     * the client.
+     *
+     * @param context
+     * @param entity
+     */
+    default void afterUpdate(JsonApiContext context, T entity) {
+    }
+
+
+    /**
      * Called prior to a new entity being added to the persistence
      * context/database.
      *
@@ -54,16 +75,6 @@ public interface JsonApiHandler<T> {
      * @param entity
      */
     default void afterPersist(JsonApiContext context, T entity) {
-    }
-
-    /**
-     * Called prior to an existing entity being updated with new values
-     * submitted by the client.
-     *
-     * @param context
-     * @param entity
-     */
-    default void beforeUpdate(JsonApiContext context, T entity) {
     }
 
     /**

@@ -25,7 +25,7 @@ import javax.ws.rs.core.UriBuilder;
 import javax.ws.rs.core.UriInfo;
 
 import io.xlate.jsonapi.rvp.JsonApiStatus;
-import io.xlate.jsonapi.rvp.internal.JsonApiClientErrorException;
+import io.xlate.jsonapi.rvp.internal.JsonApiErrorException;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMeta;
 
 public class Responses {
@@ -80,7 +80,7 @@ public class Responses {
         context.setResponseBuilder(Response.status(notAllowed).entity(errors));
     }
 
-    public static void clientError(InternalContext context, JsonApiClientErrorException e) {
+    public static void error(InternalContext context, JsonApiErrorException e) {
         JsonArray errors = e.getErrors();
 
         if (errors != null) {

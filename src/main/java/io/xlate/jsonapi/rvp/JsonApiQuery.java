@@ -239,14 +239,14 @@ public class JsonApiQuery {
         addField(this.fields, resourceType, fieldName);
     }
 
-    public static void addField(Map<String, List<String>> fields, String resourceType, String fieldName) {
+    private static void addField(Map<String, List<String>> fields, String resourceType, String fieldName) {
         if (!fields.containsKey(resourceType)) {
             fields.put(resourceType, new ArrayList<String>());
         }
         fields.get(resourceType).add(fieldName);
     }
 
-    public static void addFilter(Map<String, String> filters, String fieldName, String fieldValue) {
+    private static void addFilter(Map<String, String> filters, String fieldName, String fieldValue) {
         filters.put(fieldName, fieldValue);
     }
 
@@ -255,7 +255,7 @@ public class JsonApiQuery {
         return includeField(this.fields, resourceType, fieldName);
     }
 
-    public static boolean includeField(Map<String, List<String>> fields, String resourceType, String fieldName) {
+    private static boolean includeField(Map<String, List<String>> fields, String resourceType, String fieldName) {
         if (fields.containsKey(resourceType)) {
             if (fields.get(resourceType).isEmpty()) {
                 return true;

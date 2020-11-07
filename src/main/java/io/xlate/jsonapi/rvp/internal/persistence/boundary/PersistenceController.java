@@ -68,7 +68,8 @@ import javax.ws.rs.core.UriInfo;
 import io.xlate.jsonapi.rvp.JsonApiContext;
 import io.xlate.jsonapi.rvp.JsonApiHandler;
 import io.xlate.jsonapi.rvp.JsonApiQuery;
-import io.xlate.jsonapi.rvp.internal.JsonApiClientErrorException;
+import io.xlate.jsonapi.rvp.JsonApiContext.Attributes;
+import io.xlate.jsonapi.rvp.internal.JsonApiErrorException;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.Entity;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMeta;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMetamodel;
@@ -181,18 +182,24 @@ public class PersistenceController {
             entity = (T) entityClass.getConstructor().newInstance();
             em.setFlushMode(FlushModeType.COMMIT);
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            throw new JsonApiErrorException(Status.INTERNAL_SERVER_ERROR, "Server Error", e.getMessage());
         }
 
         reader.fromJson(this, context, entity, input);
+        handler.afterUpdate(context, entity);
 
-        handler.beforePersist(context, entity);
+        Object groupsAttribute = context.getAttribute(Attributes.VALIDATION_GROUPS);
+        Class<?>[] validationGroups = groupsAttribute instanceof Class[] ? (Class<?>[]) groupsAttribute : new Class<?>[0];
 
         TransactionalValidator validator = CDI.current().select(TransactionalValidator.class).get();
-        Set<ConstraintViolation<T>> violations = validator.validate(context.getRequest().getMethod(), entity);
+        Set<ConstraintViolation<?>> violations = Collections.unmodifiableSet(validator.validate(context.getRequest().getMethod(), entity, validationGroups));
+        handler.afterValidation(context, violations);
+
         if (!violations.isEmpty()) {
             throw new ConstraintViolationException(violations);
         }
+
+        handler.beforePersist(context, entity);
 
         em.persist(entity);
         em.flush();
@@ -224,17 +231,22 @@ public class PersistenceController {
         }
 
         handler.beforeUpdate(context, entity);
-
         reader.fromJson(this, context, entity, input);
+        handler.afterUpdate(context, entity);
 
-        handler.beforeMerge(context, entity);
+        Object groupsAttribute = context.getAttribute(Attributes.VALIDATION_GROUPS);
+        Class<?>[] validationGroups = groupsAttribute instanceof Class[] ? (Class<?>[]) groupsAttribute : new Class<?>[0];
 
         TransactionalValidator validator = CDI.current().select(TransactionalValidator.class).get();
-        Set<ConstraintViolation<T>> violations = validator.validate(context.getRequest().getMethod(), entity);
+        Set<ConstraintViolation<?>> violations = Collections.unmodifiableSet(validator.validate(context.getRequest().getMethod(), entity, validationGroups));
+        handler.afterValidation(context, violations);
+
         if (!violations.isEmpty()) {
             em.detach(entity);
             throw new ConstraintViolationException(violations);
         }
+
+        handler.beforeMerge(context, entity);
 
         final Object updatedEntity = em.merge(entity);
         em.flush();
@@ -271,7 +283,7 @@ public class PersistenceController {
             handler.afterDelete(context, entity);
             return true;
         } catch (@SuppressWarnings("unused") PersistenceException e) {
-            throw new JsonApiClientErrorException(Status.CONFLICT, "Unexpected error", null);
+            throw new JsonApiErrorException(Status.CONFLICT, "Unexpected error", null);
         }
     }
 
@@ -384,7 +396,7 @@ public class PersistenceController {
         } catch (NoResultException e) {
             return null;
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            throw new JsonApiErrorException(Status.INTERNAL_SERVER_ERROR, "Server Error", e.getMessage());
         }
 
         return entity;
@@ -542,15 +554,8 @@ public class PersistenceController {
         /* Only retrieve included records if something was found. */
         if (!results.isEmpty()) {
             for (String included : params.getInclude()) {
-                getIncluded(params, entityClass, relationships, included);
+                getIncluded(entityClass, relationships, included);
             }
-            /*if (relationshipName != null) {
-                String relatedTo = relatedJoin.getAttribute().getName();
-
-                if (!params.getInclude().contains(relatedTo)) {
-                    getIncluded(params, entityClass, relationships, relatedTo);
-                }
-            }*/
         }
 
         JsonObjectBuilder response = writer.topLevelBuilder();
@@ -639,7 +644,7 @@ public class PersistenceController {
     @Deprecated
     void validateEntityKey(EntityType<Object> rootType) {
         if (!rootType.hasSingleIdAttribute()) {
-            throw new JsonApiClientErrorException(Status.BAD_REQUEST,
+            throw new JsonApiErrorException(Status.BAD_REQUEST,
                                                   "Invalid resource",
                                                   "The requested resource type "
                                                           + "has an unsupported "
@@ -647,8 +652,7 @@ public class PersistenceController {
         }
     }
 
-    void getIncluded(@SuppressWarnings("unused") JsonApiQuery params,
-                     Class<Object> primaryClass,
+    void getIncluded(Class<Object> primaryClass,
                      Map<Object, Map<String, List<Entity>>> relationships,
                      String includedName) {
 

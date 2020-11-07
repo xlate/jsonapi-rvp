@@ -31,7 +31,6 @@ public class InternalContext implements JsonApiContext {
     private JsonObject responseEntity;
     private Map<String, Object> attributes = new HashMap<>();
 
-
     public InternalContext(Request request, UriInfo uriInfo, SecurityContext security, String resourceType, String id, String relationshipName, JsonObject requestEntity) {
         this.request = request;
         this.uriInfo = uriInfo;

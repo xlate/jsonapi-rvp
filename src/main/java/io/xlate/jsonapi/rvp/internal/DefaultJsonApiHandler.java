@@ -58,6 +58,12 @@ public class DefaultJsonApiHandler implements JsonApiHandler<Object> {
     }
 
     @Override
+    public void afterUpdate(JsonApiContext context, Object entity) {
+        // No operation
+        logger.finest("Default afterUpdate called");
+    }
+
+    @Override
     public void beforeMerge(JsonApiContext context, Object entity) {
         // No operation
         logger.finest("Default beforeMerge called");

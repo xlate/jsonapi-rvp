@@ -47,7 +47,7 @@ import javax.ws.rs.core.SecurityContext;
 import javax.ws.rs.core.UriInfo;
 
 import io.xlate.jsonapi.rvp.internal.DefaultJsonApiHandler;
-import io.xlate.jsonapi.rvp.internal.JsonApiClientErrorException;
+import io.xlate.jsonapi.rvp.internal.JsonApiErrorException;
 import io.xlate.jsonapi.rvp.internal.JsonApiHandlerChain;
 import io.xlate.jsonapi.rvp.internal.persistence.boundary.PersistenceController;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMeta;
@@ -156,8 +156,8 @@ public abstract class JsonApiResource {
             }
         } catch (ConstraintViolationException e) {
             Responses.unprocessableEntity(context, "Invalid Input", e.getConstraintViolations());
-        } catch (JsonApiClientErrorException e) {
-            Responses.clientError(context, e);
+        } catch (JsonApiErrorException e) {
+            Responses.error(context, e);
         } catch (Exception e) {
             Responses.internalServerError(context, e);
         }
@@ -182,8 +182,8 @@ public abstract class JsonApiResource {
             } else {
                 fetch(context, meta, handler);
             }
-        } catch (JsonApiClientErrorException e) {
-            Responses.clientError(context, e);
+        } catch (JsonApiErrorException e) {
+            Responses.error(context, e);
         } catch (Exception e) {
             Responses.internalServerError(context, e);
         }
@@ -208,8 +208,8 @@ public abstract class JsonApiResource {
             } else {
                 fetch(context, meta, handler);
             }
-        } catch (JsonApiClientErrorException e) {
-            Responses.clientError(context, e);
+        } catch (JsonApiErrorException e) {
+            Responses.error(context, e);
         } catch (Exception e) {
             Responses.internalServerError(context, e);
         }
@@ -237,8 +237,8 @@ public abstract class JsonApiResource {
             } else {
                 fetch(context, meta, handler);
             }
-        } catch (JsonApiClientErrorException e) {
-            Responses.clientError(context, e);
+        } catch (JsonApiErrorException e) {
+            Responses.error(context, e);
         } catch (Exception e) {
             Responses.internalServerError(context, e);
         }
@@ -295,8 +295,8 @@ public abstract class JsonApiResource {
                     Responses.notFound(context);
                 }
             }
-        } catch (JsonApiClientErrorException e) {
-            Responses.clientError(context, e);
+        } catch (JsonApiErrorException e) {
+            Responses.error(context, e);
         } catch (Exception e) {
             Responses.internalServerError(context, e);
         }
@@ -384,8 +384,8 @@ public abstract class JsonApiResource {
             }
         } catch (ConstraintViolationException e) {
             Responses.unprocessableEntity(context, "Invalid Input", e.getConstraintViolations());
-        } catch (JsonApiClientErrorException e) {
-            Responses.clientError(context, e);
+        } catch (JsonApiErrorException e) {
+            Responses.error(context, e);
         } catch (Exception e) {
             Responses.internalServerError(context, e);
         }
@@ -409,7 +409,6 @@ public abstract class JsonApiResource {
                 Responses.methodNotAllowed(context);
             } else {
                 handler.onRequest(context);
-                handler.afterValidation(context, Collections.emptySet());
 
                 if (persistence.delete(context, handler)) {
                     if (!context.hasResponse()) {
@@ -419,8 +418,8 @@ public abstract class JsonApiResource {
                     Responses.notFound(context);
                 }
             }
-        } catch (JsonApiClientErrorException e) {
-            Responses.clientError(context, e);
+        } catch (JsonApiErrorException e) {
+            Responses.error(context, e);
         } catch (Exception e) {
             Responses.internalServerError(context, e);
         }
