@@ -1,5 +1,6 @@
 package io.xlate.jsonapi.rvp.internal.validation.boundary;
 
+import java.util.Arrays;
 import java.util.Set;
 
 import javax.enterprise.context.ApplicationScoped;
@@ -21,7 +22,7 @@ public class TransactionalValidator {
     @Transactional(value = TxType.REQUIRES_NEW)
     public <T> Set<ConstraintViolation<T>> validate(String method, T entity, Class<?>... groups) {
         final int groupCount = groups.length + 1;
-        final Class<?>[] validationGroups = new Class<?>[groupCount];
+        final Class<?>[] validationGroups = Arrays.copyOf(groups, groupCount);
 
         try {
             validationGroups[groupCount - 1] = Class.forName("javax.ws.rs." + method);
