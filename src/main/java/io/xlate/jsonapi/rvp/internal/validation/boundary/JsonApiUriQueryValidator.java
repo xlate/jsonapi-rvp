@@ -121,8 +121,7 @@ public class JsonApiUriQueryValidator
                     validFilter = meta.getAttributeNames().contains(elements[i])
                             || meta.getExposedIdAttribute().getName().equals(elements[i]);
                 } else {
-                    meta = model.getEntityMeta(meta.getRelatedEntityClass(elements[i]));
-                    validFilter = meta != null;
+                    validFilter = (meta = getRelatedEntityMeta(model, meta, elements[i])) != null;
                 }
             }
 
@@ -133,6 +132,26 @@ public class JsonApiUriQueryValidator
         }
 
         return valid;
+    }
+
+    public static EntityMeta getRelatedEntityMeta(EntityMetamodel model, EntityMeta meta, String relationshipJoin) {
+        final String relationshipName;
+
+        if (relationshipJoin.startsWith("+")) {
+            // Left JOIN
+            relationshipName = relationshipJoin.substring(1);
+        } else if (relationshipJoin.endsWith("+")) {
+            // Right JOIN
+            relationshipName = relationshipJoin.substring(0, relationshipJoin.length() - 1);
+        } else {
+            relationshipName = relationshipJoin;
+        }
+
+        if (meta.isRelatedTo(relationshipName)) {
+            return model.getEntityMeta(meta.getRelatedEntityClass(relationshipName));
+        }
+
+        return null;
     }
 
     boolean validateSort(EntityType<Object> rootType,

@@ -16,6 +16,8 @@
  ******************************************************************************/
 package io.xlate.jsonapi.rvp;
 
+import static io.xlate.jsonapi.rvp.internal.validation.boundary.JsonApiUriQueryValidator.getRelatedEntityMeta;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -138,13 +140,7 @@ public class JsonApiQuery {
                     fieldPath = String.join(".", elements);
                 }
             } else {
-                String relationshipName = elements[i];
-
-                if (meta.isRelatedTo(relationshipName)) {
-                    meta = model.getEntityMeta(meta.getRelatedEntityClass(relationshipName));
-                } else {
-                    validFilter = false;
-                }
+                validFilter = (meta = getRelatedEntityMeta(model, meta, elements[i])) != null;
             }
         }
 

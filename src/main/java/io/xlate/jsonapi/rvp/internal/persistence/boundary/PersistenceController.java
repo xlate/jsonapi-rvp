@@ -323,7 +323,13 @@ public class PersistenceController {
 
             for (int i = 0; i < elements.length; i++) {
                 if (i + 1 == elements.length) {
-                    p = builder.equal(namePath.get(elements[i]), value);
+                    if ("null".equals(value)) {
+                        p = builder.isNull(namePath.get(elements[i]));
+                    } else if ("!null".equals(value)) {
+                        p = builder.isNotNull(namePath.get(elements[i]));
+                    } else {
+                        p = builder.equal(namePath.get(elements[i]), value);
+                    }
                 } else {
                     namePath = join(namePath, elements[i]);
                 }
@@ -334,17 +340,33 @@ public class PersistenceController {
     }
 
     static <Z, X> Join<X, ?> join(From<Z, X> from, String attribute) {
-        final String targetAliasName = ALIAS_PRE + attribute;
+        final String relationship;
+        final JoinType joinType;
+
+        if (attribute.startsWith("+")) {
+            // Left JOIN
+            relationship = attribute.substring(1);
+            joinType = JoinType.LEFT;
+        } else if (attribute.endsWith("+")) {
+            // Right JOIN
+            relationship = attribute.substring(0, attribute.length() - 1);
+            joinType = JoinType.RIGHT;
+        } else {
+            relationship = attribute;
+            joinType = JoinType.INNER;
+        }
+
+        final String targetAliasName = ALIAS_PRE + relationship;
 
         return from.getJoins()
                    .stream()
                    .filter(j -> targetAliasName.equals(j.getAlias()))
                    .findFirst()
-                   .orElseGet(() -> newJoin(from, attribute));
+                   .orElseGet(() -> newJoin(from, relationship, joinType));
     }
 
-    static <Z, X> Join<X, ?> newJoin(From<Z, X> from, String attribute) {
-        Join<X, ?> joined = from.join(attribute);
+    static <Z, X> Join<X, ?> newJoin(From<Z, X> from, String attribute, JoinType joinType) {
+        Join<X, ?> joined = from.join(attribute, joinType);
         joined.alias(ALIAS_PRE + attribute);
         return joined;
     }
