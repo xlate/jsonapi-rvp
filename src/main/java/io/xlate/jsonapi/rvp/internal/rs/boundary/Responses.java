@@ -86,7 +86,7 @@ public class Responses {
         if (errors != null) {
             JsonObject jsonErrors = Json.createObjectBuilder().add("errors", errors).build();
             context.setResponseEntity(jsonErrors);
-            context.setResponseBuilder(Response.status(e.getStatus()).entity(errors));
+            context.setResponseBuilder(Response.status(e.getStatus()).entity(jsonErrors));
         } else {
             error(context, e, e.getStatus(), e.getDetail());
         }

@@ -16,6 +16,7 @@
  ******************************************************************************/
 package io.xlate.jsonapi.rvp.internal.rs.boundary;
 
+import static io.xlate.jsonapi.rvp.internal.rs.boundary.JsonApiError.attributePointer;
 import static io.xlate.jsonapi.rvp.internal.rs.boundary.JsonApiError.relationshipPointer;
 
 import java.beans.PropertyDescriptor;
@@ -60,24 +61,33 @@ public class ResourceObjectReader {
     public void fromJson(PersistenceController persistence, JsonApiContext context, Object target, JsonObject source) {
         JsonObject data = source.getJsonObject("data");
 
-        putAttributes(target, data.getJsonObject("attributes"));
+        JsonArrayBuilder errors = Json.createArrayBuilder();
+
+        readAttributes(target, data.getJsonObject("attributes"), errors);
 
         if (data.containsKey("relationships")) {
-            handleRelationships(persistence,
-                                context,
-                                target,
-                                data,
-                                model.getEntityMeta(target.getClass()).getEntityType());
+            readRelationships(persistence,
+                              context,
+                              target,
+                              data,
+                              model.getEntityMeta(target.getClass()).getEntityType(),
+                              errors);
+        }
+
+        JsonArray errorsArray = errors.build();
+
+        if (!errorsArray.isEmpty()) {
+            throw new JsonApiErrorException(Status.BAD_REQUEST, errorsArray);
         }
     }
 
-    void handleRelationships(PersistenceController persistence,
-                             JsonApiContext context,
-                             Object entity,
-                             JsonObject data,
-                             EntityType<Object> rootType) {
+    void readRelationships(PersistenceController persistence,
+                           JsonApiContext context,
+                           Object entity,
+                           JsonObject data,
+                           EntityType<Object> rootType,
+                           JsonArrayBuilder errors) {
 
-        JsonArrayBuilder errors = Json.createArrayBuilder();
         JsonObject relationships = data.getJsonObject("relationships");
 
         for (Entry<String, JsonValue> entry : relationships.entrySet()) {
@@ -133,12 +143,6 @@ public class ResourceObjectReader {
                 }
             }
         }
-
-        JsonArray errorsArray = errors.build();
-
-        if (!errorsArray.isEmpty()) {
-            throw new JsonApiErrorException(Status.BAD_REQUEST, errorsArray);
-        }
     }
 
     JsonApiError invalidRelationshipError(String detail, String relationshipName) {
@@ -147,9 +151,8 @@ public class ResourceObjectReader {
                                 JsonApiError.Source.forPointer(relationshipPointer(relationshipName)));
     }
 
-    public void putAttributes(Object bean, JsonObject attributes) {
+    void readAttributes(Object bean, JsonObject attributes, JsonArrayBuilder errors) {
         EntityMeta meta = model.getEntityMeta(bean.getClass());
-        //EntityType<Object> model = meta.getEntityType();
 
         attributes.entrySet()
                   .stream()
@@ -157,13 +160,12 @@ public class ResourceObjectReader {
                       String jsonKey = attribute.getKey();
                       String fieldName = jsonKey;
 
-                      //TODO: validation
-                      //Attribute<Object, ?> a1 = model.getAttribute(fieldName);
-
-                      /*
-                       * if (a1.getPersistentAttributeType() !=
-                       * PersistentAttributeType.BASIC) { return; }
-                       */
+                      if (!meta.getAttributeNames().contains(fieldName)) {
+                          var error = invalidAttributeError("Unknown attribute: `" + jsonKey + "`.",
+                                                            jsonKey);
+                          errors.add(error.toJson());
+                          return;
+                      }
 
                       PropertyDescriptor desc = meta.getPropertyDescriptor(fieldName);
                       JsonValue jsonValue = attributes.get(jsonKey);
@@ -278,10 +280,16 @@ public class ResourceObjectReader {
                   });
     }
 
+    JsonApiError invalidAttributeError(String detail, String attributeName) {
+        return new JsonApiError("Invalid attribute",
+                                detail,
+                                JsonApiError.Source.forPointer(attributePointer(attributeName)));
+    }
+
     RuntimeException badConversionException(String jsonKey, JsonValue jsonValue) {
         return new JsonApiErrorException(Status.BAD_REQUEST,
-                                               "Invalid data binding",
-                                               "Unable to map attribute `" + jsonKey + "` with value `" + jsonValue + "`");
+                                         "Invalid data binding",
+                                         "Unable to map attribute `" + jsonKey + "` with value `" + jsonValue + "`");
     }
 
     public void putRelationship(Object bean, String relationship, Collection<Object> values) {
