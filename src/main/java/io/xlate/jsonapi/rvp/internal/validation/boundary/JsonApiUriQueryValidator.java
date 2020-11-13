@@ -23,8 +23,6 @@ import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import javax.persistence.metamodel.Attribute;
-import javax.persistence.metamodel.EntityType;
 import javax.validation.ConstraintValidator;
 import javax.validation.ConstraintValidatorContext;
 import javax.ws.rs.core.MultivaluedMap;
@@ -52,17 +50,16 @@ public class JsonApiUriQueryValidator
 
         MultivaluedMap<String, String> params = value.getUriInfo().getQueryParameters();
         EntityMeta meta = value.getEntityMeta();
-        EntityType<Object> rootType = meta.getEntityType();
         String id = value.getId();
 
         valid = validateFilters(value, context, valid);
 
         if (params.containsKey(JsonApiQuery.PARAM_INCLUDE)) {
-            valid = validateInclude(rootType, params, context, valid);
+            valid = validateInclude(meta, params, context, valid);
         }
 
         if (params.containsKey(JsonApiQuery.PARAM_SORT)) {
-            valid = validateSort(rootType, id, params, context, valid);
+            valid = validateSort(meta, id, params, context, valid);
         }
 
         valid = validatePaging(id, JsonApiQuery.PARAM_PAGE_NUMBER, params, context, valid);
@@ -74,7 +71,7 @@ public class JsonApiUriQueryValidator
         return valid;
     }
 
-    boolean validateInclude(EntityType<Object> rootType,
+    boolean validateInclude(EntityMeta meta,
                             MultivaluedMap<String, String> params,
                             ConstraintValidatorContext context,
                             boolean valid) {
@@ -86,19 +83,9 @@ public class JsonApiUriQueryValidator
         Set<String> included = new HashSet<>();
 
         for (String attribute : includeParam.split(",")) {
-            if (!included.contains(attribute)) {
-                boolean validRelationship = false;
-
-                try {
-                    validRelationship = rootType.getAttribute(attribute).isAssociation();
-                } catch (IllegalArgumentException e) {
-                    LOGGER.log(Level.FINE, e, () -> "Invalid relationship: `" + attribute + "`.");
-                }
-
-                if (!validRelationship) {
-                    valid = false;
-                    addViolation(context, JsonApiQuery.PARAM_INCLUDE, "Invalid relationship: `" + attribute + "`.");
-                }
+            if (!included.contains(attribute) && !meta.isRelatedTo(attribute)) {
+                valid = false;
+                addViolation(context, JsonApiQuery.PARAM_INCLUDE, "Invalid relationship: `" + attribute + "`.");
             }
 
             included.add(attribute);
@@ -154,7 +141,7 @@ public class JsonApiUriQueryValidator
         return null;
     }
 
-    boolean validateSort(EntityType<Object> rootType,
+    boolean validateSort(EntityMeta meta,
                          String id,
                          MultivaluedMap<String, String> params,
                          ConstraintValidatorContext context,
@@ -173,17 +160,10 @@ public class JsonApiUriQueryValidator
                 boolean descending = sort.startsWith("-");
                 String attribute = sort.substring(descending ? 1 : 0);
 
-                try {
-                    Attribute<?, ?> attr = rootType.getAttribute(attribute);
-
-                    if (attr.isAssociation()) {
-                        valid = false;
-                        addViolation(context, JsonApiQuery.PARAM_SORT, "Sort key `" + sort + "` is not an attribute.");
-                    }
-                } catch (IllegalArgumentException e) {
-                    LOGGER.log(Level.FINE, e, () -> "Invalid attribute name: `" + attribute + "`.");
+                if (!meta.getAttributeNames().contains(attribute)) {
+                    LOGGER.log(Level.FINE, () -> "Invalid attribute name: `" + attribute + "`.");
                     valid = false;
-                    addViolation(context, JsonApiQuery.PARAM_SORT, "The resource does not have a `" + sort + "` attribute.");
+                    addViolation(context, JsonApiQuery.PARAM_SORT, "Sort key `" + sort + "` is not an attribute.");
                 }
             }
         }
