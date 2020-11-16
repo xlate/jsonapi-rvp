@@ -200,24 +200,10 @@ public abstract class JsonApiResource {
 
     @GET
     @Path("{resource-type}/{id}")
-    public Response read(@PathParam("resource-type") String resourceType, @PathParam("id") final String id) {
-        InternalContext context = new InternalContext(request, uriInfo, security, resourceType, id);
-        JsonApiHandler<?> handler = findHandler(resourceType, request.getMethod());
+    public Response read(@PathParam("resource-type") String resourceType,
+                         @PathParam("id") final String id) {
 
-        try {
-            EntityMeta meta = model.getEntityMeta(resourceType);
-
-            if (isValidResourceAndMethodAllowed(context, meta, id)) {
-                fetch(context, meta, handler);
-            }
-        } catch (JsonApiErrorException e) {
-            Responses.error(context, e);
-        } catch (Exception e) {
-            Responses.internalServerError(context, e);
-        }
-
-        handler.beforeResponse(context);
-        return context.getResponseBuilder().build();
+        return read(new InternalContext(request, uriInfo, security, resourceType, id));
     }
 
     @GET
@@ -226,13 +212,16 @@ public abstract class JsonApiResource {
                                 @PathParam("id") final String id,
                                 @PathParam("relationship-name") String relationshipName) {
 
-        InternalContext context = new InternalContext(request, uriInfo, security, resourceType, id, relationshipName);
-        JsonApiHandler<?> handler = findHandler(resourceType, request.getMethod());
+        return read(new InternalContext(request, uriInfo, security, resourceType, id, relationshipName));
+    }
+
+    Response read(InternalContext context) {
+        JsonApiHandler<?> handler = findHandler(context.getResourceType(), request.getMethod());
 
         try {
-            EntityMeta meta = model.getEntityMeta(resourceType);
+            EntityMeta meta = model.getEntityMeta(context.getResourceType());
 
-            if (isValidResourceAndMethodAllowed(context, meta, id)) {
+            if (isValidResourceAndMethodAllowed(context, meta, context.getResourceId())) {
                 fetch(context, meta, handler);
             }
         } catch (JsonApiErrorException e) {
@@ -335,8 +324,8 @@ public abstract class JsonApiResource {
     @PATCH
     @Path("{resource-type}/{id}")
     public Response patchUpdate(@PathParam("resource-type") String resourceType,
-                           @PathParam("id") String id,
-                           final JsonObject input) {
+                                @PathParam("id") String id,
+                                final JsonObject input) {
         return update(resourceType, id, input);
     }
 
