@@ -50,7 +50,7 @@ public class Responses {
         context.setResponseBuilder(builder);
     }
 
-    public static void created(InternalContext context, Class<?> resource) {
+    public static void created(InternalContext context, Class<?> resource, JsonObject entity) {
         ResponseBuilder builder = Response.created(getUri(context.getUriInfo(),
                                                           resource,
                                                           "read",
@@ -58,7 +58,7 @@ public class Responses {
                                                           context.getResponseEntity().getJsonObject("data")
                                                                  .getString("id")));
 
-        builder.entity(context.getResponseEntity());
+        builder.entity(entity);
         context.setResponseBuilder(builder);
     }
 

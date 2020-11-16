@@ -20,6 +20,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
+import java.util.function.BiFunction;
+import java.util.function.Consumer;
 
 import javax.enterprise.inject.Any;
 import javax.enterprise.inject.Instance;
@@ -139,41 +141,7 @@ public abstract class JsonApiResource {
     @Path("{resource-type}")
     public Response create(@PathParam("resource-type") String resourceType, JsonObject input) {
         InternalContext context = new InternalContext(request, uriInfo, security, resourceType, input);
-        JsonApiHandler<?> handler = findHandler(resourceType, request.getMethod());
-
-        try {
-            EntityMeta meta = model.getEntityMeta(resourceType);
-
-            if (isValidResourceAndMethodAllowed(context, meta, null)) {
-                context.setEntityMeta(meta);
-                handler.onRequest(context);
-
-                Set<ConstraintViolation<?>> violations = validateEntity(resourceType, null, input);
-                handler.afterValidation(context, violations);
-
-                if (violations.isEmpty()) {
-                    JsonObject response = persistence.create(context, handler);
-
-                    if (response != null) {
-                        context.setResponseEntity(response);
-                        Responses.created(context, resourceClass);
-                    } else {
-                        Responses.notFound(context);
-                    }
-                } else {
-                    Responses.unprocessableEntity(context, "Invalid JSON API Document Structure", violations);
-                }
-            }
-        } catch (ConstraintViolationException e) {
-            Responses.unprocessableEntity(context, "Invalid Input", e.getConstraintViolations());
-        } catch (JsonApiErrorException e) {
-            Responses.error(context, e);
-        } catch (Exception e) {
-            Responses.internalServerError(context, e);
-        }
-
-        handler.beforeResponse(context);
-        return context.getResponseBuilder().build();
+        return writeEntity(context, persistence::create, response -> Responses.created(context, resourceClass, response));
     }
 
     @GET
@@ -336,41 +304,7 @@ public abstract class JsonApiResource {
                            final JsonObject input) {
 
         InternalContext context = new InternalContext(request, uriInfo, security, resourceType, id, input);
-        JsonApiHandler<?> handler = findHandler(resourceType, request.getMethod());
-
-        try {
-            EntityMeta meta = model.getEntityMeta(resourceType);
-
-            if (isValidResourceAndMethodAllowed(context, meta, id)) {
-                context.setEntityMeta(meta);
-                handler.onRequest(context);
-                Set<ConstraintViolation<?>> violations = validateEntity(resourceType, null, input);
-                handler.afterValidation(context, violations);
-
-                if (violations.isEmpty()) {
-                    JsonObject response = persistence.update(context, handler);
-
-                    if (!context.hasResponse()) {
-                        if (response != null) {
-                            Responses.ok(context, cacheControl, response);
-                        } else {
-                            Responses.notFound(context);
-                        }
-                    }
-                } else {
-                    Responses.unprocessableEntity(context, "Invalid JSON API Document Structure", violations);
-                }
-            }
-        } catch (ConstraintViolationException e) {
-            Responses.unprocessableEntity(context, "Invalid Input", e.getConstraintViolations());
-        } catch (JsonApiErrorException e) {
-            Responses.error(context, e);
-        } catch (Exception e) {
-            Responses.internalServerError(context, e);
-        }
-
-        handler.beforeResponse(context);
-        return context.getResponseBuilder().build();
+        return writeEntity(context, persistence::update, response -> Responses.ok(context, cacheControl, response));
     }
 
     @DELETE
@@ -393,6 +327,47 @@ public abstract class JsonApiResource {
                     Responses.notFound(context);
                 }
             }
+        } catch (JsonApiErrorException e) {
+            Responses.error(context, e);
+        } catch (Exception e) {
+            Responses.internalServerError(context, e);
+        }
+
+        handler.beforeResponse(context);
+        return context.getResponseBuilder().build();
+    }
+
+    Response writeEntity(InternalContext context,
+                         BiFunction<InternalContext, JsonApiHandler<?>, JsonObject> persist,
+                         Consumer<JsonObject> responder) {
+
+        JsonApiHandler<?> handler = findHandler(context.getResourceType(), request.getMethod());
+
+        try {
+            EntityMeta meta = model.getEntityMeta(context.getResourceType());
+
+            if (isValidResourceAndMethodAllowed(context, meta, context.getResourceId())) {
+                context.setEntityMeta(meta);
+                handler.onRequest(context);
+                Set<ConstraintViolation<?>> violations = validateEntity(context.getResourceType(), null, context.getRequestEntity());
+                handler.afterValidation(context, violations);
+
+                if (violations.isEmpty()) {
+                    JsonObject response = persist.apply(context, handler);
+
+                    if (!context.hasResponse()) {
+                        if (response != null) {
+                            responder.accept(response);
+                        } else {
+                            Responses.notFound(context);
+                        }
+                    }
+                } else {
+                    Responses.unprocessableEntity(context, "Invalid JSON API Document Structure", violations);
+                }
+            }
+        } catch (ConstraintViolationException e) {
+            Responses.unprocessableEntity(context, "Invalid Input", e.getConstraintViolations());
         } catch (JsonApiErrorException e) {
             Responses.error(context, e);
         } catch (Exception e) {
