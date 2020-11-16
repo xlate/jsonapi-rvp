@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.function.Supplier;
 import java.util.logging.Logger;
 
 import javax.json.Json;
@@ -69,7 +70,7 @@ public class ResourceObjectWriter {
                                              Set<String> relatedIds) {
 
         JsonObjectBuilder response = topLevelBuilder();
-        response.add("links", getRelationshipLink(uriInfo, resourceType, id, relationshipName));
+        addLinks(response, () -> getRelationshipLink(uriInfo, resourceType, id, relationshipName));
 
         JsonArrayBuilder relationships = Json.createArrayBuilder();
 
@@ -129,7 +130,7 @@ public class ResourceObjectWriter {
             builder.add("relationships", relationships);
         }
 
-        builder.add("links", getReadLink(uriInfo, resourceType, id));
+        addLinks(builder, () -> getReadLink(uriInfo, resourceType, id));
 
         return builder.build();
     }
@@ -142,41 +143,33 @@ public class ResourceObjectWriter {
             .stream()
             .filter(name -> params == null || params.includeField(bean.getType(), name))
             .sorted()
-            .forEach(name -> {
-                try {
-                    Object value = bean.getAttribute(name);
-                    String key = name;
+            .forEach(key -> {
+                Object value = bean.getAttribute(key);
 
-                    if (value != null) {
-                        if (Date.class.isAssignableFrom(value.getClass())) {
-                            OffsetDateTime odt = ((Date) value).toInstant().atOffset(ZoneOffset.UTC);
-                            attributes.add(key, odt.format(DateTimeFormatter.ISO_DATE_TIME));
-                        } else if (OffsetDateTime.class.isAssignableFrom(value.getClass())) {
-                            OffsetDateTime odt = ((OffsetDateTime) value).toInstant().atOffset(ZoneOffset.UTC);
-                            attributes.add(key, odt.format(DateTimeFormatter.ISO_DATE_TIME));
-                        } else if (Boolean.class.isAssignableFrom(value.getClass())) {
-                            attributes.add(key, (Boolean) value);
-                        } else if (BigDecimal.class.isAssignableFrom(value.getClass())) {
-                            attributes.add(key, (BigDecimal) value);
-                        } else if (BigInteger.class.isAssignableFrom(value.getClass())) {
-                            attributes.add(key, (BigInteger) value);
-                        } else if (Long.class.isAssignableFrom(value.getClass())) {
-                            attributes.add(key, (Long) value);
-                        } else if (Integer.class.isAssignableFrom(value.getClass())) {
-                            attributes.add(key, (Integer) value);
-                        } else if (Double.class.isAssignableFrom(value.getClass())) {
-                            attributes.add(key, (Double) value);
-                        } else if (Float.class.isAssignableFrom(value.getClass())) {
-                            attributes.add(key, (Float) value);
-                        } else {
-                            // TODO: Things other than string?
-                            attributes.add(key, String.valueOf(value));
-                        }
-                    } else {
-                        attributes.addNull(key);
-                    }
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
+                if (value == null) {
+                    attributes.addNull(key);
+                } else if (Date.class.isAssignableFrom(value.getClass())) {
+                    OffsetDateTime odt = ((Date) value).toInstant().atOffset(ZoneOffset.UTC);
+                    attributes.add(key, odt.format(DateTimeFormatter.ISO_DATE_TIME));
+                } else if (OffsetDateTime.class.isAssignableFrom(value.getClass())) {
+                    OffsetDateTime odt = ((OffsetDateTime) value).toInstant().atOffset(ZoneOffset.UTC);
+                    attributes.add(key, odt.format(DateTimeFormatter.ISO_DATE_TIME));
+                } else if (Boolean.class.isAssignableFrom(value.getClass())) {
+                    attributes.add(key, (Boolean) value);
+                } else if (BigDecimal.class.isAssignableFrom(value.getClass())) {
+                    attributes.add(key, (BigDecimal) value);
+                } else if (BigInteger.class.isAssignableFrom(value.getClass())) {
+                    attributes.add(key, (BigInteger) value);
+                } else if (Long.class.isAssignableFrom(value.getClass())) {
+                    attributes.add(key, (Long) value);
+                } else if (Integer.class.isAssignableFrom(value.getClass())) {
+                    attributes.add(key, (Integer) value);
+                } else if (Double.class.isAssignableFrom(value.getClass())) {
+                    attributes.add(key, (Double) value);
+                } else if (Float.class.isAssignableFrom(value.getClass())) {
+                    attributes.add(key, (Float) value);
+                } else {
+                    attributes.add(key, String.valueOf(value));
                 }
             });
 
@@ -209,11 +202,10 @@ public class ResourceObjectWriter {
                 included++;
                 JsonObjectBuilder relationshipEntry = Json.createObjectBuilder();
 
-                relationshipEntry.add("links",
-                                      getRelationshipLink(uriInfo,
-                                                          resourceType,
-                                                          rootEntityId,
-                                                          relationshipName));
+                addLinks(jsonRelationships, () -> getRelationshipLink(uriInfo,
+                                                                      resourceType,
+                                                                      rootEntityId,
+                                                                      relationshipName));
 
                 Object entryValue = entry.getValue();
                 boolean many = meta.getEntityType().getAttribute(fieldName).isCollection();
@@ -265,17 +257,21 @@ public class ResourceObjectWriter {
         return null;
     }
 
-    private JsonObject getReadLink(UriInfo uriInfo, String resourceType, String id) {
-        JsonObjectBuilder builder = Json.createObjectBuilder();
-        link(builder, uriInfo, "self", "read", model.getEntityMeta(resourceType), resourceType, id);
-        return builder.build();
-    }
-
     JsonObjectBuilder getResourceIdentifier(Entity resource) {
         JsonObjectBuilder identifier = Json.createObjectBuilder();
         identifier.add("type", resource.getType());
         identifier.add("id", resource.getStringId());
         return identifier;
+    }
+
+    private void addLinks(JsonObjectBuilder builder, Supplier<JsonObject> links) {
+        builder.add("links", links.get());
+    }
+
+    private JsonObject getReadLink(UriInfo uriInfo, String resourceType, String id) {
+        JsonObjectBuilder builder = Json.createObjectBuilder();
+        link(builder, uriInfo, "self", "read", model.getEntityMeta(resourceType), resourceType, id);
+        return builder.build();
     }
 
     private JsonObject getRelationshipLink(UriInfo uriInfo, String resourceType, String id, String relationshipName) {

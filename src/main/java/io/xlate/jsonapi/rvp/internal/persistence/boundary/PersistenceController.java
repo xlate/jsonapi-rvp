@@ -66,9 +66,9 @@ import javax.ws.rs.core.Response.Status;
 import javax.ws.rs.core.UriInfo;
 
 import io.xlate.jsonapi.rvp.JsonApiContext;
+import io.xlate.jsonapi.rvp.JsonApiContext.Attributes;
 import io.xlate.jsonapi.rvp.JsonApiHandler;
 import io.xlate.jsonapi.rvp.JsonApiQuery;
-import io.xlate.jsonapi.rvp.JsonApiContext.Attributes;
 import io.xlate.jsonapi.rvp.internal.JsonApiErrorException;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.Entity;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMeta;
@@ -128,7 +128,6 @@ public class PersistenceController {
             return null;
         }
 
-        validateEntityKey(meta.getEntityType());
         Class<Object> entityClass = meta.getEntityClass();
 
         final CriteriaBuilder builder = em.getCriteriaBuilder();
@@ -172,8 +171,6 @@ public class PersistenceController {
         if (meta == null) {
             return null;
         }
-
-        validateEntityKey(meta.getEntityType());
 
         Class<Object> entityClass = meta.getEntityClass();
         T entity;
@@ -221,9 +218,6 @@ public class PersistenceController {
         final JsonObject input = context.getRequestEntity();
         final UriInfo uriInfo = context.getUriInfo();
 
-        EntityType<Object> rootType = meta.getEntityType();
-        validateEntityKey(rootType);
-
         final T entity = findObject(context, resourceType, id);
 
         if (entity == null) {
@@ -263,9 +257,6 @@ public class PersistenceController {
         if (meta == null) {
             return false;
         }
-
-        EntityType<Object> rootType = meta.getEntityType();
-        validateEntityKey(rootType);
 
         String id = context.getResourceId();
 
@@ -339,6 +330,7 @@ public class PersistenceController {
         return p;
     }
 
+    @SuppressWarnings("java:S1452") // Suppress Sonar warnings regarding missing generic types
     static <Z, X> Join<X, ?> join(From<Z, X> from, String attribute) {
         final String relationship;
         final JoinType joinType;
@@ -365,6 +357,7 @@ public class PersistenceController {
                    .orElseGet(() -> newJoin(from, relationship, joinType));
     }
 
+    @SuppressWarnings("java:S1452") // Suppress Sonar warnings regarding missing generic types
     static <Z, X> Join<X, ?> newJoin(From<Z, X> from, String attribute, JoinType joinType) {
         Join<X, ?> joined = from.join(attribute, joinType);
         joined.alias(ALIAS_PRE + attribute);
@@ -380,7 +373,6 @@ public class PersistenceController {
         }
 
         EntityType<Object> rootType = meta.getEntityType();
-        validateEntityKey(rootType);
         Class<T> entityClass = (Class<T>) meta.getEntityClass();
         List<Attribute<Object, ?>> fetchedAttributes;
 
@@ -441,8 +433,6 @@ public class PersistenceController {
         Class<Object> entityClass = meta.getEntityClass();
         EntityType<Object> rootType = meta.getEntityType();
 
-        validateEntityKey(rootType);
-
         String id = params.getId();
         UriInfo uriInfo = params.getUriInfo();
 
@@ -460,13 +450,6 @@ public class PersistenceController {
         } else {
             relatedJoin = null;
         }
-
-        /*Set<String> counted = rootType.getAttributes().stream()
-                                      .filter(Attribute::isAssociation)
-                                      .map(Attribute::getName)
-                                      .filter(meta::isRelatedTo)
-                                      .filter(not(params.getInclude()::contains))
-                                      .collect(Collectors.toSet());*/
 
         Set<String> counted = rootType.getPluralAttributes()
                                       .stream()
@@ -663,17 +646,6 @@ public class PersistenceController {
         return response.build();
     }
 
-    @Deprecated
-    void validateEntityKey(EntityType<Object> rootType) {
-        if (!rootType.hasSingleIdAttribute()) {
-            throw new JsonApiErrorException(Status.BAD_REQUEST,
-                                                  "Invalid resource",
-                                                  "The requested resource type "
-                                                          + "has an unsupported "
-                                                          + "composite key/ID.");
-        }
-    }
-
     void getIncluded(Class<Object> primaryClass,
                      Map<Object, Map<String, List<Entity>>> relationships,
                      String includedName) {
@@ -726,6 +698,7 @@ public class PersistenceController {
         }
     }
 
+    @SuppressWarnings("java:S1452") // Suppress Sonar warnings regarding missing generic types
     Attribute<Object, ?> inverseOf(Class<Object> type, Attribute<Object, ?> attribute) {
         @SuppressWarnings("unchecked")
         Bindable<Object> bindable = (Bindable<Object>) attribute;

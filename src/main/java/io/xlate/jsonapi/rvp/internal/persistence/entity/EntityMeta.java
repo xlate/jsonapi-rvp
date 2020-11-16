@@ -36,6 +36,7 @@ import javax.ws.rs.HttpMethod;
 
 import io.xlate.jsonapi.rvp.JsonApiResourceType;
 
+@SuppressWarnings("java:S1452") // Suppress Sonar warnings regarding generic wildcards
 public class EntityMeta {
 
     private static final Map<Class<?>, Class<?>> wrapperMap = Map.of(boolean.class,
@@ -92,9 +93,10 @@ public class EntityMeta {
         }
 
         this.entityType = model.entity(entityClass);
-        this.methodsAllowed = configuredType.getMethods().stream().map(method -> {
-            return method.getAnnotation(HttpMethod.class).value();
-        }).collect(Collectors.toSet());
+        this.methodsAllowed = configuredType
+                .getMethods()
+                .stream().map(method -> method.getAnnotation(HttpMethod.class).value())
+                .collect(Collectors.toSet());
 
         this.attributes = entityType.getSingularAttributes()
                                     .stream()

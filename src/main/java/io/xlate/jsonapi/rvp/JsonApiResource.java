@@ -108,10 +108,12 @@ public abstract class JsonApiResource {
         cacheControl.setPrivate(true);
     }
 
+    @SuppressWarnings("java:S1452") // Suppress Sonar warnings regarding missing generic types
     protected Set<ConstraintViolation<?>> validateParameters(JsonApiQuery params) {
         return Collections.unmodifiableSet(validator.validate(params));
     }
 
+    @SuppressWarnings("java:S1452") // Suppress Sonar warnings regarding missing generic types
     protected Set<ConstraintViolation<?>> validateEntity(String resourceType, String id, JsonObject input) {
         JsonApiRequest jsonApiRequest = new JsonApiRequest(request.getMethod(),
                                                            model.getEntityMeta(resourceType),
@@ -119,6 +121,18 @@ public abstract class JsonApiResource {
                                                            input);
 
         return Collections.unmodifiableSet(validator.validate(jsonApiRequest));
+    }
+
+    boolean isValidResourceAndMethodAllowed(InternalContext context, EntityMeta meta, String id) {
+        if (meta == null || (id != null && !isValidId(meta, id))) {
+            Responses.notFound(context);
+            return false;
+        } else if (!meta.isMethodAllowed(request.getMethod())) {
+            Responses.methodNotAllowed(context);
+            return false;
+        }
+
+        return true;
     }
 
     @POST
@@ -130,11 +144,7 @@ public abstract class JsonApiResource {
         try {
             EntityMeta meta = model.getEntityMeta(resourceType);
 
-            if (meta == null) {
-                Responses.notFound(context);
-            } else if (!meta.isMethodAllowed(request.getMethod())) {
-                Responses.methodNotAllowed(context);
-            } else {
+            if (isValidResourceAndMethodAllowed(context, meta, null)) {
                 context.setEntityMeta(meta);
                 handler.onRequest(context);
 
@@ -175,11 +185,7 @@ public abstract class JsonApiResource {
         try {
             EntityMeta meta = model.getEntityMeta(resourceType);
 
-            if (meta == null) {
-                Responses.notFound(context);
-            } else if (!meta.isMethodAllowed(request.getMethod())) {
-                Responses.methodNotAllowed(context);
-            } else {
+            if (isValidResourceAndMethodAllowed(context, meta, null)) {
                 fetch(context, meta, handler);
             }
         } catch (JsonApiErrorException e) {
@@ -201,11 +207,7 @@ public abstract class JsonApiResource {
         try {
             EntityMeta meta = model.getEntityMeta(resourceType);
 
-            if (!isValidId(meta, id)) {
-                Responses.notFound(context);
-            } else if (!meta.isMethodAllowed(request.getMethod())) {
-                Responses.methodNotAllowed(context);
-            } else {
+            if (isValidResourceAndMethodAllowed(context, meta, id)) {
                 fetch(context, meta, handler);
             }
         } catch (JsonApiErrorException e) {
@@ -230,11 +232,7 @@ public abstract class JsonApiResource {
         try {
             EntityMeta meta = model.getEntityMeta(resourceType);
 
-            if (!isValidId(meta, id)) {
-                Responses.notFound(context);
-            } else if (!meta.isMethodAllowed(request.getMethod())) {
-                Responses.methodNotAllowed(context);
-            } else {
+            if (isValidResourceAndMethodAllowed(context, meta, id)) {
                 fetch(context, meta, handler);
             }
         } catch (JsonApiErrorException e) {
@@ -282,11 +280,7 @@ public abstract class JsonApiResource {
         try {
             EntityMeta meta = model.getEntityMeta(resourceType);
 
-            if (!isValidId(meta, id)) {
-                Responses.notFound(context);
-            } else if (!meta.isMethodAllowed(request.getMethod())) {
-                Responses.methodNotAllowed(context);
-            } else {
+            if (isValidResourceAndMethodAllowed(context, meta, id)) {
                 JsonObject response = persistence.getRelationships(context);
 
                 if (response != null) {
@@ -358,11 +352,7 @@ public abstract class JsonApiResource {
         try {
             EntityMeta meta = model.getEntityMeta(resourceType);
 
-            if (!isValidId(meta, id)) {
-                Responses.notFound(context);
-            } else if (!meta.isMethodAllowed(request.getMethod())) {
-                Responses.methodNotAllowed(context);
-            } else {
+            if (isValidResourceAndMethodAllowed(context, meta, id)) {
                 context.setEntityMeta(meta);
                 handler.onRequest(context);
                 Set<ConstraintViolation<?>> violations = validateEntity(resourceType, null, input);
@@ -403,11 +393,7 @@ public abstract class JsonApiResource {
         try {
             EntityMeta meta = model.getEntityMeta(resourceType);
 
-            if (!isValidId(meta, id)) {
-                Responses.notFound(context);
-            } else if (!meta.isMethodAllowed(request.getMethod())) {
-                Responses.methodNotAllowed(context);
-            } else {
+            if (isValidResourceAndMethodAllowed(context, meta, id)) {
                 handler.onRequest(context);
 
                 if (persistence.delete(context, handler)) {
@@ -436,6 +422,7 @@ public abstract class JsonApiResource {
         }
     }
 
+    @SuppressWarnings("java:S1452") // Suppress Sonar warnings regarding missing generic types
     JsonApiHandler<?> findHandler(String resourceType, String httpMethod) {
         List<JsonApiHandler<?>> available = new ArrayList<>(2);
 
