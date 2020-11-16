@@ -106,7 +106,7 @@ public abstract class JsonApiResource {
         persistence = new PersistenceController(persistenceContext, model);
     }
 
-    public JsonApiResource() {
+    protected JsonApiResource() {
         cacheControl.setPrivate(true);
     }
 
