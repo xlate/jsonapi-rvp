@@ -23,24 +23,24 @@ import java.io.ObjectOutputStream;
 import javax.json.Json;
 import javax.json.JsonArray;
 import javax.json.JsonReader;
-import javax.ws.rs.core.Response.Status;
+import javax.ws.rs.core.Response.StatusType;
 
 public class JsonApiErrorException extends RuntimeException {
     private static final long serialVersionUID = 1L;
 
-    private final Status status;
+    private final StatusType status;
     private final String title;
     private final String detail;
     private JsonArray errors; // NOSONAR: non-final for de-serialization
 
-    public JsonApiErrorException(Status status, JsonArray errors) {
+    public JsonApiErrorException(StatusType status, JsonArray errors) {
         this.status = status;
         this.title = null;
         this.detail = null;
         this.errors = errors;
     }
 
-    public JsonApiErrorException(Status status, String title, String detail) {
+    public JsonApiErrorException(StatusType status, String title, String detail) {
         this.status = status;
         this.title = title;
         this.detail = detail;
@@ -66,7 +66,7 @@ public class JsonApiErrorException extends RuntimeException {
         }
     }
 
-    public Status getStatus() {
+    public StatusType getStatus() {
         return status;
     }
 

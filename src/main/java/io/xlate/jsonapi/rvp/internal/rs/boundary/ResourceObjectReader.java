@@ -30,6 +30,8 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.Map.Entry;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import javax.json.Json;
 import javax.json.JsonArray;
@@ -45,12 +47,16 @@ import javax.persistence.metamodel.EntityType;
 import javax.ws.rs.core.Response.Status;
 
 import io.xlate.jsonapi.rvp.JsonApiContext;
+import io.xlate.jsonapi.rvp.JsonApiStatus;
 import io.xlate.jsonapi.rvp.internal.JsonApiErrorException;
 import io.xlate.jsonapi.rvp.internal.persistence.boundary.PersistenceController;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMeta;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMetamodel;
 
 public class ResourceObjectReader {
+
+    private static final Logger LOGGER = Logger.getLogger(ResourceObjectReader.class.getName());
+    private static final Object INVALID_VALUE = new Object();
 
     private final EntityMetamodel model;
 
@@ -77,7 +83,7 @@ public class ResourceObjectReader {
         JsonArray errorsArray = errors.build();
 
         if (!errorsArray.isEmpty()) {
-            throw new JsonApiErrorException(Status.BAD_REQUEST, errorsArray);
+            throw new JsonApiErrorException(JsonApiStatus.UNPROCESSABLE_ENTITY, errorsArray);
         }
     }
 
@@ -174,128 +180,186 @@ public class ResourceObjectReader {
 
         attributes.entrySet()
                   .stream()
-                  .forEach(attribute -> {
-                      String jsonKey = attribute.getKey();
-                      String fieldName = jsonKey;
+                  .filter(a -> validateAttributeFilter(a, meta, errors))
+                  .forEach(a -> readAttribute(a, bean, meta, errors));
+    }
 
-                      if (!meta.getAttributeNames().contains(fieldName)) {
-                          var error = invalidAttributeError("Unknown attribute: `" + jsonKey + "`.",
-                                                            jsonKey);
-                          errors.add(error.toJson());
-                          return;
-                      }
+    boolean validateAttributeFilter(Entry<String, JsonValue> attribute, EntityMeta meta, JsonArrayBuilder errors) {
+        String jsonKey = attribute.getKey();
+        boolean validAttribute = meta.getAttributeNames().contains(jsonKey);
 
-                      PropertyDescriptor desc = meta.getPropertyDescriptor(fieldName);
-                      JsonValue jsonValue = attributes.get(jsonKey);
-                      Class<?> propertyType = desc.getPropertyType();
-                      ValueType jsonValueType = jsonValue.getValueType();
-                      Method factory;
-                      Object value;
+        if (!validAttribute) {
+            var error = invalidAttributeError("Unknown attribute: `" + jsonKey + "`.",
+                                              jsonKey);
+            errors.add(error.toJson());
+        }
 
-                      if (jsonValueType == ValueType.NULL) {
-                          if (propertyType.isPrimitive()) {
-                              throw new IllegalStateException("Cannot convert null to primitive");
-                          }
-                          value = null;
-                      } else if (propertyType == String.class) {
-                          if (jsonValueType == ValueType.NULL) {
-                              value = null;
-                          } else if (jsonValueType == ValueType.STRING) {
-                              value = ((JsonString) jsonValue).getString();
-                          } else {
-                              throw badConversionException(jsonKey, jsonValue);
-                          }
-                      } else if (Boolean.class.isAssignableFrom(propertyType)) {
-                          switch (jsonValueType) {
-                          case TRUE:
-                              value = Boolean.TRUE;
-                              break;
-                          case FALSE:
-                              value = Boolean.FALSE;
-                              break;
-                          default:
-                              throw badConversionException(jsonKey, jsonValue);
-                          }
-                      } else if (Number.class.isAssignableFrom(propertyType)) {
-                          if (jsonValueType == ValueType.NUMBER) {
-                              JsonNumber number = (JsonNumber) jsonValue;
+        return validAttribute;
+    }
 
-                              if (propertyType.isAssignableFrom(BigDecimal.class)) {
-                                  value = number.bigDecimalValue();
-                              } else if (propertyType.isAssignableFrom(BigInteger.class)) {
-                                  value = number.bigIntegerValue();
-                              } else if (number.isIntegral()) {
-                                  if (propertyType.isAssignableFrom(Long.class)) {
-                                      value = number.longValue();
-                                  } else if (propertyType.isAssignableFrom(Integer.class)) {
-                                      value = number.intValue();
-                                  } else if (propertyType.isAssignableFrom(Double.class)) {
-                                      value = number.doubleValue();
-                                  } else {
-                                      throw badConversionException(jsonKey, jsonValue);
-                                  }
-                              } else if (propertyType.isAssignableFrom(Double.class)) {
-                                  value = number.doubleValue();
-                              } else {
-                                  throw badConversionException(jsonKey, jsonValue);
-                              }
-                          } else {
-                              throw badConversionException(jsonKey, jsonValue);
-                          }
-                      } else if (propertyType.isPrimitive()) {
-                          if (jsonValueType == ValueType.STRING) {
-                              String jsonString = ((JsonString) jsonValue).getString();
-                              try {
-                                  Method valueOf = propertyType.getMethod("valueOf", String.class);
-                                  value = valueOf.invoke(null, jsonString);
-                              } catch (Exception e) {
-                                  throw new RuntimeException(e);
-                              }
-                          } else {
-                              throw badConversionException(jsonKey, jsonValue);
-                          }
-                      } else if (OffsetDateTime.class.isAssignableFrom(propertyType)) {
-                          if (jsonValueType == ValueType.STRING) {
-                              String jsonString = ((JsonString) jsonValue).getString();
-                              value = OffsetDateTime.parse(jsonString);
-                          } else {
-                              throw badConversionException(jsonKey, jsonValue);
-                          }
-                      } else if ((factory = fromInstantMethod(propertyType)) != null) {
-                          if (jsonValueType == ValueType.STRING) {
-                              String jsonString = ((JsonString) jsonValue).getString();
-                              try {
-                                  value = factory.invoke(null, toInstant(jsonString));
-                              } catch (Exception e) {
-                                  throw new RuntimeException(e);
-                              }
-                          } else {
-                              throw badConversionException(jsonKey, jsonValue);
-                          }
-                      } else if (jsonValueType == ValueType.STRING) {
-                          String jsonString = ((JsonString) jsonValue).getString();
+    void readAttribute(Entry<String, JsonValue> attribute, Object bean, EntityMeta meta, JsonArrayBuilder errors) {
+        String jsonKey = attribute.getKey();
+        JsonValue jsonValue = attribute.getValue();
+        PropertyDescriptor desc = meta.getPropertyDescriptor(jsonKey);
+        Class<?> propertyType = desc.getPropertyType();
+        ValueType jsonValueType = jsonValue.getValueType();
+        Method factory;
+        Object value;
 
-                          if ((factory = fromValueMethod(propertyType)) != null) {
-                              try {
-                                  value = factory.invoke(null, jsonString);
-                              } catch (Exception e) {
-                                  throw new RuntimeException(e);
-                              }
-                          } else if ((factory = valueOfMethod(propertyType)) != null) {
-                              try {
-                                  value = factory.invoke(null, jsonString);
-                              } catch (Exception e) {
-                                  throw new RuntimeException(e);
-                              }
-                          } else {
-                              throw badConversionException(jsonKey, jsonValue);
-                          }
-                      } else {
-                          throw badConversionException(jsonKey, jsonValue);
-                      }
+        if (jsonValueType == ValueType.NULL) {
+            value = propertyType.isPrimitive() ? INVALID_VALUE : null;
+        } else if (propertyType == String.class) {
+            value = readAttributeAsString(jsonValue);
+        } else if (Boolean.class.isAssignableFrom(propertyType)) {
+            value = readAttributeAsBoolean(jsonValue);
+        } else if (Number.class.isAssignableFrom(propertyType)) {
+            value = readAttributeAsNumber(jsonKey, propertyType, jsonValue);
+        } else if (propertyType.isPrimitive()) {
+            value = readAttributeAsPrimitive(jsonKey, propertyType, jsonValue);
+        } else if (OffsetDateTime.class.isAssignableFrom(propertyType)) {
+            value = readAttributeAsOffsetDateTime(jsonValue);
+        } else if ((factory = fromInstantMethod(propertyType)) != null) {
+            value = readAttributeAsInstant(jsonKey, jsonValue, factory);
+        } else if (jsonValueType == ValueType.STRING) {
+            value = readAttributeFromString(jsonKey, propertyType, jsonValue);
+        } else {
+            LOGGER.warning(() -> "Unsupported attribute type: " + propertyType);
+            value = INVALID_VALUE;
+        }
 
-                      writeProperty(desc, bean, value);
-                  });
+        if (INVALID_VALUE != value) {
+            writeProperty(desc, bean, value);
+        } else {
+            errors.add(invalidAttributeDataTypeError(jsonKey).toJson());
+        }
+    }
+
+    Object readAttributeAsString(JsonValue jsonValue) {
+        if (jsonValue.getValueType() == ValueType.STRING) {
+            return ((JsonString) jsonValue).getString();
+        } else {
+            return INVALID_VALUE;
+        }
+    }
+
+    Object readAttributeAsBoolean(JsonValue jsonValue) {
+        switch (jsonValue.getValueType()) {
+        case TRUE:
+            return Boolean.TRUE;
+        case FALSE:
+            return Boolean.FALSE;
+        default:
+            return INVALID_VALUE;
+        }
+    }
+
+    Object readAttributeAsNumber(String attributeName, Class<?> propertyType, JsonValue jsonValue) {
+        final Object value;
+
+        switch (jsonValue.getValueType()) {
+        case NUMBER:
+            JsonNumber number = (JsonNumber) jsonValue;
+
+            if (propertyType.isAssignableFrom(BigDecimal.class)) {
+                value = number.bigDecimalValue();
+            } else if (propertyType.isAssignableFrom(BigInteger.class)) {
+                value = number.bigIntegerValue();
+            } else if (number.isIntegral()) {
+                if (propertyType.isAssignableFrom(Long.class)) {
+                    value = number.longValue();
+                } else if (propertyType.isAssignableFrom(Integer.class)) {
+                    value = number.intValue();
+                } else if (propertyType.isAssignableFrom(Double.class)) {
+                    value = number.doubleValue();
+                } else {
+                    value = INVALID_VALUE;
+                }
+            } else if (propertyType.isAssignableFrom(Double.class)) {
+                value = number.doubleValue();
+            } else {
+                value = INVALID_VALUE;
+            }
+            break;
+        case STRING:
+            value = readAttributeFromString(attributeName, propertyType, jsonValue);
+            break;
+        default:
+            value = INVALID_VALUE;
+            break;
+        }
+
+        return value;
+    }
+
+    Object readAttributeAsPrimitive(String attributeName, Class<?> propertyType, JsonValue jsonValue) {
+        if (jsonValue.getValueType() == ValueType.STRING) {
+            return readAttributeFromString(attributeName, propertyType, jsonValue);
+        } else {
+            return INVALID_VALUE;
+        }
+    }
+
+    Object readAttributeAsOffsetDateTime(JsonValue jsonValue) {
+        if (jsonValue.getValueType() == ValueType.STRING) {
+            String jsonString = ((JsonString) jsonValue).getString();
+            return OffsetDateTime.parse(jsonString);
+        } else {
+            return INVALID_VALUE;
+        }
+    }
+
+    Object readAttributeAsInstant(String attributeName, JsonValue jsonValue, Method fromInstant) {
+        if (jsonValue.getValueType() == ValueType.STRING) {
+            String jsonString = ((JsonString) jsonValue).getString();
+            Instant instant;
+
+            try {
+                instant = toInstant(jsonString);
+            } catch (Exception e) {
+                LOGGER.log(Level.WARNING, e, () -> "Unable to convert attribute `" + attributeName + "` to an instant");
+                return INVALID_VALUE;
+            }
+
+            try {
+                return fromInstant.invoke(null, instant);
+            } catch (Exception e) {
+                LOGGER.log(Level.WARNING, e, () -> "Unable to invoke `fromInstant` for attribute `" + attributeName + "`");
+                return INVALID_VALUE;
+            }
+        } else {
+            return INVALID_VALUE;
+        }
+    }
+
+    Object readAttributeFromString(String attributeName, Class<?> propertyType, JsonValue jsonValue) {
+        String jsonString = ((JsonString) jsonValue).getString();
+        Method factory;
+        Object value;
+
+        if ((factory = fromValueMethod(propertyType)) != null) {
+            try {
+                value = factory.invoke(null, jsonString);
+            } catch (Exception e) {
+                LOGGER.log(Level.WARNING, e, () -> "Unable to invoke `fromValue` for attribute `" + attributeName + "`");
+                value = INVALID_VALUE;
+            }
+        } else if ((factory = valueOfMethod(propertyType)) != null) {
+            try {
+                value = factory.invoke(null, jsonString);
+            } catch (Exception e) {
+                LOGGER.log(Level.WARNING, e, () -> "Unable to invoke `valueOf` for attribute `" + attributeName + "`");
+                value = INVALID_VALUE;
+            }
+        } else {
+            LOGGER.fine(() -> "No `valueOf`/`fromValue` method found for attribute `" + attributeName + "`");
+            value = INVALID_VALUE;
+        }
+
+        return value;
+    }
+
+    JsonApiError invalidAttributeDataTypeError(String attributeName) {
+        return invalidAttributeError("Data type invalid", attributeName);
     }
 
     JsonApiError invalidAttributeError(String detail, String attributeName) {
@@ -304,13 +368,7 @@ public class ResourceObjectReader {
                                 JsonApiError.Source.forPointer(attributePointer(attributeName)));
     }
 
-    RuntimeException badConversionException(String jsonKey, JsonValue jsonValue) {
-        return new JsonApiErrorException(Status.BAD_REQUEST,
-                                         "Invalid data binding",
-                                         "Unable to map attribute `" + jsonKey + "` with value `" + jsonValue + "`");
-    }
-
-    public void putRelationship(Object bean, String relationship, Collection<Object> values) {
+    void putRelationship(Object bean, String relationship, Collection<Object> values) {
         EntityMeta meta = model.getEntityMeta(bean.getClass());
 
         PropertyDescriptor desc = meta.getPropertyDescriptor(relationship);
@@ -372,34 +430,45 @@ public class ResourceObjectReader {
             .filter(Attribute::isAssociation)
             .filter(a -> ((Bindable<?>) a).getBindableJavaType().equals(related.getClass()))
             .forEach(a -> {
-                PropertyDescriptor desc = meta.getPropertyDescriptor(a.getName());
-
                 if (a.isCollection()) {
-                    Collection<Object> current = readProperty(desc, entity);
-
-                    if (current != null) {
-                        if (current.contains(related)) {
-                            if (remove) {
-                                current.remove(related);
-                            }
-                        } else {
-                            if (!remove) {
-                                current.add(related);
-                            }
-                        }
-                    }
+                    updateRelatedCollection(entity, meta, a, related, remove);
                 } else {
-                    if (remove) {
-                        Object current = readProperty(desc, entity);
-
-                        if (current == related) {
-                            writeProperty(desc, entity, (Object[]) null);
-                        }
-                    } else {
-                        writeProperty(desc, entity, related);
-                    }
+                    updateRelatedObject(entity, meta, a, related, remove);
                 }
             });
+    }
+
+    @SuppressWarnings({ "rawtypes", "java:S3740" })
+    void updateRelatedCollection(Object entity, EntityMeta meta, Attribute attr, Object related, boolean remove) {
+        PropertyDescriptor desc = meta.getPropertyDescriptor(attr.getName());
+        Collection<Object> current = readProperty(desc, entity);
+
+        if (current != null) {
+            if (current.contains(related)) {
+                if (remove) {
+                    current.remove(related);
+                }
+            } else {
+                if (!remove) {
+                    current.add(related);
+                }
+            }
+        }
+    }
+
+    @SuppressWarnings({ "rawtypes", "java:S3740" })
+    void updateRelatedObject(Object entity, EntityMeta meta, Attribute attr, Object related, boolean remove) {
+        PropertyDescriptor desc = meta.getPropertyDescriptor(attr.getName());
+
+        if (remove) {
+            Object current = readProperty(desc, entity);
+
+            if (current == related) {
+                writeProperty(desc, entity, (Object[]) null);
+            }
+        } else {
+            writeProperty(desc, entity, related);
+        }
     }
 
     @SuppressWarnings("unchecked")
@@ -407,7 +476,7 @@ public class ResourceObjectReader {
         try {
             return (T) descriptor.getReadMethod().invoke(entity);
         } catch (IllegalArgumentException | ReflectiveOperationException e) {
-            throw new RuntimeException(e);
+            throw new JsonApiErrorException(Status.INTERNAL_SERVER_ERROR, "Server Error", "Unable to read property");
         }
     }
 
@@ -415,14 +484,15 @@ public class ResourceObjectReader {
         try {
             descriptor.getWriteMethod().invoke(entity, value);
         } catch (IllegalArgumentException | ReflectiveOperationException e) {
-            throw new RuntimeException(e);
+            throw new JsonApiErrorException(Status.INTERNAL_SERVER_ERROR, "Server Error", "Unable to update property");
         }
     }
 
     static Method fromInstantMethod(Class<?> type) {
         try {
             return type.getMethod("from", Instant.class);
-        } catch (@SuppressWarnings("unused") Exception e) {
+        } catch (Exception e) {
+            LOGGER.log(Level.FINEST, () -> "Unable to get `from(Instant)` from class `" + type + "`: " + e.getMessage());
             return null;
         }
     }
@@ -430,7 +500,8 @@ public class ResourceObjectReader {
     static Method fromValueMethod(Class<?> type) {
         try {
             return type.getMethod("fromValue", String.class);
-        } catch (@SuppressWarnings("unused") Exception e) {
+        } catch (Exception e) {
+            LOGGER.log(Level.FINEST, () -> "Unable to get `fromValue(String)` from class `" + type + "`: " + e.getMessage());
             return null;
         }
     }
@@ -438,7 +509,8 @@ public class ResourceObjectReader {
     static Method valueOfMethod(Class<?> type) {
         try {
             return type.getMethod("valueOf", String.class);
-        } catch (@SuppressWarnings("unused") Exception e) {
+        } catch (Exception e) {
+            LOGGER.log(Level.FINEST, () -> "Unable to get `valueOf(String)` from class `" + type + "`: " + e.getMessage());
             return null;
         }
     }

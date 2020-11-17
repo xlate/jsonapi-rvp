@@ -33,8 +33,10 @@ import javax.persistence.metamodel.Metamodel;
 import javax.persistence.metamodel.PluralAttribute;
 import javax.persistence.metamodel.SingularAttribute;
 import javax.ws.rs.HttpMethod;
+import javax.ws.rs.core.Response.Status;
 
 import io.xlate.jsonapi.rvp.JsonApiResourceType;
+import io.xlate.jsonapi.rvp.internal.JsonApiErrorException;
 
 @SuppressWarnings("java:S1452") // Suppress Sonar warnings regarding generic wildcards
 public class EntityMeta {
@@ -89,7 +91,7 @@ public class EntityMeta {
         try {
             this.beanInfo = Introspector.getBeanInfo(entityClass);
         } catch (IntrospectionException e) {
-            throw new RuntimeException(e);
+            throw new IllegalStateException("Failed to obtain BeanInfo for class: " + entityClass, e);
         }
 
         this.entityType = model.entity(entityClass);
@@ -104,7 +106,6 @@ public class EntityMeta {
                                             && !a.getName().equals(configuredType.getExposedIdAttribute())
                                             && !a.isAssociation()
                                             && a.getPersistentAttributeType() == PersistentAttributeType.BASIC)
-                                    // TODO: allow configuration via JsonApiResourceType
                                     .collect(Collectors.toSet());
 
         this.attributeNames = attributes.stream().map(Attribute::getName).collect(Collectors.toSet());
@@ -230,7 +231,7 @@ public class EntityMeta {
         try {
             return descriptor.getReadMethod().invoke(bean);
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            throw new JsonApiErrorException(Status.INTERNAL_SERVER_ERROR, "Server Error", "Unable to read property");
         }
     }
 

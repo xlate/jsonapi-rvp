@@ -21,6 +21,7 @@ import javax.ws.rs.core.EntityTag;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.ResponseBuilder;
 import javax.ws.rs.core.Response.Status;
+import javax.ws.rs.core.Response.StatusType;
 import javax.ws.rs.core.UriBuilder;
 import javax.ws.rs.core.UriInfo;
 
@@ -221,7 +222,7 @@ public class Responses {
         return builder.build(resourceType, id);
     }
 
-    private static void error(InternalContext context, Exception e, Status statusCode, String message) {
+    private static void error(InternalContext context, Exception e, StatusType statusCode, String message) {
         logger.log(Level.WARNING, statusCode.getReasonPhrase(), e);
 
         JsonApiError error = new JsonApiError(statusCode, message);

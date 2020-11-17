@@ -3,7 +3,7 @@ package io.xlate.jsonapi.rvp.internal.rs.boundary;
 import javax.json.Json;
 import javax.json.JsonObject;
 import javax.json.JsonObjectBuilder;
-import javax.ws.rs.core.Response.Status;
+import javax.ws.rs.core.Response.StatusType;
 
 public class JsonApiError {
 
@@ -24,11 +24,11 @@ public class JsonApiError {
         this.source = source;
     }
 
-    public JsonApiError(Status status, String detail, Source source) {
+    public JsonApiError(StatusType status, String detail, Source source) {
         this(String.valueOf(status.getStatusCode()), null, status.getReasonPhrase(), detail, source);
     }
 
-    public JsonApiError(Status status, String detail) {
+    public JsonApiError(StatusType status, String detail) {
         this(status, detail, null);
     }
 
