@@ -1,4 +1,4 @@
-name: JSON RVP Build
+name: build
 
 on:
   push:
