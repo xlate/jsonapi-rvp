@@ -117,7 +117,7 @@ public class Responses {
             }
 
             if (!errorMap.containsKey(property)) {
-                errorMap.put(property, new ArrayList<String>(2));
+                errorMap.put(property, new ArrayList<>(2));
             }
 
             errorMap.get(property).add(violation.getMessage());
@@ -188,7 +188,7 @@ public class Responses {
             if (meta.getUniqueTuple(property) != null) {
                 for (String constrained : meta.getUniqueTuple(property)) {
                     if (!errorMap.containsKey(constrained)) {
-                        errorMap.put(constrained, new ArrayList<Error>(2));
+                        errorMap.put(constrained, new ArrayList<>(2));
                     }
 
                     errorMap.get(constrained).add(new Error("not unique",
@@ -196,7 +196,7 @@ public class Responses {
                 }
             } else {
                 if (!errorMap.containsKey(property)) {
-                    errorMap.put(property, new ArrayList<Error>(2));
+                    errorMap.put(property, new ArrayList<>(2));
                 }
 
                 errorMap.get(property).add(new Error(violation.getMessage(), null));
