@@ -237,7 +237,7 @@ public class JsonApiQuery {
 
     private static void addField(Map<String, List<String>> fields, String resourceType, String fieldName) {
         if (!fields.containsKey(resourceType)) {
-            fields.put(resourceType, new ArrayList<String>());
+            fields.put(resourceType, new ArrayList<>());
         }
         fields.get(resourceType).add(fieldName);
     }
