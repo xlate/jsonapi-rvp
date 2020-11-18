@@ -26,9 +26,9 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 import java.util.logging.Logger;
 
@@ -182,79 +182,82 @@ public class ResourceObjectWriter {
                                        UriInfo uriInfo) {
 
         JsonObjectBuilder jsonRelationships = Json.createObjectBuilder();
-
         EntityMeta meta = bean.getEntityMeta();
-        String resourceType = bean.getType();
-        String rootEntityId = bean.getStringId();
-        boolean exclusions = false;
-        int included = 0;
+        AtomicInteger included = new AtomicInteger(0);
+        AtomicInteger excluded = new AtomicInteger(0);
 
-        for (Entry<String, Object> entry : related.entrySet()) {
-            String fieldName = entry.getKey();
+        related.entrySet()
+               .stream()
+               .filter(entry -> {
+                   if (params != null && !params.includeField(bean.getType(), entry.getKey())) {
+                       excluded.incrementAndGet();
+                       return false;
+                   }
 
-            if (params == null || params.includeField(resourceType, fieldName)) {
-                String relationshipName = fieldName;
+                   return meta.isRelatedTo(entry.getKey());
+               })
+               .forEach(entry -> {
+                   String fieldName = entry.getKey();
+                   included.incrementAndGet();
+                   JsonObjectBuilder relationshipEntry = Json.createObjectBuilder();
 
-                if (!meta.isRelatedTo(relationshipName)) {
-                    continue;
-                }
+                   addLinks(jsonRelationships,
+                            () -> getRelationshipLink(uriInfo, bean.getType(), bean.getStringId(), fieldName));
 
-                included++;
-                JsonObjectBuilder relationshipEntry = Json.createObjectBuilder();
+                   Object entryValue = entry.getValue();
+                   boolean many = meta.getEntityType().getAttribute(fieldName).isCollection();
 
-                addLinks(jsonRelationships, () -> getRelationshipLink(uriInfo,
-                                                                      resourceType,
-                                                                      rootEntityId,
-                                                                      relationshipName));
+                   if (entryValue instanceof Attribute) {
+                       // No operation - only links were given
+                   } else if (entryValue instanceof Long) {
+                       Long count = (Long) entryValue;
+                       relationshipEntry.add("meta", Json.createObjectBuilder().add("count", count));
+                   } else if (entryValue instanceof Collection) {
+                       JsonValue relationshipData = getRelationshipCollection(fieldName, many, entryValue);
 
-                Object entryValue = entry.getValue();
-                boolean many = meta.getEntityType().getAttribute(fieldName).isCollection();
+                       if (relationshipData != null) {
+                           relationshipEntry.add("data", relationshipData);
+                       }
+                   } else if (entryValue instanceof Entity && !many) {
+                       relationshipEntry.add("data", getResourceIdentifier((Entity) entryValue));
+                   }
 
-                if (entryValue instanceof Attribute) {
-                    // No operation - only links were given
-                } else if (entryValue instanceof Long) {
-                    Long count = (Long) entryValue;
-                    relationshipEntry.add("meta", Json.createObjectBuilder().add("count", count));
-                } else if (entryValue instanceof Collection) {
-                    JsonValue relationshipData;
-                    @SuppressWarnings("unchecked")
-                    Collection<Entity> relatedEntities = (Collection<Entity>) entryValue;
+                   jsonRelationships.add(fieldName, relationshipEntry);
+               });
 
-                    if (many) {
-                        JsonArrayBuilder relationshipArray = Json.createArrayBuilder();
-
-                        for (Entity relatedEntity : relatedEntities) {
-                            relationshipArray.add(getResourceIdentifier(relatedEntity));
-                        }
-
-                        relationshipData = relationshipArray.build();
-                    } else {
-                        final int count = relatedEntities.size();
-
-                        if (count == 1) {
-                            relationshipData = getResourceIdentifier(relatedEntities.iterator().next()).build();
-                        } else {
-                            logger.warning(() -> String.format("Non-collection-valued relationship `%s` with %d could not be mapped.", fieldName, count));
-                            continue;
-                        }
-                    }
-
-                    relationshipEntry.add("data", relationshipData);
-                } else if (entryValue instanceof Entity && !many) {
-                    relationshipEntry.add("data", getResourceIdentifier((Entity) entryValue));
-                }
-
-                jsonRelationships.add(relationshipName, relationshipEntry);
-            } else {
-                exclusions = true;
-            }
-        }
-
-        if (included > 0 || !exclusions) {
+        if (included.get() > 0 || excluded.get() == 0) {
             return jsonRelationships.build();
         }
 
         return null;
+    }
+
+    JsonValue getRelationshipCollection(String fieldName, boolean many, Object entryValue) {
+        JsonValue relationshipData = null;
+        @SuppressWarnings("unchecked")
+        Collection<Entity> relatedEntities = (Collection<Entity>) entryValue;
+
+        if (many) {
+            JsonArrayBuilder relationshipArray = Json.createArrayBuilder();
+
+            for (Entity relatedEntity : relatedEntities) {
+                relationshipArray.add(getResourceIdentifier(relatedEntity));
+            }
+
+            relationshipData = relationshipArray.build();
+        } else {
+            final int count = relatedEntities.size();
+
+            if (count == 1) {
+                relationshipData = getResourceIdentifier(relatedEntities.iterator().next()).build();
+            } else {
+                logger.warning(() -> String.format("Non-collection-valued relationship `%s` with %d could not be mapped.",
+                                                   fieldName,
+                                                   count));
+            }
+        }
+
+        return relationshipData;
     }
 
     JsonObjectBuilder getResourceIdentifier(Entity resource) {

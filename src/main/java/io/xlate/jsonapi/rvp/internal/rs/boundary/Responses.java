@@ -33,6 +33,16 @@ public class Responses {
 
     private static final Logger logger = Logger.getLogger(Responses.class.getName());
 
+    static class Error {
+        final String message;
+        final String status;
+
+        Error(String message, String status) {
+            this.message = message;
+            this.status = status;
+        }
+    }
+
     private Responses() {
     }
 
@@ -135,19 +145,42 @@ public class Responses {
     }
 
     public static void unprocessableEntity(InternalContext context, String title, Set<?> violationSet) {
-        class Error {
-            String message;
-            String status;
+        Map<String, List<Error>> errorMap = toErrorMap(context.getEntityMeta(), violationSet);
+        JsonArrayBuilder errors = Json.createArrayBuilder();
 
-            Error(String message, String status) {
-                this.message = message;
-                this.status = status;
-            }
-        }
-        Map<String, List<Error>> errorMap = new LinkedHashMap<>();
+        errorMap.entrySet()
+                .stream()
+                .filter(entry -> !entry.getKey().isBlank())
+                .map(entry -> {
+                    String key = entry.getKey();
+
+                    if (!key.startsWith("/")) {
+                        key = "/data/attributes/" + key;
+                    }
+
+                    return Map.entry(key, entry.getValue());
+                })
+                .forEach(entry -> {
+                    for (Error error : entry.getValue()) {
+                        JsonApiError jsonError = new JsonApiError(error.status,
+                                                                  title,
+                                                                  error.message,
+                                                                  JsonApiError.Source.forPointer(entry.getKey()));
+
+                        errors.add(jsonError.toJson());
+                    }
+                });
+
+        JsonObject jsonErrors = errorsObject(errors).build();
+
+        context.setResponseEntity(jsonErrors);
+        context.setResponseBuilder(Response.status(JsonApiStatus.UNPROCESSABLE_ENTITY).entity(jsonErrors));
+    }
+
+    static Map<String, List<Error>> toErrorMap(EntityMeta meta, Set<?> violationSet) {
+        Map<String, List<Error>> errorMap = new LinkedHashMap<>(violationSet.size());
         @SuppressWarnings("unchecked")
         Set<ConstraintViolation<?>> violations = (Set<ConstraintViolation<?>>) violationSet;
-        EntityMeta meta = context.getEntityMeta();
 
         for (ConstraintViolation<?> violation : violations) {
             String property = violation.getPropertyPath().toString().replace('.', '/');
@@ -170,37 +203,7 @@ public class Responses {
             }
         }
 
-        JsonArrayBuilder errors = Json.createArrayBuilder();
-
-        for (Entry<String, List<Error>> property : errorMap.entrySet()) {
-            final String key = property.getKey();
-
-            if (key.isEmpty()) {
-                continue;
-            }
-
-            final String pointer;
-
-            if (key.startsWith("/")) {
-                pointer = key;
-            } else {
-                pointer = "/data/attributes/" + key;
-            }
-
-            for (Error error : property.getValue()) {
-                JsonApiError jsonError = new JsonApiError(error.status,
-                                                          title,
-                                                          error.message,
-                                                          JsonApiError.Source.forPointer(pointer));
-
-                errors.add(jsonError.toJson());
-            }
-        }
-
-        JsonObject jsonErrors = errorsObject(errors).build();
-
-        context.setResponseEntity(jsonErrors);
-        context.setResponseBuilder(Response.status(JsonApiStatus.UNPROCESSABLE_ENTITY).entity(jsonErrors));
+        return errorMap;
     }
 
     public static void internalServerError(InternalContext context, Exception e) {

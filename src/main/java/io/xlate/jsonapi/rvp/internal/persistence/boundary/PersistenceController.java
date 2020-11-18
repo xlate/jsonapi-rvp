@@ -93,6 +93,22 @@ public class PersistenceController {
         this.writer = new ResourceObjectWriter(model);
     }
 
+    @SuppressWarnings({ "rawtypes", "java:S3740" })
+    static class FetchQueries {
+        final TypedQuery<Tuple> dataQuery;
+        final Set<String> counted;
+        final TypedQuery<Long> countQuery;
+        final Join relatedJoin;
+
+        public FetchQueries(TypedQuery<Tuple> dataQuery, Set<String> counted, TypedQuery<Long> countQuery, Join relatedJoin) {
+            super();
+            this.dataQuery = dataQuery;
+            this.counted = counted;
+            this.countQuery = countQuery;
+            this.relatedJoin = relatedJoin;
+        }
+    }
+
     public static <T> java.util.function.Predicate<T> not(java.util.function.Predicate<T> t) {
         return t.negate();
     }
@@ -189,7 +205,9 @@ public class PersistenceController {
         Class<?>[] validationGroups = groupsAttribute instanceof Class[] ? (Class<?>[]) groupsAttribute : new Class<?>[0];
 
         TransactionalValidator validator = CDI.current().select(TransactionalValidator.class).get();
-        Set<ConstraintViolation<?>> violations = Collections.unmodifiableSet(validator.validate(context.getRequest().getMethod(), entity, validationGroups));
+        Set<ConstraintViolation<?>> violations = Collections.unmodifiableSet(validator.validate(context.getRequest().getMethod(),
+                                                                                                entity,
+                                                                                                validationGroups));
         handler.afterValidation(context, violations);
 
         if (!violations.isEmpty()) {
@@ -232,7 +250,9 @@ public class PersistenceController {
         Class<?>[] validationGroups = groupsAttribute instanceof Class[] ? (Class<?>[]) groupsAttribute : new Class<?>[0];
 
         TransactionalValidator validator = CDI.current().select(TransactionalValidator.class).get();
-        Set<ConstraintViolation<?>> violations = Collections.unmodifiableSet(validator.validate(context.getRequest().getMethod(), entity, validationGroups));
+        Set<ConstraintViolation<?>> violations = Collections.unmodifiableSet(validator.validate(context.getRequest().getMethod(),
+                                                                                                entity,
+                                                                                                validationGroups));
         handler.afterValidation(context, violations);
 
         if (!violations.isEmpty()) {
@@ -417,7 +437,7 @@ public class PersistenceController {
     }
 
     public <T> JsonObject fetch(JsonApiContext context, JsonApiHandler<T> handler) {
-        JsonApiQuery params = context.getQuery();
+        final JsonApiQuery params = context.getQuery();
         final EntityMeta meta;
         final EntityMeta relatedMeta;
         final String relationshipName = context.getRelationshipName();
@@ -430,11 +450,83 @@ public class PersistenceController {
             relatedMeta = null;
         }
 
+        final Class<Object> entityClass = meta.getEntityClass();
+        final FetchQueries queries = buildQueries(context, meta, relatedMeta);
+
+        final List<Tuple> results = queries.dataQuery.getResultList();
+        final Long totalResults = queries.countQuery != null ? queries.countQuery.getSingleResult() : null;
+
+        /*
+         * Build empty map to hold relationships based on those requested by the
+         * client.
+         **/
+        final Map<Object, Map<String, List<Entity>>> relationships = initializeRelationships(params,
+                                                                                             results,
+                                                                                             meta,
+                                                                                             relationshipName,
+                                                                                             queries);
+
+        /* Only retrieve included records if something was found. */
+        if (!results.isEmpty()) {
+            for (String included : params.getInclude()) {
+                getIncluded(entityClass, relationships, included);
+            }
+        }
+
+        JsonObjectBuilder response = writer.topLevelBuilder();
+
+        if (totalResults != null) {
+            response.add("meta", Json.createObjectBuilder().add("totalResults", totalResults));
+        }
+
+        JsonArrayBuilder data = Json.createArrayBuilder();
+        Map<String, Object> related = new TreeMap<>();
+
+        for (Tuple result : results) {
+            Object entity = result.get("root");
+            Object resultId = meta.getIdValue(entity);
+
+            related.clear();
+            related.putAll(relationships.get(resultId));
+            queries.counted.forEach(relationship -> related.put(relationship, result.get(ALIAS_PRE + relationship)));
+            data.add(writer.toJson(new Entity(meta, entity), related, params, params.getUriInfo()));
+        }
+
+        if (params.getId() != null && relationshipName == null) {
+            JsonArray singleton = data.build();
+
+            if (singleton.isEmpty()) {
+                handler.afterFind(context, null);
+                return null;
+            }
+
+            @SuppressWarnings("unchecked")
+            T resultEntity = (T) results.get(0).get("root");
+            handler.afterFind(context, resultEntity);
+
+            response.add("data", singleton.get(0));
+        } else {
+            response.add("data", data);
+        }
+
+        // Get unique set of included objects
+        final Map<String, Set<Entity>> included = distinctRelated(relationships);
+
+        if (!included.isEmpty()) {
+            response.add("included", mapIncludedToJson(params, included));
+        }
+
+        return response.build();
+    }
+
+    FetchQueries buildQueries(JsonApiContext context, EntityMeta meta, EntityMeta relatedMeta) {
+        JsonApiQuery params = context.getQuery();
+        final String relationshipName = context.getRelationshipName();
+
         Class<Object> entityClass = meta.getEntityClass();
         EntityType<Object> rootType = meta.getEntityType();
 
         String id = params.getId();
-        UriInfo uriInfo = params.getUriInfo();
 
         final CriteriaBuilder builder = em.getCriteriaBuilder();
         final CriteriaQuery<Tuple> query = builder.createTupleQuery();
@@ -530,120 +622,7 @@ public class PersistenceController {
             countQuery = null;
         }
 
-        final List<Tuple> results = typedQuery.getResultList();
-        final Map<Object, Map<String, List<Entity>>> relationships = new HashMap<>();
-        final Long totalResults = countQuery != null ? countQuery.getSingleResult() : null;
-
-        /*
-         * Build empty map to hold relationships based on those requested by the
-         * client.
-         **/
-        results.stream()
-               .map(result -> result.get("root"))
-               .forEach(entity -> {
-                   relationships.put(meta.getIdValue(entity),
-                                     params.getInclude()
-                                           .stream()
-                                           .collect(Collectors.toMap(relName -> relName,
-                                                                     relName -> new ArrayList<Entity>())));
-
-                   if (relationshipName != null) {
-                       String relatedTo = relatedJoin.getAttribute().getName();
-
-                       if (!params.getInclude().contains(relatedTo)) {
-                           relationships.get(meta.getIdValue(entity)).put(relatedTo, new ArrayList<>());
-                       }
-                   }
-               });
-
-        /* Only retrieve included records if something was found. */
-        if (!results.isEmpty()) {
-            for (String included : params.getInclude()) {
-                getIncluded(entityClass, relationships, included);
-            }
-        }
-
-        JsonObjectBuilder response = writer.topLevelBuilder();
-        if (totalResults != null) {
-            response.add("meta", Json.createObjectBuilder().add("totalResults", totalResults));
-        }
-        JsonArrayBuilder data = Json.createArrayBuilder();
-        Map<String, Object> related = new TreeMap<>();
-
-        for (Tuple result : results) {
-            Object entity = result.get("root");
-            Object resultId = meta.getIdValue(entity);
-
-            related.clear();
-            related.putAll(relationships.get(resultId));
-            counted.forEach(relationship -> related.put(relationship, result.get(ALIAS_PRE + relationship)));
-            data.add(writer.toJson(new Entity(meta, entity), related, params, uriInfo));
-        }
-
-        if (id != null && relationshipName == null) {
-            JsonArray singleton = data.build();
-
-            if (singleton.isEmpty()) {
-                handler.afterFind(context, null);
-                return null;
-            }
-
-            @SuppressWarnings("unchecked")
-            T resultEntity = (T) results.get(0).get("root");
-            handler.afterFind(context, resultEntity);
-
-            response.add("data", singleton.get(0));
-        } else {
-            response.add("data", data);
-        }
-
-        // Get unique set of included objects
-        Map<String, Set<Entity>> included;
-        included = relationships.entrySet()
-                                .stream()
-                                .flatMap(e -> e.getValue().entrySet().stream())
-                                .filter(e -> !e.getValue().isEmpty())
-                                .collect(HashMap<String, Set<Entity>>::new,
-                                         (map, entry) -> {
-                                             String key = entry.getKey();
-                                             List<Entity> value = entry.getValue();
-
-                                             if (!map.containsKey(key)) {
-                                                 Set<Entity> unique = new HashSet<>();
-                                                 unique.addAll(value);
-                                                 map.put(key, unique);
-                                             } else {
-                                                 map.get(key).addAll(value);
-                                             }
-                                         },
-                                         (m1, m2) -> {});
-
-        if (!included.isEmpty()) {
-            JsonArrayBuilder incl = Json.createArrayBuilder();
-
-            /*
-             * For each of the included resources related to the primary resource type,
-             * create the list of their own internal relationships and convert to JSON.
-             * */
-            for (Set<Entity> includedType : included.values()) {
-                for (Entity includedEntity : includedType) {
-                    related.clear();
-
-                    includedEntity.getEntityMeta()
-                                  .getEntityType()
-                                  .getAttributes()
-                                  .stream()
-                                  .filter(Attribute::isAssociation)
-                                  .forEach(relationship -> related.put(relationship.getName(), relationship));
-
-                    incl.add(writer.toJson(includedEntity, related, params, uriInfo));
-                }
-            }
-
-            response.add("included", incl);
-        }
-
-        return response.build();
+        return new FetchQueries(typedQuery, counted, countQuery, relatedJoin);
     }
 
     void getIncluded(Class<Object> primaryClass,
@@ -750,4 +729,81 @@ public class PersistenceController {
 
         return mappedBy;
     }
+
+    Map<Object, Map<String, List<Entity>>> initializeRelationships(JsonApiQuery params,
+                                                                   List<Tuple> results,
+                                                                   EntityMeta meta,
+                                                                   String relationshipName,
+                                                                   FetchQueries queries) {
+
+        final Map<Object, Map<String, List<Entity>>> relationships = new HashMap<>();
+
+        results.stream()
+               .map(result -> result.get("root"))
+               .forEach(entity -> {
+                   relationships.put(meta.getIdValue(entity),
+                                     params.getInclude()
+                                           .stream()
+                                           .collect(Collectors.toMap(relName -> relName,
+                                                                     relName -> new ArrayList<Entity>())));
+
+                   if (relationshipName != null) {
+                       String relatedTo = queries.relatedJoin.getAttribute().getName();
+
+                       if (!params.getInclude().contains(relatedTo)) {
+                           relationships.get(meta.getIdValue(entity)).put(relatedTo, new ArrayList<>());
+                       }
+                   }
+               });
+
+        return relationships;
+    }
+
+    Map<String, Set<Entity>> distinctRelated(Map<Object, Map<String, List<Entity>>> relationships) {
+        return relationships.entrySet()
+                            .stream()
+                            .flatMap(e -> e.getValue().entrySet().stream())
+                            .filter(e -> !e.getValue().isEmpty())
+                            .collect(HashMap<String, Set<Entity>>::new,
+                                     (map, entry) -> {
+                                         String key = entry.getKey();
+                                         List<Entity> value = entry.getValue();
+
+                                         if (!map.containsKey(key)) {
+                                             Set<Entity> unique = new HashSet<>();
+                                             unique.addAll(value);
+                                             map.put(key, unique);
+                                         } else {
+                                             map.get(key).addAll(value);
+                                         }
+                                     },
+                                     (m1, m2) -> {});
+    }
+
+    JsonArrayBuilder mapIncludedToJson(JsonApiQuery params, Map<String, Set<Entity>> included) {
+        JsonArrayBuilder incl = Json.createArrayBuilder();
+        Map<String, Object> related = new TreeMap<>();
+
+        /*
+         * For each of the included resources related to the primary resource type,
+         * create the list of their own internal relationships and convert to JSON.
+         * */
+        for (Set<Entity> includedType : included.values()) {
+            for (Entity includedEntity : includedType) {
+                related.clear();
+
+                includedEntity.getEntityMeta()
+                              .getEntityType()
+                              .getAttributes()
+                              .stream()
+                              .filter(Attribute::isAssociation)
+                              .forEach(relationship -> related.put(relationship.getName(), relationship));
+
+                incl.add(writer.toJson(includedEntity, related, params, params.getUriInfo()));
+            }
+        }
+
+        return incl;
+    }
+
 }
