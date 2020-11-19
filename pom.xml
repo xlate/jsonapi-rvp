@@ -59,7 +59,6 @@
     <sonar.projectKey>xlate_jsonapi-rvp</sonar.projectKey>
     <sonar.host.url>https://sonarcloud.io</sonar.host.url>
     <sonar.organization>xlate</sonar.organization>
-    <sonar.coverage.jacoco.xmlReportPaths>${project.build.directory}/site/jacoco/jacoco.xml,${project.build.directory}/site/jacoco/jacoco-it.xml</sonar.coverage.jacoco.xmlReportPaths>
 
     <version.javax.json.api>1.1.4</version.javax.json.api>
     <version.junit-jupiter>5.7.0</version.junit-jupiter>
@@ -213,7 +212,13 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
-        <version>2.19.1</version>
+        <version>2.22.2</version>
+        <configuration>
+          <systemPropertyVariables>
+            <java.util.logging.config.file>${project.build.testOutputDirectory}/logging.properties</java.util.logging.config.file>
+          </systemPropertyVariables>
+          <redirectTestOutputToFile>true</redirectTestOutputToFile>
+        </configuration>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -238,36 +243,18 @@
         <version>0.8.6</version>
         <executions>
           <execution>
-            <id>default-prepare-agent</id>
             <goals>
               <goal>prepare-agent</goal>
             </goals>
           </execution>
           <execution>
-            <id>default-prepare-agent-integration</id>
-            <goals>
-              <goal>prepare-agent-integration</goal>
-            </goals>
-          </execution>
-          <execution>
-            <id>default-report</id>
+            <id>report</id>
+            <phase>test</phase>
             <goals>
               <goal>report</goal>
             </goals>
           </execution>
-          <execution>
-            <id>default-report-integration</id>
-            <goals>
-              <goal>report-integration</goal>
-            </goals>
-          </execution>
         </executions>
-        <configuration>
-          <excludes>
-            <exclude>**/*Test.class</exclude>
-            <exclude>**/*IT.class</exclude>
-          </excludes>
-        </configuration>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
