@@ -1,4 +1,5 @@
 package io.xlate.jsonapi.rvp;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
@@ -17,7 +18,6 @@ import javax.validation.Validation;
 import javax.ws.rs.Path;
 import javax.ws.rs.core.Request;
 import javax.ws.rs.core.Response;
-import javax.ws.rs.core.Response.Status;
 import javax.ws.rs.core.SecurityContext;
 
 import org.jboss.resteasy.specimpl.ResteasyUriInfo;
@@ -25,12 +25,14 @@ import org.json.JSONException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvFileSource;
 import org.mockito.Mockito;
 import org.skyscreamer.jsonassert.JSONAssert;
 
 import io.xlate.jsonapi.rvp.internal.DefaultJsonApiHandler;
 import io.xlate.jsonapi.rvp.internal.validation.boundary.TransactionalValidator;
+import io.xlate.jsonapi.rvp.test.entity.Comment;
 import io.xlate.jsonapi.rvp.test.entity.Post;
 
 class JsonApiResourceTest {
@@ -73,40 +75,35 @@ class JsonApiResourceTest {
         em.close();
     }
 
-    @Test
-    void testIndexKnownTypeReturns200() throws JSONException {
+    @ParameterizedTest
+    @CsvFileSource(delimiter = '|', lineSeparator = "@\n", files = "src/test/resources/index-get.txt")
+    void testIndexGet(String title,
+                      String requestUri,
+                      String resourceType,
+                      int expectedStatus,
+                      String expectedResponse) throws JSONException {
+
         Set<JsonApiResourceType<?>> resourceTypes = new HashSet<>();
         resourceTypes.add(JsonApiResourceType.define("posts", Post.class).build());
+        resourceTypes.add(JsonApiResourceType.define("comments", Comment.class).build());
         target.initialize(resourceTypes);
+
         Mockito.when(target.request.getMethod()).thenReturn("GET");
-        Mockito.when(target.handlers.iterator())
-               .thenReturn(handlerIterator());
-        target.uriInfo = new ResteasyUriInfo(URI.create("/test/posts?fields[posts]=title&filter[id]=-1"));
+        Mockito.when(target.handlers.iterator()).thenReturn(handlerIterator());
+        target.uriInfo = new ResteasyUriInfo(URI.create(requestUri));
 
-        Response response = target.index("posts");
+        Response response = target.index(resourceType);
         assertNotNull(response);
-        assertEquals(Status.OK.getStatusCode(), response.getStatus());
-        JSONAssert.assertEquals("{'jsonapi':{'version':'1.0'},'data':[]}",
-                                String.valueOf(response.getEntity()),
-                                true);
-    }
 
-    @Test
-    void testIndexUnknownTypeReturns404() throws JSONException {
-        Set<JsonApiResourceType<?>> resourceTypes = new HashSet<>();
-        resourceTypes.add(JsonApiResourceType.define("posts", Post.class).build());
-        target.initialize(resourceTypes);
-        Mockito.when(target.request.getMethod()).thenReturn("GET");
-        Mockito.when(target.handlers.iterator())
-               .thenReturn(handlerIterator());
-        target.uriInfo = new ResteasyUriInfo(URI.create("/test/comments?fields[comments]=text&filter[id]=-1"));
+        String responseEntity = String.valueOf(response.getEntity());
 
-        Response response = target.index("comments");
-        assertNotNull(response);
-        assertEquals(Status.NOT_FOUND.getStatusCode(), response.getStatus());
-        JSONAssert.assertEquals("{'errors':[{'status':'404','title':'Not Found','detail':'The requested resource can not be found.'}]}",
-                                String.valueOf(response.getEntity()),
-                                true);
+        try {
+            assertEquals(expectedStatus, response.getStatus());
+            JSONAssert.assertEquals(expectedResponse, responseEntity, true);
+        } catch (Throwable t) {
+            System.out.println(responseEntity);
+            throw t;
+        }
     }
 
 }

@@ -1,0 +1,124 @@
+Empty Response OK
+    | /test/posts?fields[posts]=title&filter[id]=-1
+    | posts
+    | 200
+    | {'jsonapi':{'version':'1.0'},'data':[]}
+    @
+Invalid Resource Type
+    | /test/zombies
+    | zombies
+    | 404
+    | {'errors':[{'status':'404','title':'Not Found','detail':'The requested resource can not be found.'}]}
+    @
+################### Fields Validation
+Valid Resource Fields (Relationship)
+    | /test/posts?fields[comments]=text
+    | posts
+    | 200
+    | {'jsonapi':{'version':'1.0'},'data':[]}
+    @
+Invalid Resource Field
+    | /test/posts?fields[posts]=junk
+    | posts
+    | 400
+    | {'errors':[{'source': { 'parameter': 'fields[posts]' }, 'title':'Invalid Query Parameter','detail':'Invalid field: `junk`'}]}
+    @
+Invalid Fields Resource
+    | /test/posts?fields[zombies]=junk
+    | posts
+    | 400
+    | {'errors':[{'source': { 'parameter': 'fields[zombies]' }, 'title':'Invalid Query Parameter','detail':'Invalid resource type: `zombies`'}]}
+    @
+################### Include Validation
+Valid Include
+    | /test/posts?include=comments
+    | posts
+    | 200
+    | {'jsonapi':{'version':'1.0'},'data':[]}
+    @
+Valid Include Doubled
+    | /test/posts?include=comments,comments
+    | posts
+    | 200
+    | {'jsonapi':{'version':'1.0'},'data':[]}
+    @
+Invalid Include
+    | /test/posts?include=zombies,comments
+    | posts
+    | 400
+    | {'errors':[{'source': { 'parameter': 'include' }, 'title':'Invalid Query Parameter','detail':'Invalid relationship: `zombies`'}]}
+    @
+################### Filter Validation
+Valid Filter (Local Field)
+    | /test/posts?filter[title]=Some+Value
+    | posts
+    | 200
+    | {'jsonapi':{'version':'1.0'},'data':[]}
+    @
+Valid Filter (Local Id Field)
+    | /test/posts?filter[id]=1
+    | posts
+    | 200
+    | {'jsonapi':{'version':'1.0'},'data':[]}
+    @
+Valid Filter (Remote Field)
+    | /test/posts?filter[comments.text]=Some+Value
+    | posts
+    | 200
+    | {'jsonapi':{'version':'1.0'},'data':[]}
+    @
+Valid Filter (Remote Field LEFT JOIN)
+    | /test/posts?filter[%2bcomments.text]=Some+Value
+    | posts
+    | 200
+    | {'jsonapi':{'version':'1.0'},'data':[]}
+    @
+Invalid Filter (Remote Field RIGHT JOIN)
+    | /test/posts?filter[comments%2b.text]=Some+Value
+    | posts
+    | 400
+    | {'errors':[{'source': { 'parameter': 'filter[comments+.text]' }, 'title':'Invalid Query Parameter','detail':'Filter path `comments+.text` is not valid'}]}
+    @
+Invalid Filter (Bad Relationship)
+    | /test/posts?filter[zombies.text]=Some+Value
+    | posts
+    | 400
+    | {'errors':[{'source': { 'parameter': 'filter[zombies.text]' }, 'title':'Invalid Query Parameter','detail':'Filter path `zombies.text` is not valid'}]}
+    @
+Invalid Filter (No Such Attribute)
+    | /test/posts?filter[junk]=Some+Value
+    | posts
+    | 400
+    | {'errors':[{'source': { 'parameter': 'filter[junk]' }, 'title':'Invalid Query Parameter','detail':'Filter path `junk` is not valid'}]}
+    @
+################### Filter Validation
+Valid Sort (Ascending)
+    | /test/posts?sort=title
+    | posts
+    | 200
+    | {'jsonapi':{'version':'1.0'},'data':[]}
+    @
+Valid Sort (Descending)
+    | /test/posts?sort=-title
+    | posts
+    | 200
+    | {'jsonapi':{'version':'1.0'},'data':[]}
+    @
+Valid Sort (Mixed Asc/Desc)
+    | /test/posts?sort=-title,text
+    | posts
+    | 200
+    | {'jsonapi':{'version':'1.0'},'data':[]}
+    @
+Invalid Sort (Multiple Parameters)
+    | /test/posts?sort=-title&sort=text
+    | posts
+    | 400
+    | {'errors':[{'source': { 'parameter': 'sort' }, 'title':'Invalid Query Parameter','detail':'Multiple `sort` parameters are not supported'}]}
+    @
+Invalid Sort (No Such Attribute)
+    | /test/posts?sort=-title,text,something
+    | posts
+    | 400
+    | {'errors':[{'source': { 'parameter': 'sort' }, 'title':'Invalid Query Parameter','detail':'Sort key `something` is not an attribute'}]}
+    @

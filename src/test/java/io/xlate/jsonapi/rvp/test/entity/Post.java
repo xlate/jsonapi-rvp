@@ -18,6 +18,9 @@ public class Post {
     @Column
     private String title;
 
+    @Column
+    private String text;
+
     @OneToMany(mappedBy = "post")
     private List<Comment> comments;
 
@@ -35,6 +38,22 @@ public class Post {
 
     public void setTitle(String title) {
         this.title = title;
+    }
+
+    public String getText() {
+        return text;
+    }
+
+    public void setText(String text) {
+        this.text = text;
+    }
+
+    public List<Comment> getComments() {
+        return comments;
+    }
+
+    public void setComments(List<Comment> comments) {
+        this.comments = comments;
     }
 
 }

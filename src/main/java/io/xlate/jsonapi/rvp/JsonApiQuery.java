@@ -200,6 +200,11 @@ public class JsonApiQuery {
         return uriInfo;
     }
 
+    public Map<String, List<String>> getFields() {
+        processUri();
+        return fields;
+    }
+
     public Map<String, String> getFilters() {
         processUri();
         return filters;

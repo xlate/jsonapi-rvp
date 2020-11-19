@@ -35,9 +35,9 @@ public class Responses {
 
     static class Error {
         final String message;
-        final String status;
+        final StatusType status;
 
-        Error(String message, String status) {
+        Error(String message, StatusType status) {
             this.message = message;
             this.status = status;
         }
@@ -110,7 +110,7 @@ public class Responses {
         Map<String, List<String>> errorMap = new LinkedHashMap<>();
 
         for (ConstraintViolation<?> violation : violations) {
-            String property = violation.getPropertyPath().toString().replace('.', '/');
+            String property = violation.getPropertyPath().toString();
 
             if (property.isEmpty()) {
                 continue;
@@ -191,8 +191,7 @@ public class Responses {
                         errorMap.put(constrained, new ArrayList<>(2));
                     }
 
-                    errorMap.get(constrained).add(new Error("not unique",
-                                                            String.valueOf(Status.CONFLICT.getStatusCode())));
+                    errorMap.get(constrained).add(new Error("not unique", Status.CONFLICT));
                 }
             } else {
                 if (!errorMap.containsKey(property)) {

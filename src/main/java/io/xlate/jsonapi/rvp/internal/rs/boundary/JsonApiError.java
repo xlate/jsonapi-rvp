@@ -10,13 +10,13 @@ public class JsonApiError {
     public static final String DATA_ATTRIBUTES_POINTER = "/data/attributes";
     public static final String DATA_RELATIONSHIPS_POINTER = "/data/relationships";
 
-    private final String status;
+    private final StatusType status;
     private final String code;
     private final String title;
     private final String detail;
     private final Source source;
 
-    public JsonApiError(String status, String code, String title, String detail, Source source) {
+    public JsonApiError(StatusType status, String code, String title, String detail, Source source) {
         this.status = status;
         this.code = code;
         this.title = title;
@@ -25,14 +25,14 @@ public class JsonApiError {
     }
 
     public JsonApiError(StatusType status, String detail, Source source) {
-        this(String.valueOf(status.getStatusCode()), null, status.getReasonPhrase(), detail, source);
+        this(status, null, status.getReasonPhrase(), detail, source);
     }
 
     public JsonApiError(StatusType status, String detail) {
         this(status, detail, null);
     }
 
-    public JsonApiError(String status, String title, String detail, Source source) {
+    public JsonApiError(StatusType status, String title, String detail, Source source) {
         this(status, null, title, detail, source);
     }
 
@@ -51,7 +51,9 @@ public class JsonApiError {
     public JsonObject toJson() {
         JsonObjectBuilder builder = Json.createObjectBuilder();
 
-        add(builder, "status", status);
+        if (status != null) {
+            add(builder, "status", String.valueOf(status.getStatusCode()));
+        }
         add(builder, "code", code);
         add(builder, "title", title);
         add(builder, "detail", detail);
@@ -69,7 +71,7 @@ public class JsonApiError {
         }
     }
 
-    public String getStatus() {
+    public StatusType getStatus() {
         return status;
     }
 

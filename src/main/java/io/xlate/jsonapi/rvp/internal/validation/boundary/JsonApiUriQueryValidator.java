@@ -52,6 +52,7 @@ public class JsonApiUriQueryValidator
         EntityMeta meta = value.getEntityMeta();
         String id = value.getId();
 
+        valid = validateFields(value, context, valid);
         valid = validateFilters(value, context, valid);
 
         if (params.containsKey(JsonApiQuery.PARAM_INCLUDE)) {
@@ -85,10 +86,35 @@ public class JsonApiUriQueryValidator
         for (String attribute : includeParam.split(",")) {
             if (!included.contains(attribute) && !meta.isRelatedTo(attribute)) {
                 valid = false;
-                addViolation(context, JsonApiQuery.PARAM_INCLUDE, "Invalid relationship: `" + attribute + "`.");
+                addViolation(context, JsonApiQuery.PARAM_INCLUDE, "Invalid relationship: `" + attribute + "`");
             }
 
             included.add(attribute);
+        }
+
+        return valid;
+    }
+
+    boolean validateFields(JsonApiQuery value, ConstraintValidatorContext context, boolean valid) {
+        EntityMetamodel model = value.getModel();
+
+        for (Entry<String, List<String>> fields : value.getFields().entrySet()) {
+            String resourceType = fields.getKey();
+            EntityMeta meta = model.getEntityMeta(resourceType);
+
+            if (meta == null) {
+                valid = false;
+                addViolation(context, "fields[" + resourceType + "]", "Invalid resource type: `" + resourceType + "`");
+            } else {
+                for (String field : fields.getValue()) {
+                    if (!meta.getAttributeNames().contains(field)) {
+                        valid = false;
+                        addViolation(context,
+                                     "fields[" + resourceType + "]",
+                                     "Invalid field: `" + field + "`");
+                    }
+                }
+            }
         }
 
         return valid;
@@ -114,7 +140,7 @@ public class JsonApiUriQueryValidator
 
             if (!validFilter) {
                 valid = false;
-                addViolation(context, "filter[" + path + "]", "Filter path `" + path + "` is not valid.");
+                addViolation(context, "filter[" + path + "]", "Filter path `" + path + "` is not valid");
             }
         }
 
@@ -127,9 +153,6 @@ public class JsonApiUriQueryValidator
         if (relationshipJoin.startsWith("+")) {
             // Left JOIN
             relationshipName = relationshipJoin.substring(1);
-        } else if (relationshipJoin.endsWith("+")) {
-            // Right JOIN
-            relationshipName = relationshipJoin.substring(0, relationshipJoin.length() - 1);
         } else {
             relationshipName = relationshipJoin;
         }
@@ -163,7 +186,7 @@ public class JsonApiUriQueryValidator
                 if (!meta.getAttributeNames().contains(attribute)) {
                     LOGGER.log(Level.FINE, () -> "Invalid attribute name: `" + attribute + "`.");
                     valid = false;
-                    addViolation(context, JsonApiQuery.PARAM_SORT, "Sort key `" + sort + "` is not an attribute.");
+                    addViolation(context, JsonApiQuery.PARAM_SORT, "Sort key `" + sort + "` is not an attribute");
                 }
             }
         }
@@ -204,7 +227,7 @@ public class JsonApiUriQueryValidator
 
         if (paramValues.size() > 1) {
             valid = false;
-            addViolation(context, paramName, "Multiple `" + paramName + "` parameters are not supported.");
+            addViolation(context, paramName, "Multiple `" + paramName + "` parameters are not supported");
         }
         return valid;
     }
