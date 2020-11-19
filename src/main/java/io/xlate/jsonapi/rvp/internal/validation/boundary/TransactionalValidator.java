@@ -16,8 +16,13 @@ import io.xlate.jsonapi.rvp.internal.JsonApiErrorException;
 @ApplicationScoped
 public class TransactionalValidator {
 
+    private final Validator validator;
+
     @Inject
-    protected Validator validator;
+    public TransactionalValidator(Validator validator) {
+        super();
+        this.validator = validator;
+    }
 
     @Transactional(value = TxType.REQUIRES_NEW)
     public <T> Set<ConstraintViolation<T>> validate(String method, T entity, Class<?>... groups) {
