@@ -59,6 +59,7 @@
     <sonar.projectKey>xlate_jsonapi-rvp</sonar.projectKey>
     <sonar.host.url>https://sonarcloud.io</sonar.host.url>
     <sonar.organization>xlate</sonar.organization>
+    <sonar.coverage.jacoco.xmlReportPaths>${project.build.directory}/site/jacoco/jacoco.xml,${project.build.directory}/site/jacoco/jacoco-it.xml</sonar.coverage.jacoco.xmlReportPaths>
 
     <version.javax.json.api>1.1.4</version.javax.json.api>
     <version.junit-jupiter>5.7.0</version.junit-jupiter>
