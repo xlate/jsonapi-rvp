@@ -178,18 +178,19 @@ public class PersistenceController {
                                                        .collect(Collectors.toSet()));
     }
 
+    Class<?>[] getValidationGroups(JsonApiContext context) {
+        Object groupsAttribute = context.getAttribute(Attributes.VALIDATION_GROUPS);
+        return groupsAttribute instanceof Class[] ? (Class<?>[]) groupsAttribute : new Class<?>[0];
+    }
+
     @SuppressWarnings("unchecked")
     public <T> JsonObject create(JsonApiContext context, JsonApiHandler<T> handler) {
-        String resourceType = context.getResourceType();
         JsonObject input = context.getRequestEntity();
         UriInfo uriInfo = context.getUriInfo();
-        EntityMeta meta = model.getEntityMeta(resourceType);
-
-        if (meta == null) {
-            return null;
-        }
-
+        // Not null due to upstream validation
+        EntityMeta meta = model.getEntityMeta(context.getResourceType());
         Class<Object> entityClass = meta.getEntityClass();
+
         T entity;
 
         try {
@@ -202,9 +203,7 @@ public class PersistenceController {
         reader.fromJson(this, context, entity, input);
         handler.afterUpdate(context, entity);
 
-        Object groupsAttribute = context.getAttribute(Attributes.VALIDATION_GROUPS);
-        Class<?>[] validationGroups = groupsAttribute instanceof Class[] ? (Class<?>[]) groupsAttribute : new Class<?>[0];
-
+        Class<?>[] validationGroups = getValidationGroups(context);
         Set<ConstraintViolation<?>> violations = Collections.unmodifiableSet(validator.validate(context.getRequest().getMethod(),
                                                                                                 entity,
                                                                                                 validationGroups));
@@ -226,11 +225,8 @@ public class PersistenceController {
 
     public <T> JsonObject update(JsonApiContext context, JsonApiHandler<T> handler) {
         final String resourceType = context.getResourceType();
+        // Not null due to upstream validation
         EntityMeta meta = model.getEntityMeta(resourceType);
-
-        if (meta == null) {
-            return null;
-        }
 
         final String id = context.getResourceId();
         final JsonObject input = context.getRequestEntity();
@@ -246,9 +242,7 @@ public class PersistenceController {
         reader.fromJson(this, context, entity, input);
         handler.afterUpdate(context, entity);
 
-        Object groupsAttribute = context.getAttribute(Attributes.VALIDATION_GROUPS);
-        Class<?>[] validationGroups = groupsAttribute instanceof Class[] ? (Class<?>[]) groupsAttribute : new Class<?>[0];
-
+        Class<?>[] validationGroups = getValidationGroups(context);
         Set<ConstraintViolation<?>> violations = Collections.unmodifiableSet(validator.validate(context.getRequest().getMethod(),
                                                                                                 entity,
                                                                                                 validationGroups));
@@ -292,8 +286,8 @@ public class PersistenceController {
             em.flush();
             handler.afterDelete(context, entity);
             return true;
-        } catch (@SuppressWarnings("unused") PersistenceException e) {
-            throw new JsonApiErrorException(Status.CONFLICT, "Unexpected error", null);
+        } catch (PersistenceException e) {
+            throw new JsonApiErrorException(Status.CONFLICT, "Unexpected error", e.getMessage());
         }
     }
 

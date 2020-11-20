@@ -81,7 +81,7 @@ public class Responses {
 
     public static void methodNotAllowed(InternalContext context) {
         Status notAllowed = Status.METHOD_NOT_ALLOWED;
-        JsonApiError error = new JsonApiError(notAllowed, "Method not allowed for this resource.");
+        JsonApiError error = new JsonApiError(notAllowed, "Method not allowed for this resource");
         JsonObject errors = errorsObject(Json.createArrayBuilder().add(error.toJson())).build();
 
         context.setResponseBuilder(Response.status(notAllowed).entity(errors));

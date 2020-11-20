@@ -23,6 +23,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 import javax.json.JsonObject;
 import javax.json.JsonString;
@@ -144,7 +145,7 @@ public class JsonApiRequestValidator implements ConstraintValidator<ValidJsonApi
     boolean validTopLevelExclusive(JsonApiRequest value, ConstraintValidatorContext context, boolean validStructure) {
         JsonObject document = value.getDocument();
 
-        if (document.containsKey(KEY_DATA) && document.containsKey(KEY_ERRORS)) {
+        if (Stream.of(KEY_DATA, KEY_ERRORS).allMatch(document::containsKey)) {
             validStructure = false;
             context.buildConstraintViolationWithTemplate(""
                     + "The members `data` and `errors` MUST NOT coexist in the same document")
@@ -271,7 +272,13 @@ public class JsonApiRequestValidator implements ConstraintValidator<ValidJsonApi
     }
 
     boolean validAttributes(JsonApiRequest value, ConstraintValidatorContext context, boolean validStructure) {
-        JsonObject data = value.getDocument().getJsonObject(KEY_DATA);
+        JsonObject document = value.getDocument();
+
+        if (!document.containsKey(KEY_DATA)) {
+            return validStructure;
+        }
+
+        JsonObject data = document.getJsonObject(KEY_DATA);
 
         if (!data.containsKey(KEY_ATTRIBUTES)) {
             return validStructure;

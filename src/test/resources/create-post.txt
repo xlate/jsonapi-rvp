@@ -28,4 +28,55 @@ Create Post
         }
     }
     @
-
+Invalid Request (Keys `data` and `errors` present)
+    | /test/posts
+    | posts
+    | { 'data': { 'type': 'posts', 'attributes': { 'title': 'Testing', 'text': 'Testing Again' }}, 'errors':[]}
+    | 422
+    | { 'errors': [
+        {
+          'source': { 'pointer': '/' },
+          'title': 'Invalid JSON API Document Structure',
+          'detail':'The members `data` and `errors` MUST NOT coexist in the same document'
+        }
+      ]}
+    @
+Invalid Request (Unexpected top-level key)
+    | /test/posts
+    | posts
+    | { 'data': { 'type': 'posts', 'attributes': { 'title': 'Testing', 'text': 'Testing Again' }}, 'zombies':[]}
+    | 422
+    | { 'errors': [
+        {
+          'source': { 'pointer': '/zombies' },
+          'title': 'Invalid JSON API Document Structure',
+          'detail':'A document may ONLY contain these top-level members: `data`, `errors`, `meta`, `jsonapi`, `links`, `included`'
+        }
+      ]}
+    @
+Invalid Request (Missing required top-level keys)
+    | /test/posts
+    | posts
+    | { 'links': { }}, 'zombies':[]}
+    | 422
+    | { 'errors': [
+        {
+          'source': { 'pointer': '/' },
+          'title': 'Invalid JSON API Document Structure',
+          'detail':'A document MUST contain at least one of the following top-level members: `data`, `errors`, `meta`'
+        }
+      ]}
+    @
+Invalid Request (Read-only resource type)
+    | /test/readonly-codes
+    | readonly-codes
+    | { 'data':{} }
+    | 405
+    | { 'errors': [
+        {
+          'status': '405',
+          'title': 'Method Not Allowed',
+          'detail': 'Method not allowed for this resource'
+        }
+      ]}
+    @

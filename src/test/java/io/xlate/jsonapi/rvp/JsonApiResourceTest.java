@@ -22,6 +22,7 @@ import javax.persistence.EntityManager;
 import javax.persistence.EntityManagerFactory;
 import javax.persistence.Persistence;
 import javax.validation.Validation;
+import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.core.Request;
 import javax.ws.rs.core.Response;
@@ -41,6 +42,7 @@ import io.xlate.jsonapi.rvp.internal.DefaultJsonApiHandler;
 import io.xlate.jsonapi.rvp.internal.validation.boundary.TransactionalValidator;
 import io.xlate.jsonapi.rvp.test.entity.Comment;
 import io.xlate.jsonapi.rvp.test.entity.Post;
+import io.xlate.jsonapi.rvp.test.entity.ReadOnlyCode;
 
 class JsonApiResourceTest {
 
@@ -81,6 +83,7 @@ class JsonApiResourceTest {
         Set<JsonApiResourceType<?>> resourceTypes = new HashSet<>();
         resourceTypes.add(JsonApiResourceType.define("posts", Post.class).build());
         resourceTypes.add(JsonApiResourceType.define("comments", Comment.class).build());
+        resourceTypes.add(JsonApiResourceType.define("readonly-codes", ReadOnlyCode.class).methods(GET.class).build());
         target.initialize(resourceTypes);
     }
 
