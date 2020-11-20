@@ -3,14 +3,21 @@ package io.xlate.jsonapi.rvp;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import java.io.StringReader;
 import java.net.URI;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import javax.enterprise.inject.Instance;
+import javax.json.Json;
+import javax.json.JsonWriter;
+import javax.json.JsonWriterFactory;
+import javax.json.stream.JsonGenerator;
 import javax.persistence.EntityManager;
 import javax.persistence.EntityManagerFactory;
 import javax.persistence.Persistence;
@@ -68,11 +75,61 @@ class JsonApiResourceTest {
         target.request = Mockito.mock(Request.class);
         target.security = Mockito.mock(SecurityContext.class);
         target.txValidator = new TransactionalValidator(target.validator);
+
+        Mockito.when(target.handlers.iterator()).thenReturn(handlerIterator());
+
+        Set<JsonApiResourceType<?>> resourceTypes = new HashSet<>();
+        resourceTypes.add(JsonApiResourceType.define("posts", Post.class).build());
+        resourceTypes.add(JsonApiResourceType.define("comments", Comment.class).build());
+        target.initialize(resourceTypes);
     }
 
     @AfterEach
     void tearDown() {
+        var tx = em.getTransaction();
+        tx.begin();
+        em.createQuery("DELETE Comment").executeUpdate();
+        em.createQuery("DELETE Post").executeUpdate();
+        tx.commit();
         em.close();
+    }
+
+    void assertResponseEquals(int expectedStatus, int actualStatus, String expectedEntity, String actualEntity) throws JSONException {
+        try {
+            assertEquals(expectedStatus, actualStatus);
+            JSONAssert.assertEquals(expectedEntity, actualEntity, true);
+        } catch (Throwable t) {
+            Map<String, Object> map = new HashMap<>();
+            map.put(JsonGenerator.PRETTY_PRINTING, true);
+            JsonWriterFactory writerFactory = Json.createWriterFactory(map);
+            JsonWriter jsonWriter = writerFactory.createWriter(System.out);
+            jsonWriter.writeObject(Json.createReader(new StringReader(actualEntity)).readObject());
+            jsonWriter.close();
+            throw t;
+        }
+    }
+
+    @ParameterizedTest
+    @CsvFileSource(delimiter = '|', lineSeparator = "@\n", files = "src/test/resources/create-post.txt")
+    void testCreatePost(String title,
+                        String requestUri,
+                        String resourceType,
+                        String requestBody,
+                        int expectedStatus,
+                        String expectedResponse)
+            throws JSONException {
+
+        Mockito.when(target.request.getMethod()).thenReturn("POST");
+        target.uriInfo = new ResteasyUriInfo(URI.create(requestUri));
+
+        em.getTransaction().begin();
+        Response response = target.create(resourceType, Json.createReader(new StringReader(requestBody.replace('\'', '"'))).readObject());
+        em.getTransaction().commit();
+
+        assertNotNull(response);
+
+        String responseEntity = String.valueOf(response.getEntity());
+        assertResponseEquals(expectedStatus, response.getStatus(), expectedResponse, responseEntity);
     }
 
     @ParameterizedTest
@@ -81,29 +138,17 @@ class JsonApiResourceTest {
                       String requestUri,
                       String resourceType,
                       int expectedStatus,
-                      String expectedResponse) throws JSONException {
-
-        Set<JsonApiResourceType<?>> resourceTypes = new HashSet<>();
-        resourceTypes.add(JsonApiResourceType.define("posts", Post.class).build());
-        resourceTypes.add(JsonApiResourceType.define("comments", Comment.class).build());
-        target.initialize(resourceTypes);
+                      String expectedResponse)
+            throws JSONException {
 
         Mockito.when(target.request.getMethod()).thenReturn("GET");
-        Mockito.when(target.handlers.iterator()).thenReturn(handlerIterator());
         target.uriInfo = new ResteasyUriInfo(URI.create(requestUri));
 
         Response response = target.index(resourceType);
         assertNotNull(response);
 
         String responseEntity = String.valueOf(response.getEntity());
-
-        try {
-            assertEquals(expectedStatus, response.getStatus());
-            JSONAssert.assertEquals(expectedResponse, responseEntity, true);
-        } catch (Throwable t) {
-            System.out.println(responseEntity);
-            throw t;
-        }
+        assertResponseEquals(expectedStatus, response.getStatus(), expectedResponse, responseEntity);
     }
 
 }

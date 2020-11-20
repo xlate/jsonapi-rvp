@@ -66,11 +66,11 @@ public class Responses {
                                                           resource,
                                                           "read",
                                                           context.getResourceType(),
-                                                          context.getResponseEntity().getJsonObject("data")
-                                                                 .getString("id")));
+                                                          entity.getJsonObject("data").getString("id")));
 
         builder.entity(entity);
         context.setResponseBuilder(builder);
+        context.setResponseEntity(entity);
     }
 
     public static void notFound(InternalContext context) {

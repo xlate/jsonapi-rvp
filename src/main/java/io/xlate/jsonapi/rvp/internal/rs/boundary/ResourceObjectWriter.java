@@ -201,7 +201,7 @@ public class ResourceObjectWriter {
                    included.incrementAndGet();
                    JsonObjectBuilder relationshipEntry = Json.createObjectBuilder();
 
-                   addLinks(jsonRelationships,
+                   addLinks(relationshipEntry,
                             () -> getRelationshipLink(uriInfo, bean.getType(), bean.getStringId(), fieldName));
 
                    Object entryValue = entry.getValue();

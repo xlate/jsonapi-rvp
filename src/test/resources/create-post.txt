@@ -1,0 +1,31 @@
+Create Post
+    | /test/posts
+    | posts
+    | { 'data': { 'type': 'posts', 'attributes': { 'title': 'Testing', 'text': 'Testing Again' }}}
+    | 201
+    | {
+        "jsonapi": {
+            "version": "1.0"
+        },
+        "data": {
+            "type": "posts",
+            "id": "1",
+            "attributes": {
+                "text": "Testing Again",
+                "title": "Testing"
+            },
+            "relationships": {
+                "comments": {
+                    "links": {
+                        "self": "/test/posts/1/relationships/comments",
+                        "related": "/test/posts/1/comments"
+                    }
+                }
+            },
+            "links": {
+                "self": "/test/posts/1"
+            }
+        }
+    }
+    @
+

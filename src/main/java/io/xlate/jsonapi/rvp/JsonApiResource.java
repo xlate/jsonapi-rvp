@@ -103,7 +103,7 @@ public abstract class JsonApiResource {
         }
 
         model = new EntityMetamodel(resourceClass, resourceTypes, persistenceContext.getMetamodel());
-        persistence = new PersistenceController(persistenceContext, model);
+        persistence = new PersistenceController(persistenceContext, model, txValidator);
     }
 
     protected JsonApiResource() {

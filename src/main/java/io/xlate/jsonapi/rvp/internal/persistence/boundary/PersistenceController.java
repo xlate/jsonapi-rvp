@@ -29,7 +29,6 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 
-import javax.enterprise.inject.spi.CDI;
 import javax.json.Json;
 import javax.json.JsonArray;
 import javax.json.JsonArrayBuilder;
@@ -83,12 +82,14 @@ public class PersistenceController {
 
     private final EntityManager em;
     private final EntityMetamodel model;
+    private final TransactionalValidator validator;
     private final ResourceObjectReader reader;
     private final ResourceObjectWriter writer;
 
-    public PersistenceController(EntityManager em, EntityMetamodel model) {
+    public PersistenceController(EntityManager em, EntityMetamodel model, TransactionalValidator validator) {
         this.em = em;
         this.model = model;
+        this.validator = validator;
         this.reader = new ResourceObjectReader(model);
         this.writer = new ResourceObjectWriter(model);
     }
@@ -204,7 +205,6 @@ public class PersistenceController {
         Object groupsAttribute = context.getAttribute(Attributes.VALIDATION_GROUPS);
         Class<?>[] validationGroups = groupsAttribute instanceof Class[] ? (Class<?>[]) groupsAttribute : new Class<?>[0];
 
-        TransactionalValidator validator = CDI.current().select(TransactionalValidator.class).get();
         Set<ConstraintViolation<?>> violations = Collections.unmodifiableSet(validator.validate(context.getRequest().getMethod(),
                                                                                                 entity,
                                                                                                 validationGroups));
@@ -249,7 +249,6 @@ public class PersistenceController {
         Object groupsAttribute = context.getAttribute(Attributes.VALIDATION_GROUPS);
         Class<?>[] validationGroups = groupsAttribute instanceof Class[] ? (Class<?>[]) groupsAttribute : new Class<?>[0];
 
-        TransactionalValidator validator = CDI.current().select(TransactionalValidator.class).get();
         Set<ConstraintViolation<?>> violations = Collections.unmodifiableSet(validator.validate(context.getRequest().getMethod(),
                                                                                                 entity,
                                                                                                 validationGroups));
