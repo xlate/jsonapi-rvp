@@ -39,10 +39,6 @@ public interface JsonApiContext {
 
     boolean hasResponse();
 
-    JsonObject getResponseEntity();
-
-    void setResponseEntity(JsonObject entity);
-
     <T> T getAttribute(String name);
 
     void setAttribute(String name, Object value);

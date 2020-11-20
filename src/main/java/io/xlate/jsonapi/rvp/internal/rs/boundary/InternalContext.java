@@ -28,7 +28,6 @@ public class InternalContext implements JsonApiContext {
     private final JsonObject requestEntity;
 
     private ResponseBuilder responseBuilder;
-    private JsonObject responseEntity;
     private Map<String, Object> attributes = new HashMap<>();
 
     public InternalContext(Request request, UriInfo uriInfo, SecurityContext security, String resourceType, String id, String relationshipName, JsonObject requestEntity) {
@@ -116,13 +115,11 @@ public class InternalContext implements JsonApiContext {
     @Override
     public void setResponse(int status, JsonObject entity) {
         this.responseBuilder = Response.status(status).entity(entity);
-        setResponseEntity(entity);
     }
 
     @Override
     public void setResponse(StatusType status, JsonObject entity) {
         this.responseBuilder = Response.status(status).entity(entity);
-        setResponseEntity(entity);
     }
 
     @Override
@@ -141,16 +138,6 @@ public class InternalContext implements JsonApiContext {
     @Override
     public boolean hasResponse() {
         return responseBuilder != null;
-    }
-
-    @Override
-    public JsonObject getResponseEntity() {
-        return responseEntity;
-    }
-
-    @Override
-    public void setResponseEntity(JsonObject entity) {
-        this.responseEntity = entity;
     }
 
     @SuppressWarnings("unchecked")

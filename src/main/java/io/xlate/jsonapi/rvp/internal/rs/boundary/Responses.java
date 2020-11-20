@@ -52,7 +52,6 @@ public class Responses {
         builder = context.getRequest().evaluatePreconditions(etag);
 
         if (builder == null) {
-            context.setResponseEntity(entity);
             builder = Response.ok(entity);
             builder.tag(etag);
         }
@@ -70,7 +69,6 @@ public class Responses {
 
         builder.entity(entity);
         context.setResponseBuilder(builder);
-        context.setResponseEntity(entity);
     }
 
     public static void notFound(InternalContext context) {
@@ -78,7 +76,6 @@ public class Responses {
         JsonApiError error = new JsonApiError(notFound, "The requested resource can not be found.");
         JsonObject errors = errorsObject(Json.createArrayBuilder().add(error.toJson())).build();
 
-        context.setResponseEntity(errors);
         context.setResponseBuilder(Response.status(notFound).entity(errors));
     }
 
@@ -87,7 +84,6 @@ public class Responses {
         JsonApiError error = new JsonApiError(notAllowed, "Method not allowed for this resource.");
         JsonObject errors = errorsObject(Json.createArrayBuilder().add(error.toJson())).build();
 
-        context.setResponseEntity(errors);
         context.setResponseBuilder(Response.status(notAllowed).entity(errors));
     }
 
@@ -96,7 +92,6 @@ public class Responses {
 
         if (errors != null) {
             JsonObject jsonErrors = Json.createObjectBuilder().add("errors", errors).build();
-            context.setResponseEntity(jsonErrors);
             context.setResponseBuilder(Response.status(e.getStatus()).entity(jsonErrors));
         } else {
             error(context, e, e.getStatus(), e.getDetail());
@@ -139,7 +134,6 @@ public class Responses {
         }
 
         JsonObject jsonErrors = errorsObject(errors).build();
-        context.setResponseEntity(jsonErrors);
         context.setResponseBuilder(Response.status(Status.BAD_REQUEST).entity(jsonErrors));
 
     }
@@ -172,8 +166,6 @@ public class Responses {
                 });
 
         JsonObject jsonErrors = errorsObject(errors).build();
-
-        context.setResponseEntity(jsonErrors);
         context.setResponseBuilder(Response.status(JsonApiStatus.UNPROCESSABLE_ENTITY).entity(jsonErrors));
     }
 
@@ -229,8 +221,6 @@ public class Responses {
 
         JsonApiError error = new JsonApiError(statusCode, message);
         JsonObject errors = errorsObject(Json.createArrayBuilder().add(error.toJson())).build();
-
-        context.setResponseEntity(errors);
         context.setResponseBuilder(Response.status(statusCode).entity(errors));
     }
 
