@@ -32,6 +32,7 @@ import javax.validation.ConstraintValidator;
 import javax.validation.ConstraintValidatorContext;
 import javax.ws.rs.HttpMethod;
 
+import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMeta;
 import io.xlate.jsonapi.rvp.internal.rs.boundary.JsonApiError;
 import io.xlate.jsonapi.rvp.internal.rs.entity.JsonApiRequest;
 
@@ -86,6 +87,7 @@ public class JsonApiRequestValidator implements ConstraintValidator<ValidJsonApi
         validStructure = validTopLevel(value, context, validStructure);
         validStructure = validLinks(value, context, validStructure);
         validStructure = validData(value, context, validStructure);
+        validStructure = validAttributes(value, context, validStructure);
 
         return validStructure;
     }
@@ -145,7 +147,7 @@ public class JsonApiRequestValidator implements ConstraintValidator<ValidJsonApi
         if (document.containsKey(KEY_DATA) && document.containsKey(KEY_ERRORS)) {
             validStructure = false;
             context.buildConstraintViolationWithTemplate(""
-                    + "The members `data` and `errors` MUST NOT coexist in the same document.")
+                    + "The members `data` and `errors` MUST NOT coexist in the same document")
                    .addPropertyNode("/")
                    .addConstraintViolation();
         }
@@ -165,7 +167,7 @@ public class JsonApiRequestValidator implements ConstraintValidator<ValidJsonApi
         if (links.getValueType() != ValueType.OBJECT) {
             validStructure = false;
             context.buildConstraintViolationWithTemplate(""
-                    + "The value of each links member MUST be an object.")
+                    + "The value of each links member MUST be an object")
                    .addPropertyNode("/" + KEY_LINKS)
                    .addConstraintViolation();
         } else {
@@ -252,7 +254,7 @@ public class JsonApiRequestValidator implements ConstraintValidator<ValidJsonApi
         if (type != null && type.getValueType() != ValueType.STRING) {
             validStructure = false;
             context.buildConstraintViolationWithTemplate(""
-                    + "The value of the type member MUST be a string.")
+                    + "The value of the type member MUST be a string")
                    .addPropertyNode("/data/type")
                    .addConstraintViolation();
         }
@@ -260,7 +262,7 @@ public class JsonApiRequestValidator implements ConstraintValidator<ValidJsonApi
         if (id != null && id.getValueType() != ValueType.STRING) {
             validStructure = false;
             context.buildConstraintViolationWithTemplate(""
-                    + "The value of the id member MUST be a string.")
+                    + "The value of the id member MUST be a string")
                    .addPropertyNode("/data/id")
                    .addConstraintViolation();
         }
@@ -279,7 +281,7 @@ public class JsonApiRequestValidator implements ConstraintValidator<ValidJsonApi
 
         if (attributesValue.getValueType() != ValueType.OBJECT) {
             context.buildConstraintViolationWithTemplate(""
-                    + "The value of the `attributes` key MUST be an object (an \"attributes object\").")
+                    + "The value of the `attributes` key MUST be an object (an \"attributes object\")")
                    .addPropertyNode(JsonApiError.DATA_ATTRIBUTES_POINTER)
                    .addConstraintViolation();
             return false;
@@ -304,13 +306,23 @@ public class JsonApiRequestValidator implements ConstraintValidator<ValidJsonApi
 
         if (!validMemberName(attributeKey)) {
             context.buildConstraintViolationWithTemplate(""
-                    + "Attribute name `" + attributeKey + "` contains in invalid character.")
+                    + "Invalid attribute name `" + attributeKey + "`")
                    .addPropertyNode(JsonApiError.DATA_ATTRIBUTES_POINTER + attributeKey)
                    .addConstraintViolation();
             return false;
         }
 
-        PropertyDescriptor property = value.getEntityMeta().getPropertyDescriptor(attributeKey);
+        EntityMeta meta = value.getEntityMeta();
+
+        if (!meta.getAttributeNames().contains(attributeKey)) {
+            context.buildConstraintViolationWithTemplate(""
+                    + "No such attribute `" + attributeKey + "`")
+                   .addPropertyNode(JsonApiError.DATA_ATTRIBUTES_POINTER + attributeKey)
+                   .addConstraintViolation();
+            return false;
+        }
+
+        PropertyDescriptor property = meta.getPropertyDescriptor(attributeKey);
         Class<?> propertyType = property.getPropertyType();
         JsonValue attributeValue = attribute.getValue();
 
@@ -340,13 +352,15 @@ public class JsonApiRequestValidator implements ConstraintValidator<ValidJsonApi
             }
             break;
         case STRING:
-            String jsonString = ((JsonString) attributeValue).getString();
-            try {
-                Method valueOf = propertyType.getMethod("valueOf", String.class);
-                valueOf.invoke(null, jsonString);
-            } catch (@SuppressWarnings("unused") Exception e) {
-                validStructure = false;
-                addIncompatibleDataError(context, attributeKey);
+            if (!propertyType.equals(String.class)) {
+                String jsonString = ((JsonString) attributeValue).getString();
+                try {
+                    Method valueOf = propertyType.getMethod("valueOf", String.class);
+                    valueOf.invoke(null, jsonString);
+                } catch (@SuppressWarnings("unused") Exception e) {
+                    validStructure = false;
+                    addIncompatibleDataError(context, attributeKey);
+                }
             }
             break;
         }
