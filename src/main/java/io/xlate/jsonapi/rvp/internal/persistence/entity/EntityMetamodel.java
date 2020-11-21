@@ -62,13 +62,4 @@ public class EntityMetamodel {
         return classMetaMap.get(entityClass);
     }
 
-    public String getResourceType(Class<?> entityClass) {
-        EntityMeta meta = getEntityMeta(entityClass);
-
-        if (meta != null) {
-            return meta.getResourceType();
-        }
-
-        return entityClass.getName();
-    }
 }

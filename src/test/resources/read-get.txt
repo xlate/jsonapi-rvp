@@ -59,3 +59,20 @@ Invalid Post By ID (Not Found)
     | 404
     | {'errors':[{'status':'404','title':'Not Found','detail':'The requested resource can not be found.'}]}
     @
+Invalid Paging & Sorting (May not sort or paginate single resource)
+    | []
+    | /test/posts/1?page[offset]=0&page[limit]=10&sort=-1
+    | posts | 1
+    | 400
+    | {'errors':[
+        {
+          'source': { 'parameter': 'page[offset]' },
+          'title':'Invalid Query Parameter','detail':'Pagination not allowed for single resource requests' },
+        {
+          'source': { 'parameter': 'page[limit]' },
+          'title':'Invalid Query Parameter','detail':'Pagination not allowed for single resource requests' },
+        {
+          'source': { 'parameter': 'sort' },
+          'title':'Invalid Query Parameter','detail':'Single resource can not be sorted' }
+        ]}
+    @

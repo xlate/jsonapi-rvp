@@ -172,7 +172,7 @@ public class JsonApiUriQueryValidator
 
         if (id != null) {
             valid = false;
-            addViolation(context, JsonApiQuery.PARAM_SORT, "Cannot sort a single resource, `" + id + "`");
+            addViolation(context, JsonApiQuery.PARAM_SORT, "Single resource can not be sorted");
         } else {
             List<String> sortParams = params.get(JsonApiQuery.PARAM_SORT);
             valid = validateSingle(JsonApiQuery.PARAM_SORT, sortParams, context, valid);
@@ -203,7 +203,7 @@ public class JsonApiUriQueryValidator
         if (params.containsKey(paramName)) {
             if (id != null) {
                 valid = false;
-                addViolation(context, paramName, "Pagination not allowed for single resource requests.");
+                addViolation(context, paramName, "Pagination not allowed for single resource requests");
             } else {
                 List<String> pageParamValues = params.get(paramName);
                 valid = validateSingle(paramName, pageParamValues, context, valid);
@@ -213,7 +213,7 @@ public class JsonApiUriQueryValidator
                 } catch (NumberFormatException e) {
                     LOGGER.log(Level.FINE, e, () -> "Invalid page parameter: `" + pageParamValues.get(0) + "`.");
                     valid = false;
-                    addViolation(context, paramName, "Paging parameter must be an integer.");
+                    addViolation(context, paramName, "Page parameter must be an integer");
                 }
             }
         }

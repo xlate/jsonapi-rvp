@@ -142,6 +142,34 @@ Invalid Sort (No Such Attribute)
     | 400
     | {'errors':[{'source': { 'parameter': 'sort' }, 'title':'Invalid Query Parameter','detail':'Sort key `something` is not an attribute'}]}
     @
+Invalid Paging (Not Numeric Number & Size)
+    | []
+    | /test/posts?page[number]=a&page[size]=b
+    | posts
+    | 400
+    | {'errors':[
+        {
+          'source': { 'parameter': 'page[number]' },
+          'title':'Invalid Query Parameter','detail':'Page parameter must be an integer' },
+        {
+          'source': { 'parameter': 'page[size]' },
+          'title':'Invalid Query Parameter','detail':'Page parameter must be an integer' }
+        ]}
+    @
+Invalid Paging (Not Numeric Offset & Limit)
+    | []
+    | /test/posts?page[offset]=a&page[limit]=b
+    | posts
+    | 400
+    | {'errors':[
+        {
+          'source': { 'parameter': 'page[offset]' },
+          'title':'Invalid Query Parameter','detail':'Page parameter must be an integer' },
+        {
+          'source': { 'parameter': 'page[limit]' },
+          'title':'Invalid Query Parameter','detail':'Page parameter must be an integer' }
+        ]}
+    @
 ################### Including relationship resources @
 Post With Comments
     | [{
@@ -276,5 +304,128 @@ Post With Comments And Paging
                 "self": "/test/comments/2"
             }
         }]
+      }
+    @
+Post Paging (Offset with default limit)
+    | [{
+        "sql": "INSERT INTO POSTS (id, title, text) VALUES (1, 'Title One', 'Text one.')"
+      },{
+        "sql": "INSERT INTO POSTS (id, title, text) VALUES (2, 'Title Two', 'Text two.')"
+      }]
+    | /test/posts?sort=title&page[offset]=1
+    | posts
+    | 200
+    | {
+       'jsonapi':{'version':'1.0'},
+       'meta': { 'totalResults': 2 },
+       'data':[{
+         'id': '2',
+         'type': 'posts',
+         'attributes': {
+           'title': 'Title Two',
+           'text': 'Text two.'
+         },
+         'relationships': {
+           'comments': {
+             'links': {
+               'self': '/test/posts/2/relationships/comments',
+               'related': '/test/posts/2/comments'
+             },
+             'meta': {
+               'count': 0
+             }
+           }
+         },
+         "links": {
+            "self": "/test/posts/2"
+         }
+       }]
+      }
+    @
+Post Paging (Number with default size)
+    | [{
+        "sql": "INSERT INTO POSTS (id, title, text) VALUES (1, 'Title One', 'Text one.')"
+      },{
+        "sql": "INSERT INTO POSTS (id, title, text) VALUES (2, 'Title Two', 'Text two.')"
+      }]
+    | /test/posts?sort=title&page[number]=2
+    | posts
+    | 200
+    | {
+       'jsonapi':{'version':'1.0'},
+       'meta': { 'totalResults': 2 },
+       'data':[]
+      }
+    @
+Post Paging (Limit without offset)
+    | [{
+        "sql": "INSERT INTO POSTS (id, title, text) VALUES (1, 'Title One', 'Text one.')"
+      },{
+        "sql": "INSERT INTO POSTS (id, title, text) VALUES (2, 'Title Two', 'Text two.')"
+      }]
+    | /test/posts?sort=-title&page[limit]=1
+    | posts
+    | 200
+    | {
+       'jsonapi':{'version':'1.0'},
+       'meta': { 'totalResults': 2 },
+       'data':[{
+         'id': '2',
+         'type': 'posts',
+         'attributes': {
+           'title': 'Title Two',
+           'text': 'Text two.'
+         },
+         'relationships': {
+           'comments': {
+             'links': {
+               'self': '/test/posts/2/relationships/comments',
+               'related': '/test/posts/2/comments'
+             },
+             'meta': {
+               'count': 0
+             }
+           }
+         },
+         "links": {
+            "self": "/test/posts/2"
+         }
+       }]
+      }
+    @
+Post Paging (Size without number)
+    | [{
+        "sql": "INSERT INTO POSTS (id, title, text) VALUES (1, 'Title One', 'Text one.')"
+      },{
+        "sql": "INSERT INTO POSTS (id, title, text) VALUES (2, 'Title Two', 'Text two.')"
+      }]
+    | /test/posts?sort=-title&page[size]=1
+    | posts
+    | 200
+    | {
+       'jsonapi':{'version':'1.0'},
+       'meta': { 'totalResults': 2 },
+       'data':[{
+         'id': '2',
+         'type': 'posts',
+         'attributes': {
+           'title': 'Title Two',
+           'text': 'Text two.'
+         },
+         'relationships': {
+           'comments': {
+             'links': {
+               'self': '/test/posts/2/relationships/comments',
+               'related': '/test/posts/2/comments'
+             },
+             'meta': {
+               'count': 0
+             }
+           }
+         },
+         "links": {
+            "self": "/test/posts/2"
+         }
+       }]
       }
     @

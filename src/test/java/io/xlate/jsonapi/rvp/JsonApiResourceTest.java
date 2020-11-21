@@ -39,6 +39,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvFileSource;
 import org.mockito.Mockito;
 import org.skyscreamer.jsonassert.JSONAssert;
+import org.skyscreamer.jsonassert.JSONCompareMode;
 
 import io.xlate.jsonapi.rvp.internal.DefaultJsonApiHandler;
 import io.xlate.jsonapi.rvp.internal.validation.boundary.TransactionalValidator;
@@ -113,7 +114,7 @@ class JsonApiResourceTest {
     void assertResponseEquals(int expectedStatus, int actualStatus, String expectedEntity, String actualEntity) throws JSONException {
         try {
             assertEquals(expectedStatus, actualStatus);
-            JSONAssert.assertEquals(expectedEntity, actualEntity, true);
+            JSONAssert.assertEquals(expectedEntity, actualEntity, JSONCompareMode.NON_EXTENSIBLE);
         } catch (Throwable t) {
             Map<String, Object> map = new HashMap<>();
             map.put(JsonGenerator.PRETTY_PRINTING, true);
