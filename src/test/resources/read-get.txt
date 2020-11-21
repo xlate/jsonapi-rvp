@@ -1,0 +1,61 @@
+Post By ID With Comments
+    | [{
+        "sql": "INSERT INTO POSTS (id, title, text) VALUES (2, 'Title Two', 'Text two.')"
+      },{
+        "sql": "INSERT INTO COMMENTS (id, post_id, text) VALUES (2, 2, 'Comment two.')"
+      }]
+    | /test/posts/2?include=comments
+    | posts | 2
+    | 200
+    | {
+       'jsonapi':{'version':'1.0'},
+       'data':{
+         'id': '2',
+         'type': 'posts',
+         'attributes': {
+           'title': 'Title Two',
+           'text': 'Text two.'
+         },
+         'relationships': {
+           'comments': {
+             'links': {
+               'self': '/test/posts/2/relationships/comments',
+               'related': '/test/posts/2/comments'
+             },
+             'data': [{
+               'type': 'comments', 'id': '2'
+             }]
+           }
+         },
+         "links": {
+            "self": "/test/posts/2"
+         }
+       },
+       "included": [
+        {
+            "type": "comments",
+            "id": "2",
+            "attributes": {
+                "text": "Comment two."
+            },
+            "relationships": {
+                "post": {
+                    "links": {
+                        "self": "/test/comments/2/relationships/post",
+                        "related": "/test/comments/2/post"
+                    }
+                }
+            },
+            "links": {
+                "self": "/test/comments/2"
+            }
+        }]
+      }
+    @
+Invalid Post By ID (Not Found)
+    | []
+    | /test/posts/2?include=comments
+    | posts | 2
+    | 404
+    | {'errors':[{'status':'404','title':'Not Found','detail':'The requested resource can not be found.'}]}
+    @

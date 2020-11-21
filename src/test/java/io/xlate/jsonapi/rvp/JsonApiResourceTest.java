@@ -174,4 +174,28 @@ class JsonApiResourceTest {
         assertResponseEquals(expectedStatus, response.getStatus(), expectedResponse, responseEntity);
     }
 
+    @ParameterizedTest
+    @CsvFileSource(delimiter = '|', lineSeparator = "@\n", files = "src/test/resources/read-get.txt")
+    void testReadGet(String title,
+                      String jsonDml,
+                      String requestUri,
+                      String resourceType,
+                      String resourceId,
+                      int expectedStatus,
+                      String expectedResponse)
+            throws JSONException {
+
+        Mockito.when(target.request.getMethod()).thenReturn("GET");
+        target.uriInfo = new ResteasyUriInfo(requestUri, "/");
+
+        em.getTransaction().begin();
+        executeDml(jsonDml);
+        em.getTransaction().commit();
+
+        Response response = target.read(resourceType, resourceId);
+        assertNotNull(response);
+
+        String responseEntity = String.valueOf(response.getEntity());
+        assertResponseEquals(expectedStatus, response.getStatus(), expectedResponse, responseEntity);
+    }
 }

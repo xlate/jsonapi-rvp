@@ -219,7 +219,6 @@ Post With Comments
         }]
       }
     @
-################### Including relationship resources @
 Post With Comments And Paging
     | [{
         "sql": "INSERT INTO POSTS (id, title, text) VALUES (1, 'Title One', 'Text one.')"
