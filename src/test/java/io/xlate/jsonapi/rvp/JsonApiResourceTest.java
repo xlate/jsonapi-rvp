@@ -11,6 +11,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Supplier;
 
 import javax.enterprise.inject.Instance;
 import javax.json.Json;
@@ -125,6 +126,28 @@ class JsonApiResourceTest {
         }
     }
 
+    void testResourceMethod(String jsonDml,
+                            String requestUri,
+                            String requestMethod,
+                            int expectedStatus,
+                            String expectedResponse,
+                            Supplier<Response> responseSupplier)
+            throws JSONException {
+
+        Mockito.when(target.request.getMethod()).thenReturn(requestMethod);
+        target.uriInfo = new ResteasyUriInfo(requestUri, "/");
+
+        em.getTransaction().begin();
+        executeDml(jsonDml);
+        Response response = responseSupplier.get();
+        em.getTransaction().commit();
+
+        assertNotNull(response);
+
+        String responseEntity = String.valueOf(response.getEntity());
+        assertResponseEquals(expectedStatus, response.getStatus(), expectedResponse, responseEntity);
+    }
+
     @ParameterizedTest
     @CsvFileSource(delimiter = '|', lineSeparator = "@\n", files = "src/test/resources/create-post.txt")
     void testCreatePost(String title,
@@ -136,18 +159,13 @@ class JsonApiResourceTest {
                         String expectedResponse)
             throws JSONException {
 
-        Mockito.when(target.request.getMethod()).thenReturn("POST");
-        target.uriInfo = new ResteasyUriInfo(requestUri, "/");
-
-        em.getTransaction().begin();
-        executeDml(jsonDml);
-        Response response = target.create(resourceType, Json.createReader(new StringReader(requestBody.replace('\'', '"'))).readObject());
-        em.getTransaction().commit();
-
-        assertNotNull(response);
-
-        String responseEntity = String.valueOf(response.getEntity());
-        assertResponseEquals(expectedStatus, response.getStatus(), expectedResponse, responseEntity);
+        testResourceMethod(jsonDml,
+                           requestUri,
+                           "POST",
+                           expectedStatus,
+                           expectedResponse,
+                           () -> target.create(resourceType,
+                                               Json.createReader(new StringReader(requestBody.replace('\'', '"'))).readObject()));
     }
 
     @ParameterizedTest
@@ -160,42 +178,31 @@ class JsonApiResourceTest {
                       String expectedResponse)
             throws JSONException {
 
-        Mockito.when(target.request.getMethod()).thenReturn("GET");
-        target.uriInfo = new ResteasyUriInfo(requestUri, "/");
-
-        em.getTransaction().begin();
-        executeDml(jsonDml);
-        em.getTransaction().commit();
-
-        Response response = target.index(resourceType);
-        assertNotNull(response);
-
-        String responseEntity = String.valueOf(response.getEntity());
-        assertResponseEquals(expectedStatus, response.getStatus(), expectedResponse, responseEntity);
+        testResourceMethod(jsonDml,
+                           requestUri,
+                           "GET",
+                           expectedStatus,
+                           expectedResponse,
+                           () -> target.index(resourceType));
     }
 
     @ParameterizedTest
     @CsvFileSource(delimiter = '|', lineSeparator = "@\n", files = "src/test/resources/read-get.txt")
     void testReadGet(String title,
-                      String jsonDml,
-                      String requestUri,
-                      String resourceType,
-                      String resourceId,
-                      int expectedStatus,
-                      String expectedResponse)
+                     String jsonDml,
+                     String requestUri,
+                     String resourceType,
+                     String resourceId,
+                     int expectedStatus,
+                     String expectedResponse)
             throws JSONException {
 
-        Mockito.when(target.request.getMethod()).thenReturn("GET");
-        target.uriInfo = new ResteasyUriInfo(requestUri, "/");
 
-        em.getTransaction().begin();
-        executeDml(jsonDml);
-        em.getTransaction().commit();
-
-        Response response = target.read(resourceType, resourceId);
-        assertNotNull(response);
-
-        String responseEntity = String.valueOf(response.getEntity());
-        assertResponseEquals(expectedStatus, response.getStatus(), expectedResponse, responseEntity);
+        testResourceMethod(jsonDml,
+                           requestUri,
+                           "GET",
+                           expectedStatus,
+                           expectedResponse,
+                           () -> target.read(resourceType, resourceId));
     }
 }

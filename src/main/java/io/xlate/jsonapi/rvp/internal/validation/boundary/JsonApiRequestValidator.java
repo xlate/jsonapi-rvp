@@ -88,7 +88,10 @@ public class JsonApiRequestValidator implements ConstraintValidator<ValidJsonApi
         validStructure = validTopLevel(value, context, validStructure);
         validStructure = validLinks(value, context, validStructure);
         validStructure = validData(value, context, validStructure);
-        validStructure = validAttributes(value, context, validStructure);
+
+        if (validStructure) {
+            validStructure = validAttributes(value, context, validStructure);
+        }
 
         return validStructure;
     }
