@@ -158,15 +158,17 @@ public class JsonApiQuery {
                 this.maxResults = 10;
             }
         } else if (params.containsKey(PARAM_PAGE_NUMBER)) {
-            int pageNumber = tryParseInt(params.getFirst(PARAM_PAGE_NUMBER), 1);
+            final int pageNumber = tryParseInt(params.getFirst(PARAM_PAGE_NUMBER), 1);
+            final int pageSize;
 
             if (params.containsKey(PARAM_PAGE_SIZE)) {
-                this.maxResults = tryParseInt(params.getFirst(PARAM_PAGE_SIZE), 10);
+                pageSize = tryParseInt(params.getFirst(PARAM_PAGE_SIZE), 10);
             } else {
-                this.maxResults = 10;
+                pageSize = 10;
             }
 
-            this.firstResult = (pageNumber - 1) + this.maxResults;
+            this.firstResult = ((pageNumber - 1) * pageSize);
+            this.maxResults = pageSize;
         } else if (params.containsKey(PARAM_PAGE_LIMIT)) {
             this.maxResults = tryParseInt(params.getFirst(PARAM_PAGE_LIMIT), 10);
         } else if (params.containsKey(PARAM_PAGE_SIZE)) {

@@ -1,4 +1,5 @@
 Create Post
+    | []
     | /test/posts
     | posts
     | { 'data': { 'type': 'posts', 'attributes': { 'title': 'Testing', 'text': 'Testing Again' }}}
@@ -29,6 +30,7 @@ Create Post
     }
     @
 Invalid Request (Keys `data` and `errors` present)
+    | []
     | /test/posts
     | posts
     | { 'data': { 'type': 'posts', 'attributes': { 'title': 'Testing', 'text': 'Testing Again' }}, 'errors':[]}
@@ -42,6 +44,7 @@ Invalid Request (Keys `data` and `errors` present)
       ]}
     @
 Invalid Request (Unexpected top-level key)
+    | []
     | /test/posts
     | posts
     | { 'data': { 'type': 'posts', 'attributes': { 'title': 'Testing', 'text': 'Testing Again' }}, 'zombies':[]}
@@ -55,6 +58,7 @@ Invalid Request (Unexpected top-level key)
       ]}
     @
 Invalid Request (Missing required top-level keys)
+    | []
     | /test/posts
     | posts
     | { 'links': { }}, 'zombies':[]}
@@ -68,6 +72,7 @@ Invalid Request (Missing required top-level keys)
       ]}
     @
 Invalid Request (Read-only resource type)
+    | []
     | /test/readonly-codes
     | readonly-codes
     | { 'data':{} }

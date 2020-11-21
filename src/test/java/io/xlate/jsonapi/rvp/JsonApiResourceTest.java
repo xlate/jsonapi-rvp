@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.io.StringReader;
-import java.net.URI;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -15,6 +14,9 @@ import java.util.Set;
 
 import javax.enterprise.inject.Instance;
 import javax.json.Json;
+import javax.json.JsonArray;
+import javax.json.JsonObject;
+import javax.json.JsonValue;
 import javax.json.JsonWriter;
 import javax.json.JsonWriterFactory;
 import javax.json.stream.JsonGenerator;
@@ -97,6 +99,17 @@ class JsonApiResourceTest {
         em.close();
     }
 
+    void executeDml(String jsonDml) {
+        if (!jsonDml.isBlank()) {
+            JsonArray commands = Json.createReader(new StringReader(jsonDml)).readArray();
+
+            for (JsonValue entry : commands) {
+                JsonObject command = entry.asJsonObject();
+                em.createNativeQuery(command.getString("sql")).executeUpdate();
+            }
+        }
+    }
+
     void assertResponseEquals(int expectedStatus, int actualStatus, String expectedEntity, String actualEntity) throws JSONException {
         try {
             assertEquals(expectedStatus, actualStatus);
@@ -115,6 +128,7 @@ class JsonApiResourceTest {
     @ParameterizedTest
     @CsvFileSource(delimiter = '|', lineSeparator = "@\n", files = "src/test/resources/create-post.txt")
     void testCreatePost(String title,
+                        String jsonDml,
                         String requestUri,
                         String resourceType,
                         String requestBody,
@@ -123,9 +137,10 @@ class JsonApiResourceTest {
             throws JSONException {
 
         Mockito.when(target.request.getMethod()).thenReturn("POST");
-        target.uriInfo = new ResteasyUriInfo(URI.create(requestUri));
+        target.uriInfo = new ResteasyUriInfo(requestUri, "/");
 
         em.getTransaction().begin();
+        executeDml(jsonDml);
         Response response = target.create(resourceType, Json.createReader(new StringReader(requestBody.replace('\'', '"'))).readObject());
         em.getTransaction().commit();
 
@@ -138,6 +153,7 @@ class JsonApiResourceTest {
     @ParameterizedTest
     @CsvFileSource(delimiter = '|', lineSeparator = "@\n", files = "src/test/resources/index-get.txt")
     void testIndexGet(String title,
+                      String jsonDml,
                       String requestUri,
                       String resourceType,
                       int expectedStatus,
@@ -145,7 +161,11 @@ class JsonApiResourceTest {
             throws JSONException {
 
         Mockito.when(target.request.getMethod()).thenReturn("GET");
-        target.uriInfo = new ResteasyUriInfo(URI.create(requestUri));
+        target.uriInfo = new ResteasyUriInfo(requestUri, "/");
+
+        em.getTransaction().begin();
+        executeDml(jsonDml);
+        em.getTransaction().commit();
 
         Response response = target.index(resourceType);
         assertNotNull(response);
