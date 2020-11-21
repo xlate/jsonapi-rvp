@@ -8,6 +8,7 @@ import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.OneToMany;
+import javax.persistence.SequenceGenerator;
 import javax.persistence.Table;
 
 @Entity
@@ -15,7 +16,12 @@ import javax.persistence.Table;
 public class Post {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "postSequence")
+    @SequenceGenerator(
+            name = "postSequence",
+            initialValue = 1,
+            allocationSize = 1,
+            sequenceName = "post_sequence")
     private long id;
 
     @Column
@@ -24,7 +30,7 @@ public class Post {
     @Column
     private String text;
 
-    @OneToMany(mappedBy = "post")
+    @OneToMany(mappedBy = "post", orphanRemoval = true)
     private List<Comment> comments;
 
     public long getId() {

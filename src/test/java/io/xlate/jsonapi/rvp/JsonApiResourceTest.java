@@ -34,7 +34,6 @@ import javax.ws.rs.core.SecurityContext;
 import org.jboss.resteasy.specimpl.ResteasyUriInfo;
 import org.json.JSONException;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvFileSource;
@@ -53,16 +52,10 @@ class JsonApiResourceTest {
     static class ApiImpl extends JsonApiResource {
     }
 
-    static EntityManagerFactory emf;
-
+    EntityManagerFactory emf;
     EntityManager em;
     JsonApiResource target;
     JsonApiHandler<?> defaultHandler = new DefaultJsonApiHandler();
-
-    @BeforeAll
-    static void initialize() {
-        emf = Persistence.createEntityManagerFactory("test");
-    }
 
     Iterator<JsonApiHandler<?>> handlerIterator() {
         List<JsonApiHandler<?>> handlers = Arrays.asList(defaultHandler);
@@ -72,6 +65,7 @@ class JsonApiResourceTest {
     @SuppressWarnings("unchecked")
     @BeforeEach
     void setUp() {
+        emf = Persistence.createEntityManagerFactory("test");
         em = emf.createEntityManager();
         target = new ApiImpl();
         target.persistenceContext = em;
@@ -98,6 +92,7 @@ class JsonApiResourceTest {
         em.createQuery("DELETE Post").executeUpdate();
         tx.commit();
         em.close();
+        emf.close();
     }
 
     void executeDml(String jsonDml) {
@@ -109,6 +104,10 @@ class JsonApiResourceTest {
                 em.createNativeQuery(command.getString("sql")).executeUpdate();
             }
         }
+    }
+
+    JsonObject readObject(String requestBody) {
+        return Json.createReader(new StringReader(requestBody.replace('\'', '"'))).readObject();
     }
 
     void assertResponseEquals(int expectedStatus, int actualStatus, String expectedEntity, String actualEntity) throws JSONException {
@@ -164,8 +163,7 @@ class JsonApiResourceTest {
                            "POST",
                            expectedStatus,
                            expectedResponse,
-                           () -> target.create(resourceType,
-                                               Json.createReader(new StringReader(requestBody.replace('\'', '"'))).readObject()));
+                           () -> target.create(resourceType, readObject(requestBody)));
     }
 
     @ParameterizedTest
@@ -204,5 +202,25 @@ class JsonApiResourceTest {
                            expectedStatus,
                            expectedResponse,
                            () -> target.read(resourceType, resourceId));
+    }
+
+    @ParameterizedTest
+    @CsvFileSource(delimiter = '|', lineSeparator = "@\n", files = "src/test/resources/update-patch.txt")
+    void testUpdatePatch(String title,
+                   String jsonDml,
+                   String requestUri,
+                   String resourceType,
+                   String resourceId,
+                   String requestBody,
+                   int expectedStatus,
+                   String expectedResponse)
+            throws JSONException {
+
+        testResourceMethod(jsonDml,
+                           requestUri,
+                           "PATCH",
+                           expectedStatus,
+                           expectedResponse,
+                           () -> target.patch(resourceType, resourceId, readObject(requestBody)));
     }
 }

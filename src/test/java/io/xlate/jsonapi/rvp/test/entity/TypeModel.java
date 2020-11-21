@@ -15,8 +15,11 @@ public class TypeModel {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private long id;
 
-    @Column(name = "primitive_int", columnDefinition = "INT DEFAULT 0")
+    @Column(name = "primitive_int", nullable = false, columnDefinition = "INT DEFAULT 0")
     private int primitiveInt;
+
+    @Column(name = "wrapped_int")
+    private Integer wrappedInt;
 
     public int getPrimitiveInt() {
         return primitiveInt;

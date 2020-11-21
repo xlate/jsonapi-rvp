@@ -69,7 +69,9 @@ public class ResourceObjectReader {
 
         JsonArrayBuilder errors = Json.createArrayBuilder();
 
-        readAttributes(target, data.getJsonObject("attributes"), errors);
+        if (data.containsKey("attributes")) {
+            readAttributes(target, data.getJsonObject("attributes"), errors);
+        }
 
         if (data.containsKey("relationships")) {
             readRelationships(persistence,
@@ -314,7 +316,7 @@ public class ResourceObjectReader {
             Instant instant;
 
             try {
-                instant = toInstant(jsonString);
+                instant = OffsetDateTime.parse(jsonString).toInstant();
             } catch (Exception e) {
                 LOGGER.log(Level.WARNING, e, () -> "Unable to convert attribute `" + attributeName + "` to an instant");
                 return INVALID_VALUE;
@@ -515,7 +517,4 @@ public class ResourceObjectReader {
         }
     }
 
-    static Instant toInstant(String jsonString) {
-        return OffsetDateTime.parse(jsonString).toInstant();
-    }
 }

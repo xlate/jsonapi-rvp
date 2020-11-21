@@ -291,9 +291,9 @@ public abstract class JsonApiResource {
 
     @PATCH
     @Path("{resource-type}/{id}")
-    public Response patchUpdate(@PathParam("resource-type") String resourceType,
-                                @PathParam("id") String id,
-                                final JsonObject input) {
+    public Response patch(@PathParam("resource-type") String resourceType,
+                          @PathParam("id") String id,
+                          final JsonObject input) {
         return update(resourceType, id, input);
     }
 
