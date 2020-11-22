@@ -26,7 +26,6 @@ import java.math.BigInteger;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.Map.Entry;
@@ -100,26 +99,13 @@ public class ResourceObjectReader {
 
         for (Entry<String, JsonValue> entry : relationships.entrySet()) {
             String fieldName = entry.getKey();
-            JsonValue value = entry.getValue();
-            JsonValue relationshipData = ((JsonObject) value).get("data");
-            Attribute<Object, ?> entityAttribute = rootType.getAttribute(fieldName);
+            JsonValue relationshipData = entry.getValue().asJsonObject().get("data");
 
-            if (relationshipData.getValueType() == ValueType.ARRAY) {
-                if (!entityAttribute.isCollection()) {
-                    var error = invalidRelationshipError("Value of `data` for relationship `" + fieldName + "` must not be an array.",
-                                                         fieldName);
-                    errors.add(error.toJson());
-                } else {
-                    readRelationshipArray(persistence, context, entity, fieldName, relationshipData.asJsonArray(), errors);
-                }
-            } else if (relationshipData.getValueType() == ValueType.OBJECT) {
-                if (entityAttribute.isCollection()) {
-                    var error = invalidRelationshipError("Value of `data` for relationship `" + fieldName + "` must be an array.",
-                                                         fieldName);
-                    errors.add(error.toJson());
-                } else {
-                    readRelationshipObject(persistence, context, entity, fieldName, relationshipData.asJsonObject(), errors);
-                }
+            // Validation already completed in JsonApiRequestValidator
+            if (rootType.getAttribute(fieldName).isCollection()) {
+                readRelationshipArray(persistence, context, entity, fieldName, relationshipData.asJsonArray(), errors);
+            } else {
+                readRelationshipObject(persistence, context, entity, fieldName, relationshipData, errors);
             }
         }
     }
@@ -148,27 +134,36 @@ public class ResourceObjectReader {
             }
         }
 
-        putRelationship(entity, fieldName, replacements);
+        putPluralRelationship(entity, replacements, model.getEntityMeta(entity.getClass()).getPropertyDescriptor(fieldName));
     }
 
     void readRelationshipObject(PersistenceController persistence,
                                 JsonApiContext context,
                                 Object entity,
                                 String fieldName,
-                                JsonObject relationshipData,
+                                JsonValue relationshipData,
                                 JsonArrayBuilder errors) {
 
-        String relType = relationshipData.getString("type");
-        String relId = relationshipData.getString("id");
-        Object replacement = persistence.findObject(context, relType, relId);
+        Object replacement;
 
-        if (replacement != null) {
-            putRelationship(entity, fieldName, Arrays.asList(replacement));
+        if (relationshipData.getValueType() == ValueType.NULL) {
+            replacement = null;
         } else {
-            var error = invalidRelationshipError("Resource of type `" + relType + "` with ID `" + relId + "` cannot be found.",
-                                                 fieldName);
-            errors.add(error.toJson());
+            JsonObject relationshipObject = relationshipData.asJsonObject();
+            String relType = relationshipObject.getString("type");
+            String relId = relationshipObject.getString("id");
+            replacement = persistence.findObject(context, relType, relId);
+
+            if (replacement == null) {
+                var error = invalidRelationshipError("Resource of type `" + relType + "` with ID `" + relId + "` cannot be found.",
+                                                     fieldName);
+                errors.add(error.toJson());
+                return;
+            }
         }
+
+        putSingularRelationship(entity, replacement, model.getEntityMeta(entity.getClass()).getPropertyDescriptor(fieldName));
+
     }
 
     JsonApiError invalidRelationshipError(String detail, String relationshipName) {
@@ -370,19 +365,6 @@ public class ResourceObjectReader {
                                 JsonApiError.Source.forPointer(attributePointer(attributeName)));
     }
 
-    void putRelationship(Object bean, String relationship, Collection<Object> values) {
-        EntityMeta meta = model.getEntityMeta(bean.getClass());
-
-        PropertyDescriptor desc = meta.getPropertyDescriptor(relationship);
-        Class<?> relatedType = desc.getPropertyType();
-
-        if (Collection.class.isAssignableFrom(relatedType)) {
-            putPluralRelationship(bean, values, desc);
-        } else {
-            putSingularRelationship(bean, values, desc);
-        }
-    }
-
     void putPluralRelationship(Object bean, Collection<Object> values, PropertyDescriptor desc) {
         Collection<Object> current = readProperty(desc, bean);
         Iterator<Object> cursor = current.iterator();
@@ -392,38 +374,30 @@ public class ResourceObjectReader {
 
             if (!values.contains(related)) {
                 cursor.remove();
-                removeRelated(related, bean);
+                updateRelated(related, bean, RelatedModelAction.REMOVE);
             }
         }
 
         for (Object related : values) {
             if (!current.contains(related)) {
                 current.add(related);
-                addRelated(related, bean);
+                updateRelated(related, bean, RelatedModelAction.ADD);
             }
         }
     }
 
-    void putSingularRelationship(Object bean, Collection<Object> values, PropertyDescriptor desc) {
-        Object replacement = values.iterator().next();
+    void putSingularRelationship(Object bean, Object replacement, PropertyDescriptor desc) {
+        Object current = readProperty(desc, bean);
+        updateRelated(current, bean, RelatedModelAction.REMOVE);
+
         writeProperty(desc, bean, replacement);
 
         if (replacement != null) {
-            addRelated(replacement, bean);
-        } else {
-            removeRelated(replacement, bean);
+            updateRelated(replacement, bean, RelatedModelAction.ADD);
         }
     }
 
-    void addRelated(Object entity, Object related) {
-        updateRelated(entity, related, false);
-    }
-
-    void removeRelated(Object entity, Object related) {
-        updateRelated(entity, related, true);
-    }
-
-    void updateRelated(Object entity, Object related, boolean remove) {
+    void updateRelated(Object entity, Object related, RelatedModelAction action) {
         EntityMeta meta = model.getEntityMeta(entity.getClass());
 
         meta.getEntityType()
@@ -433,25 +407,25 @@ public class ResourceObjectReader {
             .filter(a -> ((Bindable<?>) a).getBindableJavaType().equals(related.getClass()))
             .forEach(a -> {
                 if (a.isCollection()) {
-                    updateRelatedCollection(entity, meta, a, related, remove);
+                    updateRelatedCollection(entity, meta, a, related, action);
                 } else {
-                    updateRelatedObject(entity, meta, a, related, remove);
+                    updateRelatedObject(entity, meta, a, related, action);
                 }
             });
     }
 
     @SuppressWarnings({ "rawtypes", "java:S3740" })
-    void updateRelatedCollection(Object entity, EntityMeta meta, Attribute attr, Object related, boolean remove) {
+    void updateRelatedCollection(Object entity, EntityMeta meta, Attribute attr, Object related, RelatedModelAction action) {
         PropertyDescriptor desc = meta.getPropertyDescriptor(attr.getName());
         Collection<Object> current = readProperty(desc, entity);
 
         if (current != null) {
             if (current.contains(related)) {
-                if (remove) {
+                if (action == RelatedModelAction.REMOVE) {
                     current.remove(related);
                 }
             } else {
-                if (!remove) {
+                if (action == RelatedModelAction.ADD) {
                     current.add(related);
                 }
             }
@@ -459,10 +433,10 @@ public class ResourceObjectReader {
     }
 
     @SuppressWarnings({ "rawtypes", "java:S3740" })
-    void updateRelatedObject(Object entity, EntityMeta meta, Attribute attr, Object related, boolean remove) {
+    void updateRelatedObject(Object entity, EntityMeta meta, Attribute attr, Object related, RelatedModelAction action) {
         PropertyDescriptor desc = meta.getPropertyDescriptor(attr.getName());
 
-        if (remove) {
+        if (action == RelatedModelAction.REMOVE) {
             Object current = readProperty(desc, entity);
 
             if (current == related) {
@@ -471,6 +445,10 @@ public class ResourceObjectReader {
         } else {
             writeProperty(desc, entity, related);
         }
+    }
+
+    enum RelatedModelAction {
+        ADD, REMOVE;
     }
 
     @SuppressWarnings("unchecked")

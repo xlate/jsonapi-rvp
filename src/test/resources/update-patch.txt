@@ -205,3 +205,50 @@ Update Comment Post Relationship (set to null)
         }
     }
     @
+Update Comment Post Relationship (change to another post)
+    | [{
+        "sql": "INSERT INTO POSTS (id, title, text) VALUES (1, 'Title One', 'First post!')"
+      },{
+        "sql": "INSERT INTO POSTS (id, title, text) VALUES (2, 'Title Two', 'Second post!')"
+      },{
+        "sql": "INSERT INTO COMMENTS (id, post_id, text) VALUES (1, 1, 'Comment one.')"
+      }]
+    | /test/comments/1
+    | comments | 1
+    | { 'data': {
+        'type': 'comments',
+        'id': '1',
+        'attributes': {
+          'text': 'Comment #1'
+        },
+        'relationships': {
+          'post': {
+            'data': { 'type': 'posts', 'id': '2' }
+          }
+        }
+      }}
+    | 200
+    | {
+        "jsonapi": {
+            "version": "1.0"
+        },
+        "data": {
+            "type": "comments",
+            "id": "1",
+            "attributes": {
+                "text": "Comment #1"
+            },
+            "relationships": {
+                "post": {
+                    "links": {
+                        "self": "/test/comments/1/relationships/post",
+                        "related": "/test/comments/1/post"
+                    }
+                }
+            },
+            "links": {
+                "self": "/test/comments/1"
+            }
+        }
+    }
+    @

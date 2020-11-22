@@ -87,11 +87,6 @@ class JsonApiResourceTest {
 
     @AfterEach
     void tearDown() {
-        var tx = em.getTransaction();
-        tx.begin();
-        em.createQuery("DELETE Comment").executeUpdate();
-        em.createQuery("DELETE Post").executeUpdate();
-        tx.commit();
         em.close();
         emf.close();
     }
@@ -99,11 +94,15 @@ class JsonApiResourceTest {
     void executeDml(String jsonDml) {
         if (!jsonDml.isBlank()) {
             JsonArray commands = Json.createReader(new StringReader(jsonDml)).readArray();
+            var tx = em.getTransaction();
+            tx.begin();
 
             for (JsonValue entry : commands) {
                 JsonObject command = entry.asJsonObject();
                 em.createNativeQuery(command.getString("sql")).executeUpdate();
             }
+
+            tx.commit();
         }
     }
 
@@ -134,17 +133,20 @@ class JsonApiResourceTest {
                             Supplier<Response> responseSupplier)
             throws JSONException {
 
+        executeDml(jsonDml);
+
         Mockito.when(target.request.getMethod()).thenReturn(requestMethod);
         target.uriInfo = new ResteasyUriInfo(requestUri, "/");
         Response response;
 
+        var tx = em.getTransaction();
+
         try {
-            em.getTransaction().begin();
-            executeDml(jsonDml);
+            tx.begin();
             response = responseSupplier.get();
-            em.getTransaction().commit();
+            tx.commit();
         } catch (Exception e) {
-            em.getTransaction().rollback();
+            tx.rollback();
             throw e;
         }
 
@@ -213,6 +215,26 @@ class JsonApiResourceTest {
                            expectedStatus,
                            expectedResponse,
                            () -> target.read(resourceType, resourceId));
+    }
+
+    @ParameterizedTest
+    @CsvFileSource(delimiter = '|', lineSeparator = "@\n", files = "src/test/resources/read-relationship-get.txt")
+    void testReadRelationshipGet(String title,
+                     String jsonDml,
+                     String requestUri,
+                     String resourceType,
+                     String resourceId,
+                     String relationshipName,
+                     int expectedStatus,
+                     String expectedResponse)
+            throws JSONException {
+
+        testResourceMethod(jsonDml,
+                           requestUri,
+                           "GET",
+                           expectedStatus,
+                           expectedResponse,
+                           () -> target.readRelationship(resourceType, resourceId, relationshipName));
     }
 
     @ParameterizedTest

@@ -1,0 +1,24 @@
+Post's Comments Relationship
+    | [{
+        "sql": "INSERT INTO POSTS (id, title, text) VALUES (2, 'Title Two', 'Text two.')"
+      },{
+        "sql": "INSERT INTO COMMENTS (id, post_id, text) VALUES (1, 2, 'Comment one.')"
+      },{
+        "sql": "INSERT INTO COMMENTS (id, post_id, text) VALUES (2, 2, 'Comment two.')"
+      }]
+    | /test/posts/2/relationships/comments
+    | posts | 2 | comments
+    | 200
+    | {
+       'jsonapi':{'version':'1.0'},
+       'links': {
+         'self': '/test/posts/2/relationships/comments',
+         'related': '/test/posts/2/comments'
+       },
+       'data': [{
+         'type': 'comments', 'id': '1'
+       },{
+         'type': 'comments', 'id': '2'
+       }]
+      }
+    @

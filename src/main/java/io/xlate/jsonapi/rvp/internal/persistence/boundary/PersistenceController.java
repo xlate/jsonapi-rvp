@@ -16,6 +16,8 @@
  ******************************************************************************/
 package io.xlate.jsonapi.rvp.internal.persistence.boundary;
 
+import static java.util.function.Predicate.not;
+
 import java.lang.reflect.AccessibleObject;
 import java.security.Principal;
 import java.util.ArrayList;
@@ -110,10 +112,6 @@ public class PersistenceController {
         }
     }
 
-    public static <T> java.util.function.Predicate<T> not(java.util.function.Predicate<T> t) {
-        return t.negate();
-    }
-
     List<Order> getOrderBy(CriteriaBuilder builder, Root<Object> root, JsonApiQuery params) {
         List<String> sortKeys = params.getSort();
 
@@ -140,11 +138,6 @@ public class PersistenceController {
 
         String resourceType = context.getResourceType();
         EntityMeta meta = model.getEntityMeta(resourceType);
-
-        if (meta == null) {
-            return null;
-        }
-
         Class<Object> entityClass = meta.getEntityClass();
 
         final CriteriaBuilder builder = em.getCriteriaBuilder();
@@ -160,10 +153,7 @@ public class PersistenceController {
 
         query.select(join.get(joinMeta.getExposedIdAttribute()));
         List<Predicate> predicates = buildPredicates(builder, root, context.getSecurity().getUserPrincipal(), meta, id);
-
-        if (!predicates.isEmpty()) {
-            query.where(predicates.toArray(new Predicate[predicates.size()]));
-        }
+        query.where(predicates.toArray(new Predicate[predicates.size()]));
 
         TypedQuery<Object> typedQuery = em.createQuery(query);
 
