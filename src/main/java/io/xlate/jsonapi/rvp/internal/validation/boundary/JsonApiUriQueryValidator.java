@@ -184,7 +184,7 @@ public class JsonApiUriQueryValidator
                 String attribute = sort.substring(descending ? 1 : 0);
 
                 if (!meta.getAttributeNames().contains(attribute)) {
-                    LOGGER.log(Level.FINE, () -> "Invalid attribute name: `" + attribute + "`.");
+                    LOGGER.log(Level.FINER, () -> "Invalid attribute name: `" + attribute + "`.");
                     valid = false;
                     addViolation(context, JsonApiQuery.PARAM_SORT, "Sort key `" + sort + "` is not an attribute");
                 }
@@ -211,7 +211,7 @@ public class JsonApiUriQueryValidator
                 try {
                     Integer.parseInt(pageParamValues.get(0));
                 } catch (NumberFormatException e) {
-                    LOGGER.log(Level.FINE, e, () -> "Invalid page parameter: `" + pageParamValues.get(0) + "`.");
+                    LOGGER.log(Level.FINER, () -> "Invalid page parameter: `" + pageParamValues.get(0) + "`.");
                     valid = false;
                     addViolation(context, paramName, "Page parameter must be an integer");
                 }

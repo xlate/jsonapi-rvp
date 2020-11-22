@@ -30,7 +30,7 @@ public class Post {
     @Column
     private String text;
 
-    @OneToMany(mappedBy = "post", orphanRemoval = true)
+    @OneToMany(mappedBy = "post")
     private List<Comment> comments;
 
     public long getId() {

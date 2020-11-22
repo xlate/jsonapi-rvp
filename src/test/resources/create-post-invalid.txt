@@ -1,0 +1,218 @@
+Invalid Request (`errors` present)
+    | []
+    | /test/posts
+    | posts
+    | { 'data': { 'type': 'posts', 'attributes': { 'title': 'Testing', 'text': 'Testing Again' }}, 'errors':[]}
+    | 422
+    | { 'errors': [
+        {
+          'source': { 'pointer': '/errors' },
+          'title': 'Invalid JSON API Document Structure',
+          'detail':'A resource update document may ONLY contain these top-level members: `data`, `meta`, `jsonapi`, `included`'
+        }
+      ]}
+    @
+Invalid Request (Unexpected top-level key)
+    | []
+    | /test/posts
+    | posts
+    | { 'data': { 'type': 'posts', 'attributes': { 'title': 'Testing', 'text': 'Testing Again' }}, 'zombies':[]}
+    | 422
+    | { 'errors': [
+        {
+          'source': { 'pointer': '/zombies' },
+          'title': 'Invalid JSON API Document Structure',
+          'detail':'A resource update document may ONLY contain these top-level members: `data`, `meta`, `jsonapi`, `included`'
+        }
+      ]}
+    @
+Invalid Request (Missing required top-level keys)
+    | []
+    | /test/posts
+    | posts
+    | { 'links': { }}, 'zombies':[]}
+    | 422
+    | { 'errors': [
+        {
+          'source': { 'pointer': '/data' },
+          'title': 'Invalid JSON API Document Structure',
+          'detail':'A resource update document MUST contain a top-level `data` member'
+        },
+        {
+          'source': { 'pointer': '/links' },
+          'title': 'Invalid JSON API Document Structure',
+          'detail':'A resource update document may ONLY contain these top-level members: `data`, `meta`, `jsonapi`, `included`'
+        }
+      ]}
+    @
+Invalid Request (Read-only resource type)
+    | []
+    | /test/readonly-codes
+    | readonly-codes
+    | { 'data':{} }
+    | 405
+    | { 'errors': [
+        {
+          'status': '405',
+          'title': 'Method Not Allowed',
+          'detail': 'Method not allowed for this resource'
+        }
+      ]}
+    @
+Invalid Create Comment (Relationships not an object)
+    | []
+    | /test/comments
+    | comments
+    | { 'data': { 'type': 'comments', 'attributes': { 'text': 'First comment!' }, 'relationships': [] }}
+    | 422
+    | { 'errors': [
+        {
+          'source': { 'pointer': '/data/relationships' },
+          'title': 'Invalid JSON API Document Structure',
+          'detail':'The value of the `relationships` member MUST be an object'
+        }
+      ]}
+    @
+Invalid Create Comment (Bad relationship name)
+    | []
+    | /test/comments
+    | comments
+    | { 'data': { 'type': 'comments', 'attributes': { 'text': 'First comment!' }, 'relationships': { 'post*': { }}}}
+    | 422
+    | { 'errors': [
+        {
+          'source': { 'pointer': '/data/relationships/post*' },
+          'title': 'Invalid JSON API Document Structure',
+          'detail':'Invalid relationship name'
+        }
+      ]}
+    @
+Invalid Create Comment (No such relationship)
+    | []
+    | /test/comments
+    | comments
+    | { 'data': { 'type': 'comments', 'attributes': { 'text': 'First comment!' }, 'relationships': { 'posts': { }}}}
+    | 422
+    | { 'errors': [
+        {
+          'source': { 'pointer': '/data/relationships/posts' },
+          'title': 'Invalid JSON API Document Structure',
+          'detail':'No such relationship'
+        }
+      ]}
+    @
+Invalid Create Comment (Relationship array instead of object)
+    | []
+    | /test/comments
+    | comments
+    | { 'data': { 'type': 'comments', 'attributes': { 'text': 'First comment!' }, 'relationships': { 'post': [] }}}
+    | 422
+    | { 'errors': [
+        {
+          'source': { 'pointer': '/data/relationships/post' },
+          'title': 'Invalid JSON API Document Structure',
+          'detail':'The value of a `relationships` entry MUST be an object'
+        }
+      ]}
+    @
+Invalid Create Comment (Relationship `data` missing)
+    | []
+    | /test/comments
+    | comments
+    | { 'data': { 'type': 'comments', 'attributes': { 'text': 'First comment!' }, 'relationships': { 'post': { }}}}
+    | 422
+    | { 'errors': [
+        {
+          'source': { 'pointer': '/data/relationships/post/data' },
+          'title': 'Invalid JSON API Document Structure',
+          'detail':'Relationship `data` missing'
+        }
+      ]}
+    @
+Invalid Create Comment (Relationship `data` as array)
+    | []
+    | /test/comments
+    | comments
+    | { 'data': { 'type': 'comments', 'attributes': { 'text': 'First comment!' }, 'relationships': { 'post': { 'data':[] }}}}
+    | 422
+    | { 'errors': [
+        {
+          'source': { 'pointer': '/data/relationships/post/data' },
+          'title': 'Invalid JSON API Document Structure',
+          'detail':'Value of `data` must be an object for this relationship'
+        }
+      ]}
+    @
+Invalid Create Post (Relationship `data` as object)
+    | []
+    | /test/posts
+    | posts
+    | { 'data': {
+        'type': 'posts',
+        'attributes': { 'title': 'Testing', 'text': 'Testing Again' },
+        'relationships': { 'comments': { 'data': {} } }
+        }
+      }
+    | 422
+    | { 'errors': [
+        {
+          'source': { 'pointer': '/data/relationships/comments/data' },
+          'title': 'Invalid JSON API Document Structure',
+          'detail': 'Value of `data` must be an array for this relationship'
+        }
+      ]}
+    @
+Invalid Create Post (Relationship `data` as null)
+    | []
+    | /test/posts
+    | posts
+    | { 'data': {
+        'type': 'posts',
+        'attributes': { 'title': 'Testing', 'text': 'Testing Again' },
+        'relationships': { 'comments': { 'data': null } }
+        }
+      }
+    | 422
+    | { 'errors': [
+        {
+          'source': { 'pointer': '/data/relationships/comments/data' },
+          'title': 'Invalid JSON API Document Structure',
+          'detail': 'Value of `data` must be an array for this relationship'
+        }
+      ]}
+    @
+Invalid Create Post (`type` missing)
+    | []
+    | /test/posts
+    | posts
+    | { 'data': {
+          'attributes': { 'title': 'Testing', 'text': 'Testing Again' }
+        }
+      }
+    | 422
+    | { 'errors': [
+        {
+          'source': { 'pointer': '/data' },
+          'title': 'Invalid JSON API Document Structure',
+          'detail': 'Object must contain a `type` member'
+        }
+      ]}
+    @
+Invalid Create Post (`type` as object)
+    | []
+    | /test/posts
+    | posts
+    | { 'data': {
+          'type': { 'foo': 'bar' },
+          'attributes': { 'title': 'Testing', 'text': 'Testing Again' }
+        }
+      }
+    | 422
+    | { 'errors': [
+        {
+          'source': { 'pointer': '/data/type' },
+          'title': 'Invalid JSON API Document Structure',
+          'detail': 'The value of the `type` member must be a string'
+        }
+      ]}
+    @

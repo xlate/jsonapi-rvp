@@ -118,6 +118,7 @@ public abstract class JsonApiResource {
     @SuppressWarnings("java:S1452") // Suppress Sonar warnings regarding missing generic types
     protected Set<ConstraintViolation<?>> validateEntity(String resourceType, String id, JsonObject input) {
         JsonApiRequest jsonApiRequest = new JsonApiRequest(request.getMethod(),
+                                                           model,
                                                            model.getEntityMeta(resourceType),
                                                            id,
                                                            input);

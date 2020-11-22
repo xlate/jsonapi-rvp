@@ -136,11 +136,17 @@ class JsonApiResourceTest {
 
         Mockito.when(target.request.getMethod()).thenReturn(requestMethod);
         target.uriInfo = new ResteasyUriInfo(requestUri, "/");
+        Response response;
 
-        em.getTransaction().begin();
-        executeDml(jsonDml);
-        Response response = responseSupplier.get();
-        em.getTransaction().commit();
+        try {
+            em.getTransaction().begin();
+            executeDml(jsonDml);
+            response = responseSupplier.get();
+            em.getTransaction().commit();
+        } catch (Exception e) {
+            em.getTransaction().rollback();
+            throw e;
+        }
 
         assertNotNull(response);
 
@@ -149,7 +155,12 @@ class JsonApiResourceTest {
     }
 
     @ParameterizedTest
-    @CsvFileSource(delimiter = '|', lineSeparator = "@\n", files = "src/test/resources/create-post.txt")
+    @CsvFileSource(
+            delimiter = '|',
+            lineSeparator = "@\n",
+            files = {
+                      "src/test/resources/create-post.txt",
+                      "src/test/resources/create-post-invalid.txt"})
     void testCreatePost(String title,
                         String jsonDml,
                         String requestUri,
@@ -196,7 +207,6 @@ class JsonApiResourceTest {
                      String expectedResponse)
             throws JSONException {
 
-
         testResourceMethod(jsonDml,
                            requestUri,
                            "GET",
@@ -206,15 +216,20 @@ class JsonApiResourceTest {
     }
 
     @ParameterizedTest
-    @CsvFileSource(delimiter = '|', lineSeparator = "@\n", files = "src/test/resources/update-patch.txt")
+    @CsvFileSource(
+            delimiter = '|',
+            lineSeparator = "@\n",
+            files = {
+                      "src/test/resources/update-patch.txt",
+                      "src/test/resources/update-patch-invalid.txt" })
     void testUpdatePatch(String title,
-                   String jsonDml,
-                   String requestUri,
-                   String resourceType,
-                   String resourceId,
-                   String requestBody,
-                   int expectedStatus,
-                   String expectedResponse)
+                         String jsonDml,
+                         String requestUri,
+                         String resourceType,
+                         String resourceId,
+                         String requestBody,
+                         int expectedStatus,
+                         String expectedResponse)
             throws JSONException {
 
         testResourceMethod(jsonDml,

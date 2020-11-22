@@ -1,0 +1,91 @@
+Invalid Comments Text Update
+    | []
+    | /test/comments/1
+    | comments | 1
+    | { 'data': {
+        'type': 'comments',
+        'id': '1',
+        'attributes': {
+          'text': 'Comment #1'
+        },
+        'relationships': {
+          'post': {
+            'data': {
+              'id': '1', 'type': 'comments'
+            }
+          }
+        }
+      }}
+    | 422
+    | { "errors": [{
+        "title": "Invalid JSON API Document Structure",
+        "detail": "Object's `type` is not valid for its context",
+        "source": { "pointer": "/data/relationships/post/data/type" }
+      }]}
+    @
+Invalid Comments Update (missing `id`)
+    | []
+    | /test/comments/1
+    | comments | 1
+    | { 'data': {
+        'type': 'comments',
+        'attributes': {
+          'text': 'Comment #1'
+        }
+      }}
+    | 422
+    | { "errors": [{
+        "title": "Invalid JSON API Document Structure",
+        "detail": "Object must contain an `id` member",
+        "source": { "pointer": "/data" }
+      }]}
+    @
+Invalid Comments Update (`id` not a string)
+    | []
+    | /test/comments/1
+    | comments | 1
+    | { 'data': {
+        'type': 'comments',
+        'id': 1,
+        'attributes': {
+          'text': 'Comment #1'
+        }
+      }}
+    | 422
+    | { "errors": [{
+        "title": "Invalid JSON API Document Structure",
+        "detail": "The value of the `id` member must be a string",
+        "source": { "pointer": "/data/id" }
+      }]}
+    @
+Invalid Comments Update (`data` array)
+    | []
+    | /test/comments/1
+    | comments | 1
+    | { 'data': []}
+    | 422
+    | { "errors": [{
+        "title": "Invalid JSON API Document Structure",
+        "detail": "Primary data MUST be a single resource object for requests that target single resources",
+        "source": { "pointer": "/data" }
+      }]}
+    @
+Invalid Comments Update (invalid key in `data`)
+    | []
+    | /test/comments/1
+    | comments | 1
+    | { 'data': {
+        'type': 'comments',
+        'id': '1',
+        'zombies': 'foo',
+        'attributes': {
+          'text': 'Comment #1'
+        }
+      }}
+    | 422
+    | { "errors": [{
+        "title": "Invalid JSON API Document Structure",
+        "detail": "A resource update object may only contain these members: `id`, `type`, `attributes`, `relationships`, `meta`",
+        "source": { "pointer": "/data/zombies" }
+      }]}
+    @
