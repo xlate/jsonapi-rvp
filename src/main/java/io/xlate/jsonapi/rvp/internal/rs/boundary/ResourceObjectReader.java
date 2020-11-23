@@ -16,8 +16,8 @@
  ******************************************************************************/
 package io.xlate.jsonapi.rvp.internal.rs.boundary;
 
-import static io.xlate.jsonapi.rvp.internal.rs.boundary.JsonApiError.attributePointer;
-import static io.xlate.jsonapi.rvp.internal.rs.boundary.JsonApiError.relationshipPointer;
+import static io.xlate.jsonapi.rvp.internal.rs.entity.JsonApiError.attributePointer;
+import static io.xlate.jsonapi.rvp.internal.rs.entity.JsonApiError.relationshipPointer;
 
 import java.beans.PropertyDescriptor;
 import java.lang.reflect.Method;
@@ -51,6 +51,7 @@ import io.xlate.jsonapi.rvp.internal.JsonApiErrorException;
 import io.xlate.jsonapi.rvp.internal.persistence.boundary.PersistenceController;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMeta;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMetamodel;
+import io.xlate.jsonapi.rvp.internal.rs.entity.JsonApiError;
 
 public class ResourceObjectReader {
 

@@ -38,7 +38,7 @@ import javax.validation.ConstraintValidatorContext;
 import javax.ws.rs.HttpMethod;
 
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMeta;
-import io.xlate.jsonapi.rvp.internal.rs.boundary.JsonApiError;
+import io.xlate.jsonapi.rvp.internal.rs.entity.JsonApiError;
 import io.xlate.jsonapi.rvp.internal.rs.entity.JsonApiRequest;
 
 public class JsonApiRequestValidator implements ConstraintValidator<ValidJsonApiRequest, JsonApiRequest> {
