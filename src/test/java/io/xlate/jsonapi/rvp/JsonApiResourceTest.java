@@ -26,6 +26,8 @@ import javax.persistence.EntityManagerFactory;
 import javax.persistence.Persistence;
 import javax.validation.Validation;
 import javax.ws.rs.GET;
+import javax.ws.rs.PATCH;
+import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.core.Request;
 import javax.ws.rs.core.Response;
@@ -46,6 +48,7 @@ import io.xlate.jsonapi.rvp.internal.validation.boundary.TransactionalValidator;
 import io.xlate.jsonapi.rvp.test.entity.Comment;
 import io.xlate.jsonapi.rvp.test.entity.Post;
 import io.xlate.jsonapi.rvp.test.entity.ReadOnlyCode;
+import io.xlate.jsonapi.rvp.test.entity.TypeModel;
 
 class JsonApiResourceTest {
 
@@ -82,6 +85,9 @@ class JsonApiResourceTest {
         resourceTypes.add(JsonApiResourceType.define("posts", Post.class).build());
         resourceTypes.add(JsonApiResourceType.define("comments", Comment.class).build());
         resourceTypes.add(JsonApiResourceType.define("readonly-codes", ReadOnlyCode.class).methods(GET.class).build());
+        resourceTypes.add(JsonApiResourceType.define("type-models", TypeModel.class)
+                                             .methods(GET.class, POST.class, PATCH.class)
+                                             .build());
         target.initialize(resourceTypes);
     }
 
@@ -113,7 +119,11 @@ class JsonApiResourceTest {
     void assertResponseEquals(int expectedStatus, int actualStatus, String expectedEntity, String actualEntity) throws JSONException {
         try {
             assertEquals(expectedStatus, actualStatus);
-            JSONAssert.assertEquals(expectedEntity, actualEntity, JSONCompareMode.NON_EXTENSIBLE);
+            if (expectedEntity == null || expectedEntity.isBlank()) {
+                assertEquals(expectedEntity, actualEntity);
+            } else {
+                JSONAssert.assertEquals(expectedEntity, actualEntity, JSONCompareMode.NON_EXTENSIBLE);
+            }
         } catch (Throwable t) {
             Map<String, Object> map = new HashMap<>();
             map.put(JsonGenerator.PRETTY_PRINTING, true);
@@ -152,7 +162,8 @@ class JsonApiResourceTest {
 
         assertNotNull(response);
 
-        String responseEntity = String.valueOf(response.getEntity());
+        Object entityObject = response.getEntity();
+        String responseEntity = entityObject != null ? String.valueOf(entityObject) : null;
         assertResponseEquals(expectedStatus, response.getStatus(), expectedResponse, responseEntity);
     }
 
@@ -238,6 +249,26 @@ class JsonApiResourceTest {
     }
 
     @ParameterizedTest
+    @CsvFileSource(delimiter = '|', lineSeparator = "@\n", files = "src/test/resources/read-related-get.txt")
+    void testReadRelatedGet(String title,
+                     String jsonDml,
+                     String requestUri,
+                     String resourceType,
+                     String resourceId,
+                     String relationshipName,
+                     int expectedStatus,
+                     String expectedResponse)
+            throws JSONException {
+
+        testResourceMethod(jsonDml,
+                           requestUri,
+                           "GET",
+                           expectedStatus,
+                           expectedResponse,
+                           () -> target.readRelated(resourceType, resourceId, relationshipName));
+    }
+
+    @ParameterizedTest
     @CsvFileSource(
             delimiter = '|',
             lineSeparator = "@\n",
@@ -260,5 +291,27 @@ class JsonApiResourceTest {
                            expectedStatus,
                            expectedResponse,
                            () -> target.patch(resourceType, resourceId, readObject(requestBody)));
+    }
+
+    @ParameterizedTest
+    @CsvFileSource(
+            delimiter = '|',
+            lineSeparator = "@\n",
+            files = { "src/test/resources/delete.txt" })
+    void testDelete(String title,
+                         String jsonDml,
+                         String requestUri,
+                         String resourceType,
+                         String resourceId,
+                         int expectedStatus,
+                         String expectedResponse)
+            throws JSONException {
+
+        testResourceMethod(jsonDml,
+                           requestUri,
+                           "DELETE",
+                           expectedStatus,
+                           expectedResponse,
+                           () -> target.delete(resourceType, resourceId));
     }
 }

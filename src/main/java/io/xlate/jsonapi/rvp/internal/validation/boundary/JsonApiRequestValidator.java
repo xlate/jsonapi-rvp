@@ -19,14 +19,19 @@ package io.xlate.jsonapi.rvp.internal.validation.boundary;
 import static java.util.function.Predicate.not;
 
 import java.beans.PropertyDescriptor;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import javax.json.JsonObject;
 import javax.json.JsonString;
@@ -68,6 +73,14 @@ public class JsonApiRequestValidator implements ConstraintValidator<ValidJsonApi
         topLevelKeys.addAll(topLevelRequiredKeys);
         topLevelKeys.addAll(topLevelOptionalKeys);
     }
+
+    private static final Set<Class<?>> NUMBER_PRIMITIVES = Set.of(Byte.TYPE,
+                                                                  Character.TYPE,
+                                                                  Double.TYPE,
+                                                                  Float.TYPE,
+                                                                  Integer.TYPE,
+                                                                  Long.TYPE,
+                                                                  Short.TYPE);
 
     @SuppressWarnings("unused")
     private ValidJsonApiRequest annotation;
@@ -244,16 +257,15 @@ public class JsonApiRequestValidator implements ConstraintValidator<ValidJsonApi
         return attributesValue.asJsonObject()
                               .entrySet()
                               .stream()
-                              .map(attribute -> validAttribute(value, attribute, context, validStructure))
+                              .map(attribute -> validAttribute(value, attribute, context))
                               .filter(Boolean.FALSE::equals)
-                              .findFirst()
-                              .orElse(validStructure);
+                              .count() == 0
+                && validStructure;
     }
 
     boolean validAttribute(JsonApiRequest value,
                            Entry<String, JsonValue> attribute,
-                           ConstraintValidatorContext context,
-                           boolean validStructure) {
+                           ConstraintValidatorContext context) {
 
         final String attributeKey = attribute.getKey();
 
@@ -278,52 +290,68 @@ public class JsonApiRequestValidator implements ConstraintValidator<ValidJsonApi
         PropertyDescriptor property = meta.getPropertyDescriptor(attributeKey);
         Class<?> propertyType = property.getPropertyType();
         JsonValue attributeValue = attribute.getValue();
+        Set<ValueType> allowedTypes = allowedAttributeTypes(propertyType);
+        boolean valid = true;
 
-        switch (attributeValue.getValueType()) {
-        case ARRAY:
-        case OBJECT:
-            // TODO: Add support for object and array attributes
-            validStructure = false;
-            context.buildConstraintViolationWithTemplate(""
-                    + "Array and Object attributes not supported.")
-                   .addPropertyNode(JsonApiError.attributePointer(attributeKey))
-                   .addConstraintViolation();
-            break;
-        case FALSE:
-        case TRUE:
-            if (!Boolean.class.isAssignableFrom(propertyType)) {
-                validStructure = false;
-                addIncompatibleDataError(context, attributeKey);
-            }
-            break;
-        case NULL:
-            break;
-        case NUMBER:
-            if (!Number.class.isAssignableFrom(propertyType)) {
-                validStructure = false;
-                addIncompatibleDataError(context, attributeKey);
-            }
-            break;
-        case STRING:
-            if (!propertyType.equals(String.class)) {
-                String jsonString = ((JsonString) attributeValue).getString();
+        if (allowedTypes.contains(attributeValue.getValueType())) {
+            if (allowedTypes.contains(ValueType.STRING)) {
+                var parsers = Stream.concat(Arrays.stream(propertyType.getConstructors()),
+                                            Arrays.stream(propertyType.getMethods()))
+                                    .filter(method -> Set.of("valueOf", "parse", "<init>").contains(method.getName()))
+                                    .filter(method -> Modifier.isStatic(method.getModifiers()))
+                                    .filter(method -> Objects.equals(method.getParameterCount(), 1))
+                                    .filter(method -> Objects.equals(method.getParameterTypes()[0], String.class) ||
+                                            Objects.equals(method.getParameterTypes()[0], CharSequence.class))
+                                    .collect(Collectors.toMap(method -> method.getName(), method -> method));
+
                 try {
-                    Method valueOf = propertyType.getMethod("valueOf", String.class);
-                    valueOf.invoke(null, jsonString);
+                    if (parsers.containsKey("valueOf")) {
+                        ((Method) parsers.get("valueOf")).invoke(null, ((JsonString) attributeValue).getString());
+                    } else if (parsers.containsKey("parse")) {
+                        ((Method) parsers.get("parse")).invoke(null, ((JsonString) attributeValue).getString());
+                    } else if (parsers.containsKey("<init>")) {
+                        ((Constructor<?>) parsers.get("parse")).newInstance(((JsonString) attributeValue).getString());
+                    }
                 } catch (@SuppressWarnings("unused") Exception e) {
-                    validStructure = false;
-                    addIncompatibleDataError(context, attributeKey);
+                    valid = false;
+                    addIncompatibleDataError(context, "Incompatible data type", attributeKey);
                 }
             }
-            break;
+        } else {
+            valid = false;
+            String message = allowedTypes.stream()
+                                         .filter(not(ValueType.NULL::equals))
+                                         .map(ValueType::name)
+                                         .map(String::toLowerCase)
+                                         .sorted()
+                                         .collect(Collectors.joining(" or ", "Received value type `"+ attributeValue.getValueType().name().toLowerCase() +"`, expected: ", ""));
+            addIncompatibleDataError(context, message, attributeKey);
         }
 
-        return validStructure;
+        return valid;
     }
 
-    void addIncompatibleDataError(ConstraintValidatorContext context, String attributeKey) {
-        context.buildConstraintViolationWithTemplate(""
-                + "Incompatible data type")
+    Set<ValueType> allowedAttributeTypes(Class<?> propertyType) {
+        if (Boolean.class.isAssignableFrom(propertyType) || Boolean.TYPE.equals(propertyType)) {
+            return propertyType.isPrimitive()
+                    ? Set.of(ValueType.TRUE, ValueType.FALSE)
+                    : Set.of(ValueType.TRUE, ValueType.FALSE, ValueType.NULL);
+        }
+
+        if (Number.class.isAssignableFrom(propertyType)
+                || Character.class.isAssignableFrom(propertyType)
+                || NUMBER_PRIMITIVES.contains(propertyType)) {
+
+            return propertyType.isPrimitive()
+                    ? Set.of(ValueType.NUMBER)
+                    : Set.of(ValueType.NUMBER, ValueType.NULL);
+        }
+
+        return Set.of(ValueType.STRING, ValueType.NULL);
+    }
+
+    void addIncompatibleDataError(ConstraintValidatorContext context, String message, String attributeKey) {
+        context.buildConstraintViolationWithTemplate(message)
                .addPropertyNode(JsonApiError.attributePointer(attributeKey))
                .addConstraintViolation();
     }
@@ -400,7 +428,7 @@ public class JsonApiRequestValidator implements ConstraintValidator<ValidJsonApi
         Attribute<Object, ?> entityAttribute = meta.getEntityType().getAttribute(relationshipName);
         ValueType receivedType = relationshipData.getValueType();
 
-        if (allowedTypes(entityAttribute).contains(receivedType)) {
+        if (allowedRelationshipTypes(entityAttribute).contains(receivedType)) {
             switch (receivedType) {
             case ARRAY:
                 // validate array entries are resource id objects of correct type
@@ -437,7 +465,7 @@ public class JsonApiRequestValidator implements ConstraintValidator<ValidJsonApi
         return validStructure;
     }
 
-    Set<ValueType> allowedTypes(Attribute<Object, ?> entityAttribute) {
+    Set<ValueType> allowedRelationshipTypes(Attribute<Object, ?> entityAttribute) {
         if (entityAttribute.isCollection()) {
             return Set.of(ValueType.ARRAY);
         }

@@ -1,0 +1,21 @@
+Delete Comment
+    | [{
+        "sql": "INSERT INTO POSTS (id, title, text) VALUES (1, 'Title One', 'First post!')"
+      },{
+        "sql": "INSERT INTO COMMENTS (id, post_id, text) VALUES (1, 1, 'Comment one.')"
+      }]
+    | /test/comments/1
+    | comments | 1
+    | 204
+    | @
+Invalid Delete Comment (Not Found)
+    | [{
+        "sql": "INSERT INTO POSTS (id, title, text) VALUES (1, 'Title One', 'First post!')"
+      },{
+        "sql": "INSERT INTO COMMENTS (id, post_id, text) VALUES (1, 1, 'Comment one.')"
+      }]
+    | /test/comments/10
+    | comments | 10
+    | 404
+    | {'errors':[{'status':'404','title':'Not Found','detail':'The requested resource can not be found.'}]}
+    @

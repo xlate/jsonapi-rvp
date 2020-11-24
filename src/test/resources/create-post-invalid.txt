@@ -216,3 +216,89 @@ Invalid Create Post (`type` as object)
         }
       ]}
     @
+Invalid TypeModel (bad types)
+    | []
+    | /test/type-models
+    | type-models
+    | { 'data': {
+          'type': 'type-models',
+          'attributes': {
+            'string': true,
+            'primitiveInt': '1',
+            'offsetTime': 1920,
+            'invalid*': 'baz',
+            'utilDate': false,
+            'offsetDateTime': 202011231920,
+            'wrappedInt': { 'foo': 'bar' },
+            'primitiveBoolean': 'false',
+            'wrappedBoolean': 'true'
+          }
+        }
+      }
+    | 422
+    | { 'errors': [
+       {
+            "title": "Invalid JSON API Document Structure",
+            "detail": "Received value type `string`, expected: false or true",
+            "source": {
+                "pointer": "/data/attributes/wrappedBoolean"
+            }
+        },
+        {
+            "title": "Invalid JSON API Document Structure",
+            "detail": "Received value type `string`, expected: number",
+            "source": {
+                "pointer": "/data/attributes/primitiveInt"
+            }
+        },
+        {
+            "title": "Invalid JSON API Document Structure",
+            "detail": "Received value type `number`, expected: string",
+            "source": {
+                "pointer": "/data/attributes/offsetDateTime"
+            }
+        },
+        {
+            "title": "Invalid JSON API Document Structure",
+            "detail": "Received value type `string`, expected: false or true",
+            "source": {
+                "pointer": "/data/attributes/primitiveBoolean"
+            }
+        },
+        {
+            "title": "Invalid JSON API Document Structure",
+            "detail": "Received value type `number`, expected: string",
+            "source": {
+                "pointer": "/data/attributes/offsetTime"
+            }
+        },
+        {
+            "title": "Invalid JSON API Document Structure",
+            "detail": "Received value type `true`, expected: string",
+            "source": {
+                "pointer": "/data/attributes/string"
+            }
+        },
+        {
+            "title": "Invalid JSON API Document Structure",
+            "detail": "Received value type `false`, expected: string",
+            "source": {
+                "pointer": "/data/attributes/utilDate"
+            }
+        },
+        {
+            "title": "Invalid JSON API Document Structure",
+            "detail": "Received value type `object`, expected: number",
+            "source": {
+                "pointer": "/data/attributes/wrappedInt"
+            }
+        },
+        {
+            "title": "Invalid JSON API Document Structure",
+            "detail": "Invalid attribute name",
+            "source": {
+                "pointer": "/data/attributes/invalid*"
+            }
+        }
+      ]}
+    @
