@@ -72,7 +72,7 @@ public class ResourceObjectReader {
         JsonArrayBuilder errors = Json.createArrayBuilder();
 
         if (data.containsKey("attributes")) {
-            readAttributes(target, data.getJsonObject("attributes"), errors);
+            readAttributes(target, data.getJsonObject("attributes"));
         }
 
         if (data.containsKey("relationships")) {
@@ -175,12 +175,12 @@ public class ResourceObjectReader {
                                 JsonApiError.Source.forPointer(relationshipPointer(relationshipName)));
     }
 
-    void readAttributes(Object bean, JsonObject attributes, JsonArrayBuilder errors) {
+    void readAttributes(Object bean, JsonObject attributes) {
         EntityMeta meta = model.getEntityMeta(bean.getClass());
-        attributes.entrySet().forEach(a -> readAttribute(a, bean, meta, errors));
+        attributes.entrySet().forEach(a -> readAttribute(a, bean, meta));
     }
 
-    void readAttribute(Entry<String, JsonValue> attribute, Object bean, EntityMeta meta, JsonArrayBuilder errors) {
+    void readAttribute(Entry<String, JsonValue> attribute, Object bean, EntityMeta meta) {
         String jsonKey = attribute.getKey();
         JsonValue jsonValue = attribute.getValue();
         PropertyDescriptor desc = meta.getPropertyDescriptor(jsonKey);
