@@ -20,11 +20,21 @@ import java.beans.BeanInfo;
 import java.beans.IntrospectionException;
 import java.beans.Introspector;
 import java.beans.PropertyDescriptor;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Executable;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import javax.persistence.metamodel.Attribute;
 import javax.persistence.metamodel.Attribute.PersistentAttributeType;
@@ -37,9 +47,12 @@ import javax.ws.rs.core.Response.Status;
 
 import io.xlate.jsonapi.rvp.JsonApiResourceType;
 import io.xlate.jsonapi.rvp.internal.JsonApiErrorException;
+import io.xlate.jsonapi.rvp.internal.rs.boundary.ResourceObjectReader;
 
 @SuppressWarnings("java:S1452") // Suppress Sonar warnings regarding generic wildcards
 public class EntityMeta {
+
+    private static final Logger LOGGER = Logger.getLogger(EntityMeta.class.getName());
 
     private static final Map<Class<?>, Class<?>> wrapperMap = Map.of(boolean.class,
                                                                      Boolean.class,
@@ -75,6 +88,7 @@ public class EntityMeta {
 
     private final Set<SingularAttribute<?, ?>> attributes;
     private final Set<String> attributeNames;
+    private final Map<String, Function<String, ? extends Object>> readers;
 
     private final Set<Attribute<?, ?>> relationships;
     private final Set<String> relationshipNames;
@@ -96,9 +110,9 @@ public class EntityMeta {
 
         this.entityType = model.entity(entityClass);
         this.methodsAllowed = configuredType
-                .getMethods()
-                .stream().map(method -> method.getAnnotation(HttpMethod.class).value())
-                .collect(Collectors.toSet());
+                                            .getMethods()
+                                            .stream().map(method -> method.getAnnotation(HttpMethod.class).value())
+                                            .collect(Collectors.toSet());
 
         this.attributes = entityType.getSingularAttributes()
                                     .stream()
@@ -109,6 +123,11 @@ public class EntityMeta {
                                     .collect(Collectors.toSet());
 
         this.attributeNames = attributes.stream().map(Attribute::getName).collect(Collectors.toSet());
+
+        this.readers = attributes.stream()
+                                 .filter(EntityMeta::readerRequired)
+                                 .map(this::readerEntry)
+                                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
         this.relationships = entityType.getAttributes()
                                        .stream()
@@ -122,6 +141,95 @@ public class EntityMeta {
         this.propertyDescriptors = Arrays.stream(beanInfo.getPropertyDescriptors())
                                          .collect(Collectors.toMap(PropertyDescriptor::getName,
                                                                    descriptor -> descriptor));
+    }
+
+    static boolean readerRequired(SingularAttribute<?, ?> attribute) {
+        Class<?> propertyType = attribute.getBindableJavaType();
+
+        return !(Boolean.class.isAssignableFrom(propertyType)
+                || Boolean.TYPE.equals(propertyType)
+                || Number.class.isAssignableFrom(propertyType)
+                || Character.class.isAssignableFrom(propertyType)
+                || ResourceObjectReader.NUMBER_PRIMITIVES.contains(propertyType));
+    }
+
+    Map.Entry<String, Function<String, Object>> readerEntry(SingularAttribute<?, ?> attribute) {
+        String name = attribute.getName();
+
+        if (configuredType.getReaders().containsKey(name)) {
+            return Map.entry(name, configuredType.getReaders().get(name));
+        }
+
+        Class<?> propertyType = attribute.getBindableJavaType();
+
+        if (String.class.equals(propertyType)) {
+            return Map.entry(name, Object.class::cast);
+        }
+
+        var parsers = Stream.concat(Arrays.stream(propertyType.getConstructors()),
+                                    Arrays.stream(propertyType.getMethods()))
+                            .filter(method -> Modifier.isStatic(method.getModifiers()))
+                            .filter(method -> Objects.equals(method.getParameterCount(), 1))
+                            .filter(this::parsingMethod)
+                            .collect(Collectors.toMap(Executable::getName, method -> method));
+
+        var parser = objectParserMethod(parsers, propertyType);
+
+        return Map.entry(name, parser);
+    }
+
+    boolean parsingMethod(Executable method) {
+        return fromCharSequence(method) || fromInstant(method);
+    }
+
+    boolean fromCharSequence(Executable method) {
+        Class<?> paramType = method.getParameterTypes()[0];
+        return paramType == String.class || paramType == CharSequence.class;
+    }
+
+    boolean fromInstant(Executable method) {
+        return method.getParameterTypes()[0] == Instant.class && "from".equals(method.getName());
+    }
+
+    Function<String, Object> objectParserMethod(Map<String, Executable> methods, Class<?> propertyType) {
+        if (propertyType.isAssignableFrom(OffsetDateTime.class)) {
+            return OffsetDateTime::parse;
+        }
+
+        if (methods.containsKey("from") && methods.get("from").getParameterTypes()[0].equals(Instant.class)) {
+            return value -> safeParse(value, raw -> {
+                Instant instant = OffsetDateTime.parse(value).toInstant();
+                return ((Method) methods.get("from")).invoke(null, instant);
+            });
+        }
+
+        if (methods.containsKey("valueOf")) {
+            return value -> safeParse(value, raw -> ((Method) methods.get("valueOf")).invoke(null, value));
+        }
+
+        if (methods.containsKey("parse")) {
+            return value -> safeParse(value, raw -> ((Method) methods.get("parse")).invoke(null, value));
+        }
+
+        if (methods.containsKey("<init>")) {
+            return value -> safeParse(value, raw -> Constructor.class.cast(methods.get("<init>")).newInstance(value));
+        }
+
+        return value -> null;
+    }
+
+    Object safeParse(String value, StringParser parser) {
+        try {
+            return parser.parse(value);
+        } catch (Exception e) {
+            LOGGER.finer(() -> "Error parsing string attribute: " + e.getMessage());
+            return null;
+        }
+    }
+
+    @FunctionalInterface
+    interface StringParser {
+        Object parse(String value) throws Exception; //NOSONAR - Not in control of thrown exceptions
     }
 
     public boolean isMethodAllowed(String method) {
@@ -148,6 +256,10 @@ public class EntityMeta {
 
     public Set<String> getAttributeNames() {
         return attributeNames;
+    }
+
+    public Map<String, Function<String, ? extends Object>> getReaders() {
+        return readers;
     }
 
     public Set<Attribute<?, ?>> getRelationships() {
@@ -225,13 +337,24 @@ public class EntityMeta {
         throw new NoSuchElementException(name);
     }
 
-    public Object getPropertyValue(Object bean, String propertyName) {
-        PropertyDescriptor descriptor = getPropertyDescriptor(propertyName);
+    @SuppressWarnings("unchecked")
+    public <T> T getPropertyValue(Object bean, String name) {
+        PropertyDescriptor descriptor = getPropertyDescriptor(name);
 
         try {
-            return descriptor.getReadMethod().invoke(bean);
+            return (T) descriptor.getReadMethod().invoke(bean);
         } catch (Exception e) {
             throw new JsonApiErrorException(Status.INTERNAL_SERVER_ERROR, "Server Error", "Unable to read property");
+        }
+    }
+
+    public <T> void setPropertyValue(Object bean, String name, T value) {
+        PropertyDescriptor descriptor = getPropertyDescriptor(name);
+
+        try {
+            descriptor.getWriteMethod().invoke(bean, value);
+        } catch (Exception e) {
+            throw new JsonApiErrorException(Status.INTERNAL_SERVER_ERROR, "Server Error", "Unable to update property");
         }
     }
 

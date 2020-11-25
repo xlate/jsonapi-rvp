@@ -16,24 +16,19 @@
  ******************************************************************************/
 package io.xlate.jsonapi.rvp.internal.rs.boundary;
 
-import static io.xlate.jsonapi.rvp.internal.rs.entity.JsonApiError.attributePointer;
 import static io.xlate.jsonapi.rvp.internal.rs.entity.JsonApiError.relationshipPointer;
 
-import java.beans.PropertyDescriptor;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Executable;
-import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.time.Instant;
-import java.time.OffsetDateTime;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Set;
-import java.util.logging.Level;
+import java.util.function.Function;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 import javax.json.Json;
 import javax.json.JsonArray;
@@ -46,7 +41,6 @@ import javax.json.JsonValue.ValueType;
 import javax.persistence.metamodel.Attribute;
 import javax.persistence.metamodel.Bindable;
 import javax.persistence.metamodel.EntityType;
-import javax.ws.rs.core.Response.Status;
 
 import io.xlate.jsonapi.rvp.JsonApiContext;
 import io.xlate.jsonapi.rvp.JsonApiStatus;
@@ -60,6 +54,42 @@ public class ResourceObjectReader {
 
     private static final Logger LOGGER = Logger.getLogger(ResourceObjectReader.class.getName());
 
+    public static final Set<Class<?>> NUMBER_PRIMITIVES = Set.of(Byte.TYPE,
+                                                                 Character.TYPE,
+                                                                 Double.TYPE,
+                                                                 Float.TYPE,
+                                                                 Integer.TYPE,
+                                                                 Long.TYPE,
+                                                                 Short.TYPE);
+
+    public static final Map<Class<?>, Function<JsonNumber, ?>> NUMBER_MAPPERS;
+
+    static {
+        NUMBER_MAPPERS = Map.ofEntries(Map.entry(BigDecimal.class, JsonNumber::bigDecimalValue),
+                                       Map.entry(BigInteger.class, JsonNumber::bigIntegerValue),
+                                       //
+                                       Map.entry(Byte.class, j -> Byte.valueOf((byte) j.intValue())),
+                                       Map.entry(byte.class, j -> Byte.valueOf((byte) j.intValue())),
+                                       //
+                                       Map.entry(Short.class, j -> Short.valueOf((short) j.intValue())),
+                                       Map.entry(short.class, j -> Short.valueOf((short) j.intValue())),
+                                       //
+                                       Map.entry(Character.class, j -> Character.valueOf((char) j.intValue())),
+                                       Map.entry(char.class, j -> Character.valueOf((char) j.intValue())),
+                                       //
+                                       Map.entry(Integer.class, JsonNumber::intValue),
+                                       Map.entry(int.class, JsonNumber::intValue),
+                                       //
+                                       Map.entry(Long.class, JsonNumber::longValue),
+                                       Map.entry(long.class, JsonNumber::longValue),
+                                       //
+                                       Map.entry(Float.class, j -> Float.valueOf((float) j.doubleValue())),
+                                       Map.entry(float.class, j -> Float.valueOf((float) j.doubleValue())),
+                                       //
+                                       Map.entry(Double.class, JsonNumber::doubleValue),
+                                       Map.entry(double.class, JsonNumber::doubleValue));
+    }
+
     private final EntityMetamodel model;
 
     public ResourceObjectReader(EntityMetamodel model) {
@@ -68,8 +98,6 @@ public class ResourceObjectReader {
 
     public void fromJson(PersistenceController persistence, JsonApiContext context, Object target, JsonObject source) {
         JsonObject data = source.getJsonObject("data");
-
-        JsonArrayBuilder errors = Json.createArrayBuilder();
 
         if (data.containsKey("attributes")) {
             readAttributes(target, data.getJsonObject("attributes"));
@@ -80,14 +108,7 @@ public class ResourceObjectReader {
                               context,
                               target,
                               data,
-                              model.getEntityMeta(target.getClass()).getEntityType(),
-                              errors);
-        }
-
-        JsonArray errorsArray = errors.build();
-
-        if (!errorsArray.isEmpty()) {
-            throw new JsonApiErrorException(JsonApiStatus.UNPROCESSABLE_ENTITY, errorsArray);
+                              model.getEntityMeta(target.getClass()).getEntityType());
         }
     }
 
@@ -95,10 +116,10 @@ public class ResourceObjectReader {
                            JsonApiContext context,
                            Object entity,
                            JsonObject data,
-                           EntityType<Object> rootType,
-                           JsonArrayBuilder errors) {
+                           EntityType<Object> rootType) {
 
         JsonObject relationships = data.getJsonObject("relationships");
+        JsonArrayBuilder errors = Json.createArrayBuilder();
 
         for (Entry<String, JsonValue> entry : relationships.entrySet()) {
             String fieldName = entry.getKey();
@@ -111,6 +132,12 @@ public class ResourceObjectReader {
                 readRelationshipObject(persistence, context, entity, fieldName, relationshipData, errors);
             }
         }
+
+        JsonArray errorsArray = errors.build();
+
+        if (!errorsArray.isEmpty()) {
+            throw new JsonApiErrorException(JsonApiStatus.UNPROCESSABLE_ENTITY, errorsArray);
+        }
     }
 
     void readRelationshipArray(PersistenceController persistence,
@@ -120,24 +147,13 @@ public class ResourceObjectReader {
                                JsonArray relationshipData,
                                JsonArrayBuilder errors) {
 
-        Collection<Object> replacements = new ArrayList<>();
+        Collection<Object> replacements = relationshipData.stream()
+                        .map(JsonValue::asJsonObject)
+                        .map(entry -> findReplacement(persistence, context, entry, fieldName, errors))
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toList());
 
-        for (JsonValue relationship : relationshipData) {
-            JsonObject relationshipObject = (JsonObject) relationship;
-            String relType = relationshipObject.getString("type");
-            String relId = relationshipObject.getString("id");
-            Object replacement = persistence.findObject(context, relType, relId);
-
-            if (replacement != null) {
-                replacements.add(replacement);
-            } else {
-                var error = invalidRelationshipError("Resource of type `" + relType + "` with ID `" + relId + "` cannot be found.",
-                                                     fieldName);
-                errors.add(error.toJson());
-            }
-        }
-
-        putPluralRelationship(entity, replacements, model.getEntityMeta(entity.getClass()).getPropertyDescriptor(fieldName));
+        putPluralRelationship(entity, model.getEntityMeta(entity.getClass()), fieldName, replacements);
     }
 
     void readRelationshipObject(PersistenceController persistence,
@@ -152,27 +168,30 @@ public class ResourceObjectReader {
         if (relationshipData.getValueType() == ValueType.NULL) {
             replacement = null;
         } else {
-            JsonObject relationshipObject = relationshipData.asJsonObject();
-            String relType = relationshipObject.getString("type");
-            String relId = relationshipObject.getString("id");
-            replacement = persistence.findObject(context, relType, relId);
+            replacement = findReplacement(persistence, context, relationshipData.asJsonObject(), fieldName, errors);
 
             if (replacement == null) {
-                var error = invalidRelationshipError("Resource of type `" + relType + "` with ID `" + relId + "` cannot be found.",
-                                                     fieldName);
-                errors.add(error.toJson());
                 return;
             }
         }
 
-        putSingularRelationship(entity, replacement, model.getEntityMeta(entity.getClass()).getPropertyDescriptor(fieldName));
-
+        putSingularRelationship(entity, model.getEntityMeta(entity.getClass()), fieldName, replacement);
     }
 
-    JsonApiError invalidRelationshipError(String detail, String relationshipName) {
-        return new JsonApiError("Invalid relationship",
-                                detail,
-                                JsonApiError.Source.forPointer(relationshipPointer(relationshipName)));
+    Object findReplacement(PersistenceController persistence, JsonApiContext context, JsonObject resourceId, String fieldName, JsonArrayBuilder errors) {
+        final String type = resourceId.getString("type");
+        final String id = resourceId.getString("id");
+        final Object replacement = persistence.findObject(context, type, id);
+
+        if (replacement == null) {
+            var error = new JsonApiError("Invalid relationship",
+                                         String.format("Resource not found => type: `%s`, id: `%s`", type, id),
+                                         JsonApiError.Source.forPointer(relationshipPointer(fieldName)));
+
+            errors.add(error.toJson());
+        }
+
+        return replacement;
     }
 
     void readAttributes(Object bean, JsonObject attributes) {
@@ -183,10 +202,8 @@ public class ResourceObjectReader {
     void readAttribute(Entry<String, JsonValue> attribute, Object bean, EntityMeta meta) {
         String jsonKey = attribute.getKey();
         JsonValue jsonValue = attribute.getValue();
-        PropertyDescriptor desc = meta.getPropertyDescriptor(jsonKey);
-        Class<?> propertyType = desc.getPropertyType();
+        Class<?> propertyType = meta.getPropertyDescriptor(jsonKey).getPropertyType();
         ValueType jsonValueType = jsonValue.getValueType();
-        Method factory;
         Object value;
 
         if (jsonValueType == ValueType.NULL) {
@@ -194,132 +211,26 @@ public class ResourceObjectReader {
         } else if (propertyType == String.class) {
             value = ((JsonString) jsonValue).getString();
         } else if (classMatch(propertyType, Boolean.class, Boolean.TYPE)) {
-            value = readAttributeAsBoolean(jsonValue);
+            value = Boolean.valueOf(JsonValue.TRUE.equals(jsonValue));
         } else if (Number.class.isAssignableFrom(propertyType) || propertyType.isPrimitive()) {
-            value = readAttributeAsNumber(propertyType, jsonValue);
-        } else if (OffsetDateTime.class.isAssignableFrom(propertyType)) {
-            value = readAttributeAsOffsetDateTime(jsonValue);
-        } else if ((factory = fromInstantMethod(propertyType)) != null) {
-            value = readAttributeAsInstant(jsonKey, jsonValue, factory);
-        } else if (jsonValueType == ValueType.STRING) {
-            value = readAttributeFromString(jsonKey, propertyType, jsonValue);
+            value = NUMBER_MAPPERS.getOrDefault(propertyType, JsonNumber::numberValue)
+                                  .apply((JsonNumber) jsonValue);
+        } else if (meta.getReaders().containsKey(jsonKey)) {
+            value = meta.getReaders().get(jsonKey).apply(((JsonString) jsonValue).getString());
         } else {
             LOGGER.warning(() -> "Unsupported attribute type: " + propertyType);
             value = null;
         }
 
-        writeProperty(desc, bean, value);
-    }
-
-    Object readAttributeAsBoolean(JsonValue jsonValue) {
-        switch (jsonValue.getValueType()) {
-        case TRUE:
-            return Boolean.TRUE;
-        case FALSE:
-        default:
-            return Boolean.FALSE;
-        }
-    }
-
-    Object readAttributeAsNumber(Class<?> propertyType, JsonValue jsonValue) {
-        final Object value;
-
-        JsonNumber number = (JsonNumber) jsonValue;
-
-        if (propertyType.isAssignableFrom(BigDecimal.class)) {
-            value = number.bigDecimalValue();
-        } else if (propertyType.isAssignableFrom(BigInteger.class)) {
-            value = number.bigIntegerValue();
-        } else if (classMatch(propertyType, Long.class, Long.TYPE)) {
-            value = number.longValue();
-        } else if (classMatch(propertyType, Integer.class, Integer.TYPE)) {
-            value = number.intValue();
-        } else if (classMatch(propertyType, Short.class, Short.TYPE)) {
-            value = (short) number.intValue();
-        } else if (classMatch(propertyType, Character.class, Character.TYPE)) {
-            value = (char) number.intValue();
-        } else if (classMatch(propertyType, Byte.class, Byte.TYPE)) {
-            value = (byte) number.intValue();
-        } else if (classMatch(propertyType, Float.class, Float.TYPE)) {
-            value = number.doubleValue();
-        } else if (classMatch(propertyType, Double.class, Double.TYPE)) {
-            value = number.doubleValue();
-        } else {
-            value = number.numberValue();
-        }
-
-        return value;
+        meta.setPropertyValue(bean, jsonKey, value);
     }
 
     boolean classMatch(Class<?> propertyType, Class<?> wrapper, Class<?> primitive) {
         return propertyType.equals(wrapper) || primitive.equals(propertyType);
     }
 
-    Object readAttributeAsOffsetDateTime(JsonValue jsonValue) {
-        String jsonString = ((JsonString) jsonValue).getString();
-        return OffsetDateTime.parse(jsonString);
-    }
-
-    Object readAttributeAsInstant(String attributeName, JsonValue jsonValue, Method fromInstant) {
-        String jsonString = ((JsonString) jsonValue).getString();
-        Instant instant;
-
-        try {
-            instant = OffsetDateTime.parse(jsonString).toInstant();
-            return fromInstant.invoke(null, instant);
-        } catch (Exception e) {
-            LOGGER.log(Level.WARNING, e, () -> "Unable to convert attribute `" + attributeName + "` to an instant");
-            return null;
-        }
-    }
-
-    Object readAttributeFromString(String attributeName, Class<?> propertyType, JsonValue jsonValue) {
-        String jsonString = ((JsonString) jsonValue).getString();
-        Method factory;
-        Constructor<?> constructor;
-        Object value;
-
-        if ((factory = (Method) getStringMethod(propertyType, "valueOf")) != null) {
-            try {
-                value = factory.invoke(null, jsonString);
-            } catch (Exception e) {
-                LOGGER.log(Level.WARNING, e, () -> "Unable to invoke `valueOf` for attribute `" + attributeName + "`");
-                value = null;
-            }
-        } else if ((factory = (Method) getStringMethod(propertyType, "parse")) != null) {
-            try {
-                value = factory.invoke(null, jsonString);
-            } catch (Exception e) {
-                LOGGER.log(Level.WARNING, e, () -> "Unable to invoke `fromValue` for attribute `" + attributeName + "`");
-                value = null;
-            }
-        } else if ((constructor = constructorMethod(propertyType)) != null) {
-            try {
-                value = constructor.newInstance(jsonString);
-            } catch (Exception e) {
-                LOGGER.log(Level.WARNING, e, () -> "Unable to invoke constructor for attribute `" + attributeName + "`");
-                value = null;
-            }
-        } else {
-            LOGGER.fine(() -> "No `valueOf`/`fromValue` method found for attribute `" + attributeName + "`");
-            value = null;
-        }
-
-        return value;
-    }
-
-    JsonApiError invalidAttributeDataTypeError(String attributeName) {
-        return invalidAttributeError("Data type invalid", attributeName);
-    }
-
-    JsonApiError invalidAttributeError(String detail, String attributeName) {
-        return new JsonApiError("Invalid attribute",
-                                detail,
-                                JsonApiError.Source.forPointer(attributePointer(attributeName)));
-    }
-
-    void putPluralRelationship(Object bean, Collection<Object> values, PropertyDescriptor desc) {
-        Collection<Object> current = readProperty(desc, bean);
+    void putPluralRelationship(Object bean, EntityMeta meta, String relationshipName, Collection<Object> values) {
+        Collection<Object> current = meta.getPropertyValue(bean, relationshipName);
         Iterator<Object> cursor = current.iterator();
 
         while (cursor.hasNext()) {
@@ -339,11 +250,11 @@ public class ResourceObjectReader {
         }
     }
 
-    void putSingularRelationship(Object bean, Object replacement, PropertyDescriptor desc) {
-        Object current = readProperty(desc, bean);
+    void putSingularRelationship(Object bean, EntityMeta meta, String relationshipName, Object replacement) {
+        Object current = meta.getPropertyValue(bean, relationshipName);
         updateRelated(current, bean, RelatedModelAction.REMOVE);
 
-        writeProperty(desc, bean, replacement);
+        meta.setPropertyValue(bean, relationshipName, replacement);
 
         if (replacement != null) {
             updateRelated(replacement, bean, RelatedModelAction.ADD);
@@ -369,8 +280,7 @@ public class ResourceObjectReader {
 
     @SuppressWarnings({ "rawtypes", "java:S3740" })
     void updateRelatedCollection(Object entity, EntityMeta meta, Attribute attr, Object related, RelatedModelAction action) {
-        PropertyDescriptor desc = meta.getPropertyDescriptor(attr.getName());
-        Collection<Object> current = readProperty(desc, entity);
+        Collection<Object> current = meta.getPropertyValue(entity, attr.getName());
 
         if (current != null) {
             if (current.contains(related)) {
@@ -387,16 +297,16 @@ public class ResourceObjectReader {
 
     @SuppressWarnings({ "rawtypes", "java:S3740" })
     void updateRelatedObject(Object entity, EntityMeta meta, Attribute attr, Object related, RelatedModelAction action) {
-        PropertyDescriptor desc = meta.getPropertyDescriptor(attr.getName());
+        final String relationshipName = attr.getName();
 
         if (action == RelatedModelAction.REMOVE) {
-            Object current = readProperty(desc, entity);
+            Object current = meta.getPropertyValue(entity, relationshipName);
 
             if (current == related) {
-                writeProperty(desc, entity, (Object[]) null);
+                meta.setPropertyValue(entity, relationshipName, null);
             }
         } else {
-            writeProperty(desc, entity, related);
+            meta.setPropertyValue(entity, relationshipName, related);
         }
     }
 
@@ -405,50 +315,4 @@ public class ResourceObjectReader {
         REMOVE;
     }
 
-    @SuppressWarnings("unchecked")
-    static <T> T readProperty(PropertyDescriptor descriptor, Object entity) {
-        try {
-            return (T) descriptor.getReadMethod().invoke(entity);
-        } catch (IllegalArgumentException | ReflectiveOperationException e) {
-            throw new JsonApiErrorException(Status.INTERNAL_SERVER_ERROR, "Server Error", "Unable to read property");
-        }
-    }
-
-    static <T> void writeProperty(PropertyDescriptor descriptor, Object entity, T value) {
-        try {
-            descriptor.getWriteMethod().invoke(entity, value);
-        } catch (IllegalArgumentException | ReflectiveOperationException e) {
-            throw new JsonApiErrorException(Status.INTERNAL_SERVER_ERROR, "Server Error", "Unable to update property");
-        }
-    }
-
-    static Method fromInstantMethod(Class<?> type) {
-        try {
-            return type.getMethod("from", Instant.class);
-        } catch (Exception e) {
-            LOGGER.log(Level.FINEST, () -> "Unable to get `from(Instant)` from class `" + type + "`: " + e.getMessage());
-            return null;
-        }
-    }
-
-    static Constructor<?> constructorMethod(Class<?> type) {
-        try {
-            return type.getConstructor(String.class);
-        } catch (Exception e) {
-            LOGGER.log(Level.FINEST, () -> "Unable to get `<init>(String)` from class `" + type + "`: " + e.getMessage());
-            return null;
-        }
-    }
-
-    static Executable getStringMethod(Class<?> type, String method) {
-        for (Class<?> arg : Set.of(String.class, CharSequence.class)) {
-            try {
-                return type.getMethod(method, arg);
-            } catch (Exception e) {
-                LOGGER.log(Level.FINEST, () -> "Unable to get `valueOf(String)` from class `" + type + "`: " + e.getMessage());
-            }
-        }
-
-        return null;
-    }
 }

@@ -251,7 +251,7 @@ Invalid TypeModel (bad types)
             'offsetTime': 1920,
             'invalid*': 'baz',
             'utilDate': false,
-            'offsetDateTime': 202011231920,
+            'offsetDateTime': '202011231920',
             'wrappedInt': { 'foo': 'bar' },
             'primitiveBoolean': 'false',
             'wrappedBoolean': 'true'
@@ -276,7 +276,7 @@ Invalid TypeModel (bad types)
         },
         {
             "title": "Invalid JSON API Document Structure",
-            "detail": "Received value type `number`, expected: string",
+            "detail": "Invalid format",
             "source": {
                 "pointer": "/data/attributes/offsetDateTime"
             }

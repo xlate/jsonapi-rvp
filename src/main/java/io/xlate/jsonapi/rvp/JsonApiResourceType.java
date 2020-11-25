@@ -22,8 +22,13 @@ public class JsonApiResourceType<T> {
     private final Class<T> klass;
     private final Set<Class<?>> methods;
     private final String exposedIdAttribute;
+
+    private final Set<String> attributes;
+    private final Map<String, Function<String, Object>> readers;
+
     private final Set<String> relationships;
     private final Map<String, Set<String>> uniqueTuples;
+
     private final Function<String, Object> idReader;
     private final String principalNamePath;
 
@@ -35,6 +40,10 @@ public class JsonApiResourceType<T> {
         private final String name;
         private final Class<T> klass;
         private final Set<Class<?>> methods = new HashSet<>();
+
+        private Set<String> attributes;
+        private Map<String, Function<String, Object>> readers = new HashMap<>(5);
+
         private Set<String> relationships;
         private Map<String, Set<String>> uniqueTuples = new HashMap<>(3);
         private String exposedIdAttribute;
@@ -50,6 +59,8 @@ public class JsonApiResourceType<T> {
             return new JsonApiResourceType<>(name,
                                              klass,
                                              methods,
+                                             attributes,
+                                             readers,
                                              relationships,
                                              uniqueTuples,
                                              exposedIdAttribute,
@@ -64,6 +75,23 @@ public class JsonApiResourceType<T> {
                 }
                 this.methods.add(method);
             }
+            return this;
+        }
+
+        public Builder<T> attributes(String... attributes) {
+            this.attributes = new HashSet<>(Arrays.asList(attributes));
+            return this;
+        }
+
+        /**
+         * Provide a function to convert string-based attributes to a custom object
+         *
+         * @param attributeName Name of the attribute using the reader
+         * @param reader Function to parse a string JSON attribute to an object value
+         * @return the builder
+         */
+        public Builder<T> reader(String attributeName, Function<String, Object> reader) {
+            this.readers.put(attributeName, reader);
             return this;
         }
 
@@ -93,6 +121,8 @@ public class JsonApiResourceType<T> {
     private JsonApiResourceType(String name,
             Class<T> klass,
             Set<Class<?>> methods,
+            Set<String> attributes,
+            Map<String, Function<String, Object>> readers,
             Set<String> relationships,
             Map<String, Set<String>> uniqueTuples,
             String exposedIdAttribute,
@@ -107,6 +137,14 @@ public class JsonApiResourceType<T> {
         } else {
             this.methods = Set.copyOf(methods);
         }
+
+        if (attributes != null) {
+            this.attributes = Set.copyOf(attributes);
+        } else {
+            this.attributes = Set.of(); // Empty
+        }
+
+        this.readers = Map.copyOf(readers);
 
         if (relationships != null) {
             this.relationships = Set.copyOf(relationships);
@@ -160,6 +198,14 @@ public class JsonApiResourceType<T> {
 
     public Set<Class<?>> getMethods() {
         return methods;
+    }
+
+    public Set<String> getAttributes() {
+        return attributes;
+    }
+
+    public Map<String, Function<String, Object>> getReaders() {
+        return readers;
     }
 
     public Set<String> getRelationships() {

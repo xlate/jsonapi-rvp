@@ -82,7 +82,7 @@ class JsonApiResourceTest {
         Mockito.when(target.handlers.iterator()).thenReturn(handlerIterator());
 
         Set<JsonApiResourceType<?>> resourceTypes = new HashSet<>();
-        resourceTypes.add(JsonApiResourceType.define("posts", Post.class).build());
+        resourceTypes.add(JsonApiResourceType.define("posts", Post.class).reader("title", String::valueOf).build());
         resourceTypes.add(JsonApiResourceType.define("comments", Comment.class).build());
         resourceTypes.add(JsonApiResourceType.define("readonly-codes", ReadOnlyCode.class).methods(GET.class).build());
         resourceTypes.add(JsonApiResourceType.define("type-models", TypeModel.class)
