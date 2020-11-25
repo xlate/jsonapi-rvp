@@ -255,12 +255,6 @@ public class PersistenceController {
 
     public <T> boolean delete(JsonApiContext context, JsonApiHandler<T> handler) {
         String resourceType = context.getResourceType();
-        EntityMeta meta = model.getEntityMeta(resourceType);
-
-        if (meta == null) {
-            return false;
-        }
-
         String id = context.getResourceId();
 
         final T entity = findObject(context, resourceType, id);
@@ -342,10 +336,6 @@ public class PersistenceController {
             // Left JOIN
             relationship = attribute.substring(1);
             joinType = JoinType.LEFT;
-        } else if (attribute.endsWith("+")) {
-            // Right JOIN
-            relationship = attribute.substring(0, attribute.length() - 1);
-            joinType = JoinType.RIGHT;
         } else {
             relationship = attribute;
             joinType = JoinType.INNER;
@@ -370,11 +360,6 @@ public class PersistenceController {
     @SuppressWarnings("unchecked")
     public <T> T findObject(JsonApiContext context, String resourceType, String id) {
         EntityMeta meta = model.getEntityMeta(resourceType);
-
-        if (meta == null) {
-            return null;
-        }
-
         EntityType<Object> rootType = meta.getEntityType();
         Class<T> entityClass = (Class<T>) meta.getEntityClass();
         List<Attribute<Object, ?>> fetchedAttributes;

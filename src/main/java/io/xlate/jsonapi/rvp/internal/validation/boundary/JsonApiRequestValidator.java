@@ -33,6 +33,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import javax.json.JsonArray;
 import javax.json.JsonObject;
 import javax.json.JsonString;
 import javax.json.JsonValue;
@@ -159,6 +160,7 @@ public class JsonApiRequestValidator implements ConstraintValidator<ValidJsonApi
         JsonValue data = document.get(KEY_DATA);
 
         if (data.getValueType() != ValueType.OBJECT) {
+            // TODO: Allow `null` for relationship end points
             context.buildConstraintViolationWithTemplate(""
                     + "Primary data MUST be a single resource object for requests that target single resources")
                    .addPropertyNode(PATH_DATA)
@@ -248,7 +250,7 @@ public class JsonApiRequestValidator implements ConstraintValidator<ValidJsonApi
 
         if (attributesValue.getValueType() != ValueType.OBJECT) {
             context.buildConstraintViolationWithTemplate(""
-                    + "The value of the `attributes` key MUST be an object (an \"attributes object\")")
+                    + "The value of the `attributes` key MUST be an object")
                    .addPropertyNode(JsonApiError.DATA_ATTRIBUTES_POINTER)
                    .addConstraintViolation();
             return false;
@@ -324,7 +326,11 @@ public class JsonApiRequestValidator implements ConstraintValidator<ValidJsonApi
                                          .map(ValueType::name)
                                          .map(String::toLowerCase)
                                          .sorted()
-                                         .collect(Collectors.joining(" or ", "Received value type `"+ attributeValue.getValueType().name().toLowerCase() +"`, expected: ", ""));
+                                         .collect(Collectors.joining(" or ",
+                                                                     "Received value type `"
+                                                                             + attributeValue.getValueType().name().toLowerCase()
+                                                                             + "`, expected: ",
+                                                                     ""));
             addIncompatibleDataError(context, message, attributeKey);
         }
 
@@ -432,6 +438,12 @@ public class JsonApiRequestValidator implements ConstraintValidator<ValidJsonApi
             switch (receivedType) {
             case ARRAY:
                 // validate array entries are resource id objects of correct type
+                validStructure = validIdentifiers(value,
+                                                 relatedMeta,
+                                                 relationshipData.asJsonArray(),
+                                                 context,
+                                                 validStructure,
+                                                 JsonApiError.relationshipPointer(relationshipName) + PATH_DATA);
                 break;
             case OBJECT:
                 // validate the resource id object is correct type
@@ -471,6 +483,37 @@ public class JsonApiRequestValidator implements ConstraintValidator<ValidJsonApi
         }
 
         return Set.of(ValueType.NULL, ValueType.OBJECT);
+    }
+
+    boolean validIdentifiers(JsonApiRequest value,
+                             EntityMeta meta,
+                             JsonArray relationshipData,
+                             ConstraintValidatorContext context,
+                             boolean validStructure,
+                             String propertyContext) {
+
+        int index = 0;
+
+        for (JsonValue entry : relationshipData.asJsonArray()) {
+            final String path = String.format("%s/%d", propertyContext, index++);
+
+            if (entry.getValueType() != ValueType.OBJECT) {
+                validStructure = false;
+                context.buildConstraintViolationWithTemplate(""
+                        + "Expected object, but received " + entry.getValueType().name().toLowerCase())
+                       .addPropertyNode(path)
+                       .addConstraintViolation();
+            } else {
+                validStructure = validIdentifier(value,
+                                                 meta,
+                                                 entry.asJsonObject(),
+                                                 context,
+                                                 validStructure,
+                                                 path);
+            }
+        }
+
+        return validStructure;
     }
 
     boolean validMemberName(String name) {

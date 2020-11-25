@@ -181,6 +181,29 @@ Invalid Create Post (Relationship `data` as null)
         }
       ]}
     @
+Invalid Create Post (Relationship `data` entry as non-object)
+    | []
+    | /test/posts
+    | posts
+    | { 'data': {
+        'type': 'posts',
+        'attributes': { 'title': 'Testing', 'text': 'Testing Again' },
+        'relationships': { 'comments': { 'data': [ 1, true ] } }
+        }
+      }
+    | 422
+    | { 'errors': [
+        {
+          'source': { 'pointer': '/data/relationships/comments/data/0' },
+          'title': 'Invalid JSON API Document Structure',
+          'detail': 'Expected object, but received number'
+        },{
+          'source': { 'pointer': '/data/relationships/comments/data/1' },
+          'title': 'Invalid JSON API Document Structure',
+          'detail': 'Expected object, but received true'
+        }
+      ]}
+    @
 Invalid Create Post (`type` missing)
     | []
     | /test/posts
