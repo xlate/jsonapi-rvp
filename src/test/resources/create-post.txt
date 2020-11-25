@@ -29,3 +29,47 @@ Create Post
         }
     }
     @
+Create TypeModel
+    | []
+    | /test/type-models
+    | type-models
+    | { 'data': {
+          'type': 'type-models',
+          'attributes': {
+            'string': 'Some Value',
+            'primitiveInt': 1,
+            'offsetTime': '00:00:00+18:00',
+            'utilDate': '2020-11-24T21:00:00.000Z',
+            'offsetDateTime': '2020-11-24T21:00:00.000Z',
+            'wrappedInt': 55,
+            'primitiveBoolean': false,
+            'wrappedBoolean': true
+          }
+        }
+      }
+    | 201
+    | {
+        "jsonapi": {
+            "version": "1.0"
+        },
+        "data": {
+            "type": "type-models",
+            "id": "1",
+            'attributes': {
+              'string': 'Some Value',
+              'primitiveInt': 1,
+              'offsetTime': '00:00+18:00',
+              'utilDate': '2020-11-24T21:00:00Z',
+              'offsetDateTime': '2020-11-24T21:00:00Z',
+              'wrappedInt': 55,
+              'primitiveBoolean': false,
+              'wrappedBoolean': true,
+              'zonedDateTime': null
+            },
+            'relationships': {},
+            "links": {
+                "self": "/test/type-models/1"
+            }
+        }
+    }
+    @

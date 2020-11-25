@@ -20,6 +20,8 @@ import static io.xlate.jsonapi.rvp.internal.rs.entity.JsonApiError.attributePoin
 import static io.xlate.jsonapi.rvp.internal.rs.entity.JsonApiError.relationshipPointer;
 
 import java.beans.PropertyDescriptor;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Executable;
 import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -29,6 +31,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -56,7 +59,6 @@ import io.xlate.jsonapi.rvp.internal.rs.entity.JsonApiError;
 public class ResourceObjectReader {
 
     private static final Logger LOGGER = Logger.getLogger(ResourceObjectReader.class.getName());
-    private static final Object INVALID_VALUE = new Object();
 
     private final EntityMetamodel model;
 
@@ -175,24 +177,7 @@ public class ResourceObjectReader {
 
     void readAttributes(Object bean, JsonObject attributes, JsonArrayBuilder errors) {
         EntityMeta meta = model.getEntityMeta(bean.getClass());
-
-        attributes.entrySet()
-                  .stream()
-                  .filter(a -> validateAttributeFilter(a, meta, errors))
-                  .forEach(a -> readAttribute(a, bean, meta, errors));
-    }
-
-    boolean validateAttributeFilter(Entry<String, JsonValue> attribute, EntityMeta meta, JsonArrayBuilder errors) {
-        String jsonKey = attribute.getKey();
-        boolean validAttribute = meta.getAttributeNames().contains(jsonKey);
-
-        if (!validAttribute) {
-            var error = invalidAttributeError("Unknown attribute: `" + jsonKey + "`.",
-                                              jsonKey);
-            errors.add(error.toJson());
-        }
-
-        return validAttribute;
+        attributes.entrySet().forEach(a -> readAttribute(a, bean, meta, errors));
     }
 
     void readAttribute(Entry<String, JsonValue> attribute, Object bean, EntityMeta meta, JsonArrayBuilder errors) {
@@ -205,15 +190,13 @@ public class ResourceObjectReader {
         Object value;
 
         if (jsonValueType == ValueType.NULL) {
-            value = propertyType.isPrimitive() ? INVALID_VALUE : null;
+            value = null;
         } else if (propertyType == String.class) {
-            value = readAttributeAsString(jsonValue);
-        } else if (Boolean.class.isAssignableFrom(propertyType)) {
+            value = ((JsonString) jsonValue).getString();
+        } else if (classMatch(propertyType, Boolean.class, Boolean.TYPE)) {
             value = readAttributeAsBoolean(jsonValue);
-        } else if (Number.class.isAssignableFrom(propertyType)) {
-            value = readAttributeAsNumber(jsonKey, propertyType, jsonValue);
-        } else if (propertyType.isPrimitive()) {
-            value = readAttributeAsPrimitive(jsonKey, propertyType, jsonValue);
+        } else if (Number.class.isAssignableFrom(propertyType) || propertyType.isPrimitive()) {
+            value = readAttributeAsNumber(propertyType, jsonValue);
         } else if (OffsetDateTime.class.isAssignableFrom(propertyType)) {
             value = readAttributeAsOffsetDateTime(jsonValue);
         } else if ((factory = fromInstantMethod(propertyType)) != null) {
@@ -222,22 +205,10 @@ public class ResourceObjectReader {
             value = readAttributeFromString(jsonKey, propertyType, jsonValue);
         } else {
             LOGGER.warning(() -> "Unsupported attribute type: " + propertyType);
-            value = INVALID_VALUE;
+            value = null;
         }
 
-        if (INVALID_VALUE != value) {
-            writeProperty(desc, bean, value);
-        } else {
-            errors.add(invalidAttributeDataTypeError(jsonKey).toJson());
-        }
-    }
-
-    Object readAttributeAsString(JsonValue jsonValue) {
-        if (jsonValue.getValueType() == ValueType.STRING) {
-            return ((JsonString) jsonValue).getString();
-        } else {
-            return INVALID_VALUE;
-        }
+        writeProperty(desc, bean, value);
     }
 
     Object readAttributeAsBoolean(JsonValue jsonValue) {
@@ -245,112 +216,93 @@ public class ResourceObjectReader {
         case TRUE:
             return Boolean.TRUE;
         case FALSE:
-            return Boolean.FALSE;
         default:
-            return INVALID_VALUE;
+            return Boolean.FALSE;
         }
     }
 
-    Object readAttributeAsNumber(String attributeName, Class<?> propertyType, JsonValue jsonValue) {
+    Object readAttributeAsNumber(Class<?> propertyType, JsonValue jsonValue) {
         final Object value;
 
-        switch (jsonValue.getValueType()) {
-        case NUMBER:
-            JsonNumber number = (JsonNumber) jsonValue;
+        JsonNumber number = (JsonNumber) jsonValue;
 
-            if (propertyType.isAssignableFrom(BigDecimal.class)) {
-                value = number.bigDecimalValue();
-            } else if (propertyType.isAssignableFrom(BigInteger.class)) {
-                value = number.bigIntegerValue();
-            } else if (number.isIntegral()) {
-                if (propertyType.isAssignableFrom(Long.class)) {
-                    value = number.longValue();
-                } else if (propertyType.isAssignableFrom(Integer.class)) {
-                    value = number.intValue();
-                } else if (propertyType.isAssignableFrom(Double.class)) {
-                    value = number.doubleValue();
-                } else {
-                    value = INVALID_VALUE;
-                }
-            } else if (propertyType.isAssignableFrom(Double.class)) {
-                value = number.doubleValue();
-            } else {
-                value = INVALID_VALUE;
-            }
-            break;
-        case STRING:
-            value = readAttributeFromString(attributeName, propertyType, jsonValue);
-            break;
-        default:
-            value = INVALID_VALUE;
-            break;
+        if (propertyType.isAssignableFrom(BigDecimal.class)) {
+            value = number.bigDecimalValue();
+        } else if (propertyType.isAssignableFrom(BigInteger.class)) {
+            value = number.bigIntegerValue();
+        } else if (classMatch(propertyType, Long.class, Long.TYPE)) {
+            value = number.longValue();
+        } else if (classMatch(propertyType, Integer.class, Integer.TYPE)) {
+            value = number.intValue();
+        } else if (classMatch(propertyType, Short.class, Short.TYPE)) {
+            value = (short) number.intValue();
+        } else if (classMatch(propertyType, Character.class, Character.TYPE)) {
+            value = (char) number.intValue();
+        } else if (classMatch(propertyType, Byte.class, Byte.TYPE)) {
+            value = (byte) number.intValue();
+        } else if (classMatch(propertyType, Float.class, Float.TYPE)) {
+            value = number.doubleValue();
+        } else if (classMatch(propertyType, Double.class, Double.TYPE)) {
+            value = number.doubleValue();
+        } else {
+            value = number.numberValue();
         }
 
         return value;
     }
 
-    Object readAttributeAsPrimitive(String attributeName, Class<?> propertyType, JsonValue jsonValue) {
-        if (jsonValue.getValueType() == ValueType.STRING) {
-            return readAttributeFromString(attributeName, propertyType, jsonValue);
-        } else {
-            return INVALID_VALUE;
-        }
+    boolean classMatch(Class<?> propertyType, Class<?> wrapper, Class<?> primitive) {
+        return propertyType.equals(wrapper) || primitive.equals(propertyType);
     }
 
     Object readAttributeAsOffsetDateTime(JsonValue jsonValue) {
-        if (jsonValue.getValueType() == ValueType.STRING) {
-            String jsonString = ((JsonString) jsonValue).getString();
-            return OffsetDateTime.parse(jsonString);
-        } else {
-            return INVALID_VALUE;
-        }
+        String jsonString = ((JsonString) jsonValue).getString();
+        return OffsetDateTime.parse(jsonString);
     }
 
     Object readAttributeAsInstant(String attributeName, JsonValue jsonValue, Method fromInstant) {
-        if (jsonValue.getValueType() == ValueType.STRING) {
-            String jsonString = ((JsonString) jsonValue).getString();
-            Instant instant;
+        String jsonString = ((JsonString) jsonValue).getString();
+        Instant instant;
 
-            try {
-                instant = OffsetDateTime.parse(jsonString).toInstant();
-            } catch (Exception e) {
-                LOGGER.log(Level.WARNING, e, () -> "Unable to convert attribute `" + attributeName + "` to an instant");
-                return INVALID_VALUE;
-            }
-
-            try {
-                return fromInstant.invoke(null, instant);
-            } catch (Exception e) {
-                LOGGER.log(Level.WARNING, e, () -> "Unable to invoke `fromInstant` for attribute `" + attributeName + "`");
-                return INVALID_VALUE;
-            }
-        } else {
-            return INVALID_VALUE;
+        try {
+            instant = OffsetDateTime.parse(jsonString).toInstant();
+            return fromInstant.invoke(null, instant);
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING, e, () -> "Unable to convert attribute `" + attributeName + "` to an instant");
+            return null;
         }
     }
 
     Object readAttributeFromString(String attributeName, Class<?> propertyType, JsonValue jsonValue) {
         String jsonString = ((JsonString) jsonValue).getString();
         Method factory;
+        Constructor<?> constructor;
         Object value;
 
-        if ((factory = fromValueMethod(propertyType)) != null) {
-            try {
-                value = factory.invoke(null, jsonString);
-            } catch (Exception e) {
-                LOGGER.log(Level.WARNING, e, () -> "Unable to invoke `fromValue` for attribute `" + attributeName + "`");
-                value = INVALID_VALUE;
-            }
-        } else if ((factory = valueOfMethod(propertyType)) != null) {
+        if ((factory = (Method) getStringMethod(propertyType, "valueOf")) != null) {
             try {
                 value = factory.invoke(null, jsonString);
             } catch (Exception e) {
                 LOGGER.log(Level.WARNING, e, () -> "Unable to invoke `valueOf` for attribute `" + attributeName + "`");
-                value = INVALID_VALUE;
+                value = null;
+            }
+        } else if ((factory = (Method) getStringMethod(propertyType, "parse")) != null) {
+            try {
+                value = factory.invoke(null, jsonString);
+            } catch (Exception e) {
+                LOGGER.log(Level.WARNING, e, () -> "Unable to invoke `fromValue` for attribute `" + attributeName + "`");
+                value = null;
+            }
+        } else if ((constructor = constructorMethod(propertyType)) != null) {
+            try {
+                value = constructor.newInstance(jsonString);
+            } catch (Exception e) {
+                LOGGER.log(Level.WARNING, e, () -> "Unable to invoke constructor for attribute `" + attributeName + "`");
+                value = null;
             }
         } else {
             LOGGER.fine(() -> "No `valueOf`/`fromValue` method found for attribute `" + attributeName + "`");
-            value = INVALID_VALUE;
+            value = null;
         }
 
         return value;
@@ -449,7 +401,8 @@ public class ResourceObjectReader {
     }
 
     enum RelatedModelAction {
-        ADD, REMOVE;
+        ADD,
+        REMOVE;
     }
 
     @SuppressWarnings("unchecked")
@@ -478,22 +431,24 @@ public class ResourceObjectReader {
         }
     }
 
-    static Method fromValueMethod(Class<?> type) {
+    static Constructor<?> constructorMethod(Class<?> type) {
         try {
-            return type.getMethod("fromValue", String.class);
+            return type.getConstructor(String.class);
         } catch (Exception e) {
-            LOGGER.log(Level.FINEST, () -> "Unable to get `fromValue(String)` from class `" + type + "`: " + e.getMessage());
+            LOGGER.log(Level.FINEST, () -> "Unable to get `<init>(String)` from class `" + type + "`: " + e.getMessage());
             return null;
         }
     }
 
-    static Method valueOfMethod(Class<?> type) {
-        try {
-            return type.getMethod("valueOf", String.class);
-        } catch (Exception e) {
-            LOGGER.log(Level.FINEST, () -> "Unable to get `valueOf(String)` from class `" + type + "`: " + e.getMessage());
-            return null;
+    static Executable getStringMethod(Class<?> type, String method) {
+        for (Class<?> arg : Set.of(String.class, CharSequence.class)) {
+            try {
+                return type.getMethod(method, arg);
+            } catch (Exception e) {
+                LOGGER.log(Level.FINEST, () -> "Unable to get `valueOf(String)` from class `" + type + "`: " + e.getMessage());
+            }
         }
-    }
 
+        return null;
+    }
 }

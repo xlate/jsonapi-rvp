@@ -20,15 +20,20 @@ import static java.util.function.Predicate.not;
 
 import java.beans.PropertyDescriptor;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Executable;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.logging.Logger;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -48,6 +53,9 @@ import io.xlate.jsonapi.rvp.internal.rs.entity.JsonApiError;
 import io.xlate.jsonapi.rvp.internal.rs.entity.JsonApiRequest;
 
 public class JsonApiRequestValidator implements ConstraintValidator<ValidJsonApiRequest, JsonApiRequest> {
+
+    private static final Logger LOGGER = Logger.getLogger(JsonApiRequestValidator.class.getName());
+    private static final Object INVALID_VALUE = new Object();
 
     public static final String KEY_DATA = "data";
     public static final String KEY_META = "meta";
@@ -297,27 +305,7 @@ public class JsonApiRequestValidator implements ConstraintValidator<ValidJsonApi
 
         if (allowedTypes.contains(attributeValue.getValueType())) {
             if (allowedTypes.contains(ValueType.STRING)) {
-                var parsers = Stream.concat(Arrays.stream(propertyType.getConstructors()),
-                                            Arrays.stream(propertyType.getMethods()))
-                                    .filter(method -> Set.of("valueOf", "parse", "<init>").contains(method.getName()))
-                                    .filter(method -> Modifier.isStatic(method.getModifiers()))
-                                    .filter(method -> Objects.equals(method.getParameterCount(), 1))
-                                    .filter(method -> Objects.equals(method.getParameterTypes()[0], String.class) ||
-                                            Objects.equals(method.getParameterTypes()[0], CharSequence.class))
-                                    .collect(Collectors.toMap(method -> method.getName(), method -> method));
-
-                try {
-                    if (parsers.containsKey("valueOf")) {
-                        ((Method) parsers.get("valueOf")).invoke(null, ((JsonString) attributeValue).getString());
-                    } else if (parsers.containsKey("parse")) {
-                        ((Method) parsers.get("parse")).invoke(null, ((JsonString) attributeValue).getString());
-                    } else if (parsers.containsKey("<init>")) {
-                        ((Constructor<?>) parsers.get("parse")).newInstance(((JsonString) attributeValue).getString());
-                    }
-                } catch (@SuppressWarnings("unused") Exception e) {
-                    valid = false;
-                    addIncompatibleDataError(context, "Incompatible data type", attributeKey);
-                }
+                valid = validateStringAttribute(context, propertyType, attributeKey, attributeValue);
             }
         } else {
             valid = false;
@@ -354,6 +342,82 @@ public class JsonApiRequestValidator implements ConstraintValidator<ValidJsonApi
         }
 
         return Set.of(ValueType.STRING, ValueType.NULL);
+    }
+
+    boolean validateStringAttribute(ConstraintValidatorContext context, Class<?> propertyType, String attributeKey, JsonValue attributeValue) {
+        boolean valid = true;
+
+        var parsers = Stream.concat(Arrays.stream(propertyType.getConstructors()),
+                                    Arrays.stream(propertyType.getMethods()))
+                            .filter(method -> Modifier.isStatic(method.getModifiers()))
+                            .filter(method -> Objects.equals(method.getParameterCount(), 1))
+                            .filter(this::parsingMethod)
+                            .collect(Collectors.toMap(Executable::getName, method -> method));
+
+        StringParser parser = objectParserMethod(parsers, propertyType);
+
+        try {
+            if (parser.parse(((JsonString) attributeValue).getString()) == INVALID_VALUE) {
+                valid = false;
+                addIncompatibleDataError(context, "Incompatible data type", attributeKey);
+            }
+        } catch (Exception e) {
+            LOGGER.finer(() -> "Error parsing string attribute: " + e.getMessage());
+            valid = false;
+            addIncompatibleDataError(context, "Incompatible data type", attributeKey);
+        }
+
+        return valid;
+    }
+
+    boolean parsingMethod(Executable method) {
+        Class<?> paramType = method.getParameterTypes()[0];
+
+        if (paramType == String.class || paramType == CharSequence.class) {
+            return true;
+        }
+
+        if (paramType == Instant.class && "from".equals(method.getName())) {
+            return true;
+        }
+
+        return false;
+    }
+
+    StringParser objectParserMethod(Map<String, Executable> methods, Class<?> propertyType) {
+        if (String.class.equals(propertyType)) {
+            return value -> value;
+        }
+
+        if (propertyType.isAssignableFrom(OffsetDateTime.class)) {
+            return OffsetDateTime::parse;
+        }
+
+        if (methods.containsKey("from") && methods.get("from").getParameterTypes()[0].equals(Instant.class)) {
+            return value -> {
+                Instant instant = OffsetDateTime.parse(value).toInstant();
+                return ((Method) methods.get("from")).invoke(null, instant);
+            };
+        }
+
+        if (methods.containsKey("valueOf")) {
+            return value -> ((Method) methods.get("valueOf")).invoke(null, value);
+        }
+
+        if (methods.containsKey("parse")) {
+            return value -> ((Method) methods.get("parse")).invoke(null, value);
+        }
+
+        if (methods.containsKey("<init>")) {
+            return value -> Constructor.class.cast(methods.get("<init>")).newInstance(value);
+        }
+
+        return value -> INVALID_VALUE;
+    }
+
+    @FunctionalInterface
+    interface StringParser {
+        Object parse(String value) throws Exception;
     }
 
     void addIncompatibleDataError(ConstraintValidatorContext context, String message, String attributeKey) {
