@@ -236,6 +236,10 @@ public class EntityMeta {
         return this.methodsAllowed.contains(method);
     }
 
+    public boolean isField(String name) {
+        return getAttributeNames().contains(name) || getRelationshipNames().contains(name);
+    }
+
     @SuppressWarnings("unchecked")
     public SingularAttribute<Object, ?> getExposedIdAttribute() {
         final SingularAttribute<?, ?> attr;
