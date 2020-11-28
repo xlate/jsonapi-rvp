@@ -16,10 +16,17 @@
  ******************************************************************************/
 package io.xlate.jsonapi.rvp;
 
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 
@@ -35,6 +42,7 @@ import javax.validation.Validator;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
+import javax.ws.rs.InternalServerErrorException;
 import javax.ws.rs.PATCH;
 import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
@@ -43,9 +51,12 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.CacheControl;
 import javax.ws.rs.core.Context;
+import javax.ws.rs.core.EntityTag;
 import javax.ws.rs.core.Request;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.Response.ResponseBuilder;
 import javax.ws.rs.core.SecurityContext;
+import javax.ws.rs.core.UriBuilder;
 import javax.ws.rs.core.UriInfo;
 
 import io.xlate.jsonapi.rvp.internal.DefaultJsonApiHandler;
@@ -85,11 +96,14 @@ public abstract class JsonApiResource {
     @Inject
     TransactionalValidator txValidator;
 
+    Date initializationDate = new Date();
     CacheControl cacheControl = new CacheControl();
 
     private Class<?> resourceClass;
     private EntityMetamodel model;
     private PersistenceController persistence;
+
+    private Map<URI, String> clients = new ConcurrentHashMap<>(5);
 
     protected void initialize(Set<JsonApiResourceType<?>> resourceTypes) {
         resourceClass = this.getClass();
@@ -136,6 +150,48 @@ public abstract class JsonApiResource {
         }
 
         return true;
+    }
+
+    static String generateClientModule(URI uri, Class<?> resourceClass) {
+        StringBuilder buffer = new StringBuilder();
+
+        try {
+            try (Reader prototype = new InputStreamReader(JsonApiResource.class.getResourceAsStream("/META-INF/jsonapi-rvp-client.js"))) {
+
+                var builder = UriBuilder.fromUri(uri);
+                builder.replacePath("").path(resourceClass);
+                buffer.append(String.format("const baseAdminUrl = '%s';%n%n", builder.build().toString()));
+                int data;
+
+                while ((data = prototype.read()) > -1) {
+                    buffer.append((char) data);
+                }
+            }
+        } catch (IOException e) {
+            throw new InternalServerErrorException("Client module not available", e);
+        }
+
+        return buffer.toString();
+    }
+
+    @GET
+    @Path("client.js")
+    @Produces("application/javascript")
+    public Response getClient() {
+        String client = clients.computeIfAbsent(uriInfo.getRequestUri(), uri -> generateClientModule(uri, this.resourceClass));
+        EntityTag etag = new EntityTag(Integer.toString(client.hashCode()));
+        ResponseBuilder builder;
+        builder = request.evaluatePreconditions(initializationDate, etag);
+
+        if (builder == null) {
+            builder = Response.ok(client);
+            builder.tag(etag);
+            builder.lastModified(initializationDate);
+        }
+
+        builder.cacheControl(cacheControl);
+
+        return builder.build();
     }
 
     @POST

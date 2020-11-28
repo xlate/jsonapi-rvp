@@ -3,6 +3,7 @@ package io.xlate.jsonapi.rvp;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import java.io.IOException;
 import java.io.StringReader;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -39,6 +40,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvFileSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 import org.skyscreamer.jsonassert.JSONAssert;
 import org.skyscreamer.jsonassert.JSONCompareMode;
@@ -173,7 +175,7 @@ class JsonApiResourceTest {
             lineSeparator = "@\n",
             files = {
                       "src/test/resources/create-post.txt",
-                      "src/test/resources/create-post-invalid.txt"})
+                      "src/test/resources/create-post-invalid.txt" })
     void testCreatePost(String title,
                         String jsonDml,
                         String requestUri,
@@ -231,13 +233,13 @@ class JsonApiResourceTest {
     @ParameterizedTest
     @CsvFileSource(delimiter = '|', lineSeparator = "@\n", files = "src/test/resources/read-relationship-get.txt")
     void testReadRelationshipGet(String title,
-                     String jsonDml,
-                     String requestUri,
-                     String resourceType,
-                     String resourceId,
-                     String relationshipName,
-                     int expectedStatus,
-                     String expectedResponse)
+                                 String jsonDml,
+                                 String requestUri,
+                                 String resourceType,
+                                 String resourceId,
+                                 String relationshipName,
+                                 int expectedStatus,
+                                 String expectedResponse)
             throws JSONException {
 
         testResourceMethod(jsonDml,
@@ -251,13 +253,13 @@ class JsonApiResourceTest {
     @ParameterizedTest
     @CsvFileSource(delimiter = '|', lineSeparator = "@\n", files = "src/test/resources/read-related-get.txt")
     void testReadRelatedGet(String title,
-                     String jsonDml,
-                     String requestUri,
-                     String resourceType,
-                     String resourceId,
-                     String relationshipName,
-                     int expectedStatus,
-                     String expectedResponse)
+                            String jsonDml,
+                            String requestUri,
+                            String resourceType,
+                            String resourceId,
+                            String relationshipName,
+                            int expectedStatus,
+                            String expectedResponse)
             throws JSONException {
 
         testResourceMethod(jsonDml,
@@ -299,12 +301,12 @@ class JsonApiResourceTest {
             lineSeparator = "@\n",
             files = { "src/test/resources/delete.txt" })
     void testDelete(String title,
-                         String jsonDml,
-                         String requestUri,
-                         String resourceType,
-                         String resourceId,
-                         int expectedStatus,
-                         String expectedResponse)
+                    String jsonDml,
+                    String requestUri,
+                    String resourceType,
+                    String resourceId,
+                    int expectedStatus,
+                    String expectedResponse)
             throws JSONException {
 
         testResourceMethod(jsonDml,
@@ -313,5 +315,19 @@ class JsonApiResourceTest {
                            expectedStatus,
                            expectedResponse,
                            () -> target.delete(resourceType, resourceId));
+    }
+
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                        "http://localhost:8080/test/client.js",
+                        "http://127.0.0.1/test/client.js" })
+    void testGetClient(String requestUri) throws IOException {
+        target.uriInfo = new ResteasyUriInfo(requestUri, "/");
+        Response response = target.getClient();
+        String clientScript = (String) response.getEntity();
+        String firstLine = clientScript.lines().findFirst().orElse("");
+        String expected = String.format("const baseAdminUrl = '%s';", requestUri.substring(0, requestUri.lastIndexOf('/')));
+        assertEquals(expected, firstLine);
     }
 }
