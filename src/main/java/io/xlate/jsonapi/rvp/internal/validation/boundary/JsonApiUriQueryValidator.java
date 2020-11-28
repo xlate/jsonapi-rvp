@@ -107,7 +107,7 @@ public class JsonApiUriQueryValidator
                 addViolation(context, "fields[" + resourceType + "]", "Invalid resource type: `" + resourceType + "`");
             } else {
                 for (String field : fields.getValue()) {
-                    if (!meta.getAttributeNames().contains(field)) {
+                    if (!meta.isField(field)) {
                         valid = false;
                         addViolation(context,
                                      "fields[" + resourceType + "]",
