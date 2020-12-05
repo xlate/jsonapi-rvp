@@ -75,4 +75,6 @@ public class Comment {
     // ... Getters and Setters
 }
 ```
-Assuming a server on localhost, port 8080, JSON:API models are now available at `http://localhost:8080/blogapi/{resource-type}`. See the [JSON:API specification](https://jsonapi.org/format/) for URL conventions and message body formatting.
+Assuming a server on localhost, port 8080, JSON:API models are now available at `http://localhost:8080/blogapi/{resource-type}`. See the [JSON:API specification](https://jsonapi.org/format/) for URL conventions and message body formatting. Additionally, an ES6 client module for the API can be retrieved at `http://localhost:8080/blogapi/client.js`. The ES6 client utilizes the standard `fetch` API available in modern browsers.
+
+This library is under active development and *APIs may not be stable*. Please open issues for feature requests or bug reports.
