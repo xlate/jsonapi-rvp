@@ -1,3 +1,5 @@
+const JSON_API_MEDIA_TYPE = 'application/vnd.api+json';
+
 function getIncluded(related, included = []) {
     if (Array.isArray(related)) {
         if (related.length > 0) {
@@ -55,8 +57,8 @@ async function create(type, attributes, relationships) {
     return fetch(url, {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/vnd.api+json',
-            'Accept': 'application/vnd.api+json'
+            'Content-Type': JSON_API_MEDIA_TYPE,
+            'Accept': JSON_API_MEDIA_TYPE
         },
         body: JSON.stringify(body)
     })
@@ -64,7 +66,7 @@ async function create(type, attributes, relationships) {
         .catch(console.warn);
 }
 
-async function fetchData(type, path, fields = {}, filters = {}, includes = [], sort = [], pageOffset = null, pageLimit = null) {
+async function fetchData(type, path, fields = {}, filters = {}, include = [], sort = [], pageOffset = null, pageLimit = null) {
     let url = baseAdminUrl + '/' + path;
     let params = [];
 
@@ -80,8 +82,8 @@ async function fetchData(type, path, fields = {}, filters = {}, includes = [], s
         filterParams.forEach(p => params.push(p));
     }
 
-    if (includes.length > 0) {
-        params.push('include=' + includes.join());
+    if (include.length > 0) {
+        params.push('include=' + include.join());
     }
 
     if (sort.length > 0) {
@@ -103,7 +105,7 @@ async function fetchData(type, path, fields = {}, filters = {}, includes = [], s
     return fetch(url, {
         method: 'GET',
         headers: {
-            'Accept': 'application/vnd.api+json'
+            'Accept': JSON_API_MEDIA_TYPE
         }
     })
         .then(response => response.json())
@@ -111,14 +113,38 @@ async function fetchData(type, path, fields = {}, filters = {}, includes = [], s
         .catch(console.warn);
 }
 
-async function fetchList({ type, fields = [], filters = {}, includes = [], sort = [], pageOffset, pageLimit } = {}) {
-    return fetchData(type, type, fields, filters, includes, sort, pageOffset, pageLimit);
+/**
+ * @param {String} type resource type (required)
+ * @param {Object} params request parameters
+ * @param {Object.<string, Array.<string>>} [params.fields = {}] fields to be included
+ * @param {Object.<string, Array.<string>>} [params.filters = {}] selection criteria
+ * @param {Array.<string>} [params.include = []] included relationships
+ * @param {Array.<string>} [params.sort = []] result sort criteria
+ * @param {number} [params.pageOffset] position of the first result, numbered from 0
+ * @param {number} [params.pageLimit] position of the last result (exclusive), numbered from 0
+ */
+async function fetchList(type, { fields = [], filters = {}, include = [], sort = [], pageOffset, pageLimit } = {}) {
+    return fetchData(type, type, fields, filters, include, sort, pageOffset, pageLimit);
 }
 
-async function fetchSingle({ type, id, fields = [], filters = {}, includes = [] } = {}) {
-    return fetchData(type, type + '/' + id, fields, filters, includes);
+/**
+ * @param {String} type resource type (required)
+ * @param {String} id resource identifier (required)
+ * @param {Object} params request parameters
+ * @param {Object.<string, Array.<string>>} [params.fields = {}] fields to be included
+ * @param {Object.<string, Array.<string>>} [params.filters = {}] selection criteria
+ * @param {Array.<string>} [params.include = []] included relationships
+ */
+async function fetchSingle(type, id, { fields = {}, filters = {}, include = [] } = {}) {
+    return fetchData(type, type + '/' + id, fields, filters, include);
 }
 
+/**
+ * @param {String} type resource type (required)
+ * @param {String} id resource identifier (required)
+ * @param {Object.<string, any>} attributes map of attributes and the values to update
+ * @param {Object.<string, any>} relationships map of relationships to be updated
+ */
 async function update(type, id, attributes, relationships) {
     let url = baseAdminUrl + '/' + type + '/' + id;
     let body = { data: { type: type, id: id, attributes: attributes, relationships: relationships } };
@@ -126,8 +152,8 @@ async function update(type, id, attributes, relationships) {
     return fetch(url, {
         method: 'PATCH',
         headers: {
-            'Content-Type': 'application/vnd.api+json',
-            'Accept': 'application/vnd.api+json'
+            'Content-Type': JSON_API_MEDIA_TYPE,
+            'Accept': JSON_API_MEDIA_TYPE
         },
         body: JSON.stringify(body)
     })
@@ -135,13 +161,19 @@ async function update(type, id, attributes, relationships) {
         .catch(console.warn);
 }
 
+/**
+ * Delete the resource identified by type and identifier.
+ *
+ * @param {String} type resource type (required)
+ * @param {String} id resource identifier (required)
+ */
 async function remove(type, id) {
     let url = baseAdminUrl + '/' + type + '/' + id;
 
     return fetch(url, {
         method: 'DELETE',
         headers: {
-            'Accept': 'application/vnd.api+json'
+            'Accept': JSON_API_MEDIA_TYPE
         }
     })
         .then(response => response.json())
