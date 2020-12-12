@@ -207,8 +207,9 @@ public class ResourceObjectWriter {
                    Object entryValue = entry.getValue();
                    boolean many = meta.getEntityType().getAttribute(fieldName).isCollection();
 
-                   if (entryValue instanceof Attribute) {
-                       // No operation - only links were given
+                   if (entryValue instanceof Attribute || Entity.UNFETCHED_RELATIONSHIP == entryValue) {
+                       // No operation - only links were given if the relationship is an attribute
+                       // or the special instance indicating nothing watch fetched
                    } else if (entryValue instanceof Long) {
                        Long count = (Long) entryValue;
                        relationshipEntry.add("meta", Json.createObjectBuilder().add("count", count));
@@ -248,12 +249,18 @@ public class ResourceObjectWriter {
         } else {
             final int count = relatedEntities.size();
 
-            if (count == 1) {
+            switch (count) {
+            case 0:
+                relationshipData = JsonValue.NULL;
+                break;
+            case 1:
                 relationshipData = getResourceIdentifier(relatedEntities.iterator().next()).build();
-            } else {
+                break;
+            default:
                 logger.warning(() -> String.format("Non-collection-valued relationship `%s` with %d could not be mapped.",
                                                    fieldName,
                                                    count));
+                break;
             }
         }
 

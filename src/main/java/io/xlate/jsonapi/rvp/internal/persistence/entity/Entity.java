@@ -1,9 +1,13 @@
 package io.xlate.jsonapi.rvp.internal.persistence.entity;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
 public class Entity {
+
+    public static final List<Entity> UNFETCHED_RELATIONSHIP = Collections.emptyList();
 
     private final EntityMeta entityMeta;
 

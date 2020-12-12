@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import javax.json.Json;
@@ -428,10 +429,8 @@ public class PersistenceController {
          * Build empty map to hold relationships based on those requested by the
          * client.
          **/
-        final Map<Object, Map<String, List<Entity>>> relationships = initializeRelationships(params,
-                                                                                             results,
+        final Map<Object, Map<String, List<Entity>>> relationships = initializeRelationships(results,
                                                                                              meta,
-                                                                                             relationshipName,
                                                                                              queries);
 
         /* Only retrieve included records if something was found. */
@@ -511,8 +510,9 @@ public class PersistenceController {
             relatedJoin = null;
         }
 
-        Set<String> counted = rootType.getPluralAttributes()
+        Set<String> counted = rootType.getAttributes()
                                       .stream()
+                                      .filter(Attribute::isAssociation)
                                       .map(Attribute::getName)
                                       .filter(meta::isRelatedTo)
                                       .filter(not(params.getInclude()::contains))
@@ -629,6 +629,9 @@ public class PersistenceController {
 
         TypedQuery<Tuple> typedQuery = em.createQuery(query);
 
+        // Initialize the included relationship for all selected entities
+        relationships.values().stream().forEach(map -> map.put(includedName, new ArrayList<>()));
+
         for (Tuple result : typedQuery.getResultList()) {
             Object primaryIdValue = result.get("primaryId");
             Object includedIdValue = result.get("includedId");
@@ -698,31 +701,19 @@ public class PersistenceController {
         return mappedBy;
     }
 
-    Map<Object, Map<String, List<Entity>>> initializeRelationships(JsonApiQuery params,
-                                                                   List<Tuple> results,
+    Map<Object, Map<String, List<Entity>>> initializeRelationships(List<Tuple> results,
                                                                    EntityMeta meta,
-                                                                   String relationshipName,
                                                                    FetchQueries queries) {
 
         final Map<Object, Map<String, List<Entity>>> relationships = new HashMap<>();
+        final Map<String, List<Entity>> prototype = meta.getRelationshipNames()
+                .stream()
+                .collect(Collectors.toMap(Function.identity(), name -> Entity.UNFETCHED_RELATIONSHIP));
 
         results.stream()
                .map(result -> result.get("root"))
-               .forEach(entity -> {
-                   relationships.put(meta.getIdValue(entity),
-                                     params.getInclude()
-                                           .stream()
-                                           .collect(Collectors.toMap(relName -> relName,
-                                                                     relName -> new ArrayList<Entity>())));
-
-                   if (relationshipName != null) {
-                       String relatedTo = queries.relatedJoin.getAttribute().getName();
-
-                       if (!params.getInclude().contains(relatedTo)) {
-                           relationships.get(meta.getIdValue(entity)).put(relatedTo, new ArrayList<>());
-                       }
-                   }
-               });
+               .map(meta::getIdValue)
+               .forEach(identifier -> relationships.put(identifier, new HashMap<>(prototype)));
 
         return relationships;
     }
