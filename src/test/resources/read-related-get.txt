@@ -21,6 +21,9 @@ Post's Related Comments
                     "links": {
                         "self": "/test/comments/2/relationships/post",
                         "related": "/test/comments/2/post"
+                    },
+                    "meta": {
+                        "count": 1
                     }
                 }
             },
@@ -28,5 +31,65 @@ Post's Related Comments
                 "self": "/test/comments/2"
             }
         }]
+      }
+    @
+Post's Related Comments with Post Included
+    | [{
+        "sql": "INSERT INTO POSTS (id, title, text) VALUES (2, 'Title Two', 'Text two.')"
+      },{
+        "sql": "INSERT INTO COMMENTS (id, post_id, text) VALUES (2, 2, 'Comment two.')"
+      }]
+    | /test/posts/2/comments?include=post
+    | posts | 2 | comments
+    | 200
+    | {
+        "jsonapi": {
+          "version": "1.0"
+        },
+        "data": [
+          {
+            "type": "comments",
+            "id": "2",
+            "attributes": {
+              "text": "Comment two."
+            },
+            "relationships": {
+              "post": {
+                "links": {
+                  "self": "/test/comments/2/relationships/post",
+                  "related": "/test/comments/2/post"
+                },
+                "data": {
+                  "type": "posts",
+                  "id": "2"
+                }
+              }
+            },
+            "links": {
+              "self": "/test/comments/2"
+            }
+          }
+        ],
+        "included": [
+          {
+            "type": "posts",
+            "id": "2",
+            "attributes": {
+              "text": "Text two.",
+              "title": "Title Two"
+            },
+            "relationships": {
+              "comments": {
+                "links": {
+                  "self": "/test/posts/2/relationships/comments",
+                  "related": "/test/posts/2/comments"
+                }
+              }
+            },
+            "links": {
+              "self": "/test/posts/2"
+            }
+          }
+        ]
       }
     @

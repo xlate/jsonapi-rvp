@@ -49,18 +49,17 @@ public class JsonApiUriQueryValidator
         boolean valid = true;
 
         MultivaluedMap<String, String> params = value.getUriInfo().getQueryParameters();
-        EntityMeta meta = value.getEntityMeta();
         String id = value.getId();
 
         valid = validateFields(value, context, valid);
         valid = validateFilters(value, context, valid);
 
         if (params.containsKey(JsonApiQuery.PARAM_INCLUDE)) {
-            valid = validateInclude(meta, params, context, valid);
+            valid = validateInclude(value, params, context, valid);
         }
 
         if (params.containsKey(JsonApiQuery.PARAM_SORT)) {
-            valid = validateSort(meta, id, params, context, valid);
+            valid = validateSort(value, id, params, context, valid);
         }
 
         valid = validatePaging(id, JsonApiQuery.PARAM_PAGE_NUMBER, params, context, valid);
@@ -72,11 +71,12 @@ public class JsonApiUriQueryValidator
         return valid;
     }
 
-    boolean validateInclude(EntityMeta meta,
+    boolean validateInclude(JsonApiQuery value,
                             MultivaluedMap<String, String> params,
                             ConstraintValidatorContext context,
                             boolean valid) {
 
+        EntityMeta meta = getEntityMeta(value);
         List<String> includeParams = params.get(JsonApiQuery.PARAM_INCLUDE);
         valid = validateSingle(JsonApiQuery.PARAM_INCLUDE, includeParams, context, valid);
 
@@ -164,11 +164,13 @@ public class JsonApiUriQueryValidator
         return null;
     }
 
-    boolean validateSort(EntityMeta meta,
+    boolean validateSort(JsonApiQuery value,
                          String id,
                          MultivaluedMap<String, String> params,
                          ConstraintValidatorContext context,
                          boolean valid) {
+
+        EntityMeta meta = getEntityMeta(value);
 
         if (id != null) {
             valid = false;
@@ -192,6 +194,18 @@ public class JsonApiUriQueryValidator
         }
 
         return valid;
+    }
+
+    EntityMeta getEntityMeta(JsonApiQuery value) {
+        EntityMeta meta = value.getEntityMeta();
+        String relationshipName = value.getRelationshipName();
+
+        if (relationshipName != null) {
+            // Validate the `include` relative to the "related" entity URI
+            meta = value.getModel().getEntityMeta(meta.getRelatedEntityClass(relationshipName));
+        }
+
+        return meta;
     }
 
     boolean validatePaging(String id,

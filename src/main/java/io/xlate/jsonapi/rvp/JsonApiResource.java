@@ -260,7 +260,7 @@ public abstract class JsonApiResource {
     }
 
     void fetch(InternalContext context, EntityMeta meta, JsonApiHandler<?> handler) {
-        JsonApiQuery params = new JsonApiQuery(this.model, meta, context.getResourceId(), context.getUriInfo());
+        JsonApiQuery params = new JsonApiQuery(this.model, meta, context.getResourceId(), context.getRelationshipName(), context.getUriInfo());
         context.setQuery(params);
 
         handler.onRequest(context);

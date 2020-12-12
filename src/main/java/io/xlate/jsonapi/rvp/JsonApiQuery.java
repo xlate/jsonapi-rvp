@@ -52,6 +52,7 @@ public class JsonApiQuery {
     private final EntityMetamodel model;
     private final EntityMeta entityMeta;
     private final String id;
+    private final String relationshipName;
     private final UriInfo uriInfo;
     private boolean uriProcessed = false;
 
@@ -65,11 +66,12 @@ public class JsonApiQuery {
     private Integer firstResult = null;
     private Integer maxResults;
 
-    public JsonApiQuery(EntityMetamodel model, EntityMeta entityMeta, String id, UriInfo uriInfo) {
+    public JsonApiQuery(EntityMetamodel model, EntityMeta entityMeta, String id, String relationshipName, UriInfo uriInfo) {
         super();
         this.model = model;
         this.entityMeta = entityMeta;
         this.id = id;
+        this.relationshipName = relationshipName;
         this.uriInfo = uriInfo;
     }
 
@@ -196,6 +198,10 @@ public class JsonApiQuery {
 
     public String getId() {
         return id;
+    }
+
+    public String getRelationshipName() {
+        return relationshipName;
     }
 
     public UriInfo getUriInfo() {
