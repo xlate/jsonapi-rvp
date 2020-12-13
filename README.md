@@ -14,7 +14,7 @@ Implementation of a [JSON:API](https://jsonapi.org/) server in Java using JAX-RS
 <dependency>
   <groupId>io.xlate</groupId>
   <artifactId>jsonapi-rvp</artifactId>
-  <version>0.0.6</version>
+  <version>0.0.7</version>
 </dependency>
 ```
 
