@@ -62,7 +62,7 @@ public class ResourceObjectReader {
                                                                  Long.TYPE,
                                                                  Short.TYPE);
 
-    public static final Map<Class<?>, Function<JsonNumber, ?>> NUMBER_MAPPERS;
+    static final Map<Class<?>, Function<JsonNumber, ?>> NUMBER_MAPPERS;
 
     static {
         NUMBER_MAPPERS = Map.ofEntries(Map.entry(BigDecimal.class, JsonNumber::bigDecimalValue),

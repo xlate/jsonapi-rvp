@@ -113,3 +113,15 @@ Post's Author (missing)
        'data': null
       }
     @
+## Post's Author (no such post missing)
+##     | [{
+##         "sql": "INSERT INTO POSTS (id, title, text) VALUES (2, 'Title Two', 'Text two.')"
+##       },{
+##         "sql": "INSERT INTO COMMENTS (id, post_id, text) VALUES (2, 2, 'Comment two.')"
+##       }]
+##     | /test/posts/3/author
+##     | posts | 3 | author
+##     | 404
+##     |
+##     @
+##

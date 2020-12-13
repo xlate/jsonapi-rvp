@@ -37,7 +37,9 @@ public class EntityMetamodel {
         classMetaMap = new HashMap<>(resourceTypes.size());
         typeMetaMap = new HashMap<>(resourceTypes.size());
 
-        Set<Class<?>> knownTypes = resourceTypes.stream().map(type -> type.getResourceClass()).collect(Collectors.toSet());
+        Set<Class<?>> knownTypes = resourceTypes.stream()
+                                                .map(JsonApiResourceType::getResourceClass)
+                                                .collect(Collectors.toSet());
 
         for (JsonApiResourceType<?> entry : resourceTypes) {
             EntityMeta meta = new EntityMeta(resourceClass, entry, model, knownTypes);
