@@ -231,12 +231,14 @@ public class ResourceObjectWriter {
     }
 
     void addCountedRelationship(JsonObjectBuilder relationshipEntry, Long count, boolean many) {
-        if (count == 0) {
-            if (many) {
+        if (many) {
+            relationshipEntry.add("meta", Json.createObjectBuilder().add("count", count));
+
+            if (count == 0) {
                 relationshipEntry.add("data", Json.createArrayBuilder());
-            } else {
-                relationshipEntry.add("data", JsonValue.NULL);
             }
+        } else if (count == 0) {
+            relationshipEntry.add("data", JsonValue.NULL);
         } else {
             relationshipEntry.add("meta", Json.createObjectBuilder().add("count", count));
         }

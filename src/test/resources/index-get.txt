@@ -404,6 +404,9 @@ Post Paging (Offset with default limit)
                'self': '/test/posts/2/relationships/comments',
                'related': '/test/posts/2/comments'
              },
+             'meta': {
+               'count': 0
+             },
              'data': []
            },
            'author': {
@@ -460,6 +463,9 @@ Post Paging (Limit without offset)
                'self': '/test/posts/2/relationships/comments',
                'related': '/test/posts/2/comments'
              },
+             'meta': {
+               'count': 0
+             },
              'data': []
            },
            'author': {
@@ -500,6 +506,9 @@ Post Paging (Size without number)
              'links': {
                'self': '/test/posts/2/relationships/comments',
                'related': '/test/posts/2/comments'
+             },
+             'meta': {
+               'count': 0
              },
              'data': []
            },
