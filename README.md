@@ -86,30 +86,30 @@ Accept: application/vnd.api+json
 ### Response
 ```json
 {
-  'jsonapi':{'version':'1.0'},
-  'data':{
-    'id': '2',
-    'type': 'posts',
-    'attributes': {
-      'title': 'Title Two',
-      'text': 'Text two.'
+  "jsonapi":{"version":"1.0"},
+  "data":{
+    "id": "2",
+    "type": "posts",
+    "attributes": {
+      "title": "Title Two",
+      "text": "Text two."
     },
-    'relationships': {
-      'comments': {
-        'links': {
-          'self': '/test/posts/2/relationships/comments',
-          'related': '/test/posts/2/comments'
+    "relationships": {
+      "comments": {
+        "links": {
+          "self": "/test/posts/2/relationships/comments",
+          "related": "/test/posts/2/comments"
         },
-        'data': [{
-          'type': 'comments', 'id': '2'
+        "data": [{
+          "type": "comments", "id": "2"
         }]
       },
-      'author': {
-        'links': {
-          'self': '/test/posts/2/relationships/author',
-          'related': '/test/posts/2/author'
+      "author": {
+        "links": {
+          "self": "/test/posts/2/relationships/author",
+          "related": "/test/posts/2/author"
         },
-        'data': null
+        "data": null
       }
     },
     "links": {
