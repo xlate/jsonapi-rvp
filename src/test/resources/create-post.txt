@@ -16,6 +16,12 @@ Create Post
                 "title": "Testing"
             },
             "relationships": {
+                "author": {
+                    "links": {
+                        "self": "/test/posts/1/relationships/author",
+                        "related": "/test/posts/1/author"
+                    }
+                },
                 "comments": {
                     "links": {
                         "self": "/test/posts/1/relationships/comments",

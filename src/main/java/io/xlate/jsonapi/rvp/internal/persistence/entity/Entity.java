@@ -66,7 +66,7 @@ public class Entity {
     }
 
     public Object getAttribute(String name) {
-        if (!entityMeta.getAttributeNames().contains(name)) {
+        if (!entityMeta.hasAttribute(name)) {
             throw new IllegalArgumentException("No such attribute: " + name);
         }
 
@@ -82,7 +82,7 @@ public class Entity {
     }
 
     public Object getRelationship(String name) {
-        if (!entityMeta.getRelationshipNames().contains(name)) {
+        if (!entityMeta.getRelationships().containsKey(name)) {
             throw new IllegalArgumentException("No such relationship: " + name);
         }
 

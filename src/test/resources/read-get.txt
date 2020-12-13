@@ -25,6 +25,13 @@ Post By ID With Comments
              'data': [{
                'type': 'comments', 'id': '2'
              }]
+           },
+           'author': {
+             'links': {
+               'self': '/test/posts/2/relationships/author',
+               'related': '/test/posts/2/author'
+             },
+             'data': null
            }
          },
          "links": {

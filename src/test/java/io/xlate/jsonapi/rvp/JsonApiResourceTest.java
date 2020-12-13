@@ -47,6 +47,7 @@ import org.skyscreamer.jsonassert.JSONCompareMode;
 
 import io.xlate.jsonapi.rvp.internal.DefaultJsonApiHandler;
 import io.xlate.jsonapi.rvp.internal.validation.boundary.TransactionalValidator;
+import io.xlate.jsonapi.rvp.test.entity.Author;
 import io.xlate.jsonapi.rvp.test.entity.Comment;
 import io.xlate.jsonapi.rvp.test.entity.Post;
 import io.xlate.jsonapi.rvp.test.entity.ReadOnlyCode;
@@ -84,6 +85,7 @@ class JsonApiResourceTest {
         Mockito.when(target.handlers.iterator()).thenReturn(handlerIterator());
 
         Set<JsonApiResourceType<?>> resourceTypes = new HashSet<>();
+        resourceTypes.add(JsonApiResourceType.define("authors", Author.class).build());
         resourceTypes.add(JsonApiResourceType.define("posts", Post.class).reader("title", String::valueOf).build());
         resourceTypes.add(JsonApiResourceType.define("comments", Comment.class).build());
         resourceTypes.add(JsonApiResourceType.define("readonly-codes", ReadOnlyCode.class).methods(GET.class).build());

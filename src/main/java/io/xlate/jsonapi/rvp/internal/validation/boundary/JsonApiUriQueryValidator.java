@@ -131,7 +131,7 @@ public class JsonApiUriQueryValidator
 
             for (int i = 0; i < elements.length && validFilter; i++) {
                 if (i + 1 == elements.length) {
-                    validFilter = meta.getAttributeNames().contains(elements[i])
+                    validFilter = meta.hasAttribute(elements[i])
                             || meta.getExposedIdAttribute().getName().equals(elements[i]);
                 } else {
                     validFilter = (meta = getRelatedEntityMeta(model, meta, elements[i])) != null;
@@ -185,7 +185,7 @@ public class JsonApiUriQueryValidator
                 boolean descending = sort.startsWith("-");
                 String attribute = sort.substring(descending ? 1 : 0);
 
-                if (!meta.getAttributeNames().contains(attribute)) {
+                if (!meta.hasAttribute(attribute)) {
                     LOGGER.log(Level.FINER, () -> "Invalid attribute name: `" + attribute + "`.");
                     valid = false;
                     addViolation(context, JsonApiQuery.PARAM_SORT, "Sort key `" + sort + "` is not an attribute");

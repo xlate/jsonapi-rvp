@@ -19,6 +19,7 @@ package io.xlate.jsonapi.rvp.internal.persistence.entity;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import javax.persistence.metamodel.Metamodel;
 
@@ -36,8 +37,10 @@ public class EntityMetamodel {
         classMetaMap = new HashMap<>(resourceTypes.size());
         typeMetaMap = new HashMap<>(resourceTypes.size());
 
+        Set<Class<?>> knownTypes = resourceTypes.stream().map(type -> type.getResourceClass()).collect(Collectors.toSet());
+
         for (JsonApiResourceType<?> entry : resourceTypes) {
-            EntityMeta meta = new EntityMeta(resourceClass, entry, model);
+            EntityMeta meta = new EntityMeta(resourceClass, entry, model, knownTypes);
 
             typeMetaMap.put(entry.getName(), meta);
             classMetaMap.put(entry.getResourceClass(), meta);
@@ -53,8 +56,7 @@ public class EntityMetamodel {
             // Deal with JPA proxy classes. Find alternate and add new cross reference
             classMetaMap.keySet()
                         .stream()
-                        .filter(key -> key.isAssignableFrom(entityClass)
-                                || entityClass.getSuperclass().isAssignableFrom(key))
+                        .filter(candidate -> candidate.isAssignableFrom(entityClass))
                         .findFirst()
                         .ifPresent(alternate -> classMetaMap.put(entityClass, classMetaMap.get(alternate)));
         }

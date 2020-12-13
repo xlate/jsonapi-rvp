@@ -88,7 +88,7 @@ public class ResourceObjectWriter {
         EntityMeta meta = bean.getEntityMeta();
         Map<String, Object> related = new TreeMap<>();
 
-        meta.getRelationships().forEach(a -> {
+        meta.getRelationships().values().forEach(a -> {
             Object value;
 
             if (!a.isCollection()) {
@@ -176,10 +176,10 @@ public class ResourceObjectWriter {
         return attributes.build();
     }
 
-    public JsonObject getRelationships(Entity bean,
-                                       Map<String, Object> related,
-                                       JsonApiQuery params,
-                                       UriInfo uriInfo) {
+    JsonObject getRelationships(Entity bean,
+                                Map<String, Object> related,
+                                JsonApiQuery params,
+                                UriInfo uriInfo) {
 
         JsonObjectBuilder jsonRelationships = Json.createObjectBuilder();
         EntityMeta meta = bean.getEntityMeta();
@@ -211,16 +211,13 @@ public class ResourceObjectWriter {
                        // No operation - only links were given if the relationship is an attribute
                        // or the special instance indicating nothing watch fetched
                    } else if (entryValue instanceof Long) {
-                       Long count = (Long) entryValue;
-                       relationshipEntry.add("meta", Json.createObjectBuilder().add("count", count));
+                       addCountedRelationship(relationshipEntry, (Long) entryValue, many);
                    } else if (entryValue instanceof Collection) {
                        JsonValue relationshipData = getRelationshipCollection(fieldName, many, entryValue);
 
                        if (relationshipData != null) {
                            relationshipEntry.add("data", relationshipData);
                        }
-                   } else if (entryValue instanceof Entity && !many) {
-                       relationshipEntry.add("data", getResourceIdentifier((Entity) entryValue));
                    }
 
                    jsonRelationships.add(fieldName, relationshipEntry);
@@ -231,6 +228,18 @@ public class ResourceObjectWriter {
         }
 
         return null;
+    }
+
+    void addCountedRelationship(JsonObjectBuilder relationshipEntry, Long count, boolean many) {
+        if (count == 0) {
+            if (many) {
+                relationshipEntry.add("data", Json.createArrayBuilder());
+            } else {
+                relationshipEntry.add("data", JsonValue.NULL);
+            }
+        } else {
+            relationshipEntry.add("meta", Json.createObjectBuilder().add("count", count));
+        }
     }
 
     JsonValue getRelationshipCollection(String fieldName, boolean many, Object entryValue) {

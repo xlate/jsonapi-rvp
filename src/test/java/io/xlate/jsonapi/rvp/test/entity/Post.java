@@ -4,9 +4,11 @@ import java.util.List;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
+import javax.persistence.FetchType;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
+import javax.persistence.ManyToOne;
 import javax.persistence.OneToMany;
 import javax.persistence.SequenceGenerator;
 import javax.persistence.Table;
@@ -29,6 +31,12 @@ public class Post {
 
     @Column
     private String text;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    private Author author;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    private Unused unused;
 
     @OneToMany(mappedBy = "post")
     private List<Comment> comments;
@@ -55,6 +63,14 @@ public class Post {
 
     public void setText(String text) {
         this.text = text;
+    }
+
+    public Author getAuthor() {
+        return author;
+    }
+
+    public void setAuthor(Author author) {
+        this.author = author;
     }
 
     public List<Comment> getComments() {

@@ -84,6 +84,12 @@ Post's Related Comments with Post Included
                   "self": "/test/posts/2/relationships/comments",
                   "related": "/test/posts/2/comments"
                 }
+              },
+              'author': {
+                'links': {
+                  'self': '/test/posts/2/relationships/author',
+                  'related': '/test/posts/2/author'
+                }
               }
             },
             "links": {
@@ -91,5 +97,19 @@ Post's Related Comments with Post Included
             }
           }
         ]
+      }
+    @
+Post's Author (missing)
+    | [{
+        "sql": "INSERT INTO POSTS (id, title, text) VALUES (2, 'Title Two', 'Text two.')"
+      },{
+        "sql": "INSERT INTO COMMENTS (id, post_id, text) VALUES (2, 2, 'Comment two.')"
+      }]
+    | /test/posts/2/author
+    | posts | 2 | author
+    | 200
+    | {
+       'jsonapi':{'version':'1.0'},
+       'data': null
       }
     @

@@ -38,6 +38,7 @@ import java.util.stream.Stream;
 
 import javax.persistence.metamodel.Attribute;
 import javax.persistence.metamodel.Attribute.PersistentAttributeType;
+import javax.persistence.metamodel.Bindable;
 import javax.persistence.metamodel.EntityType;
 import javax.persistence.metamodel.Metamodel;
 import javax.persistence.metamodel.PluralAttribute;
@@ -86,16 +87,15 @@ public class EntityMeta {
     private final EntityType<?> entityType;
     private final Set<String> methodsAllowed;
 
-    private final Set<SingularAttribute<?, ?>> attributes;
-    private final Set<String> attributeNames;
+    private final Map<String, SingularAttribute<?, ?>> attributes;
     private final Map<String, Function<String, ? extends Object>> readers;
 
-    private final Set<Attribute<?, ?>> relationships;
-    private final Set<String> relationshipNames;
+    private final Map<String, Attribute<?, ?>> relationships;
 
     public EntityMeta(Class<?> resourceClass,
             JsonApiResourceType<?> configuredType,
-            Metamodel model) {
+            Metamodel model,
+            Set<Class<?>> knownTypes) {
 
         this.resourceClass = resourceClass;
         this.configuredType = configuredType;
@@ -109,8 +109,7 @@ public class EntityMeta {
         }
 
         this.entityType = model.entity(entityClass);
-        this.methodsAllowed = configuredType
-                                            .getMethods()
+        this.methodsAllowed = configuredType.getMethods()
                                             .stream().map(method -> method.getAnnotation(HttpMethod.class).value())
                                             .collect(Collectors.toSet());
 
@@ -120,11 +119,9 @@ public class EntityMeta {
                                             && !a.getName().equals(configuredType.getExposedIdAttribute())
                                             && !a.isAssociation()
                                             && a.getPersistentAttributeType() == PersistentAttributeType.BASIC)
-                                    .collect(Collectors.toSet());
+                                    .collect(Collectors.toMap(Attribute::getName, Function.identity()));
 
-        this.attributeNames = attributes.stream().map(Attribute::getName).collect(Collectors.toSet());
-
-        this.readers = attributes.stream()
+        this.readers = attributes.values().stream()
                                  .filter(EntityMeta::readerRequired)
                                  .map(this::readerEntry)
                                  .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
@@ -134,9 +131,8 @@ public class EntityMeta {
                                        .filter(Attribute::isAssociation)
                                        .filter(a -> this.configuredType.getRelationships().isEmpty()
                                                || this.configuredType.getRelationships().contains(a.getName()))
-                                       .collect(Collectors.toSet());
-
-        this.relationshipNames = relationships.stream().map(Attribute::getName).collect(Collectors.toSet());
+                                       .filter(a -> knownTypes.contains(Bindable.class.cast(a).getBindableJavaType()))
+                                       .collect(Collectors.toMap(Attribute::getName, Function.identity()));
 
         this.propertyDescriptors = Arrays.stream(beanInfo.getPropertyDescriptors())
                                          .collect(Collectors.toMap(PropertyDescriptor::getName,
@@ -237,7 +233,7 @@ public class EntityMeta {
     }
 
     public boolean isField(String name) {
-        return getAttributeNames().contains(name) || getRelationshipNames().contains(name);
+        return getAttributes().containsKey(name) || getRelationships().containsKey(name);
     }
 
     @SuppressWarnings("unchecked")
@@ -254,24 +250,24 @@ public class EntityMeta {
         return (SingularAttribute<Object, ?>) attr;
     }
 
-    public Set<SingularAttribute<?, ?>> getAttributes() {
+    public Map<String, SingularAttribute<?, ?>> getAttributes() {
         return attributes;
     }
 
     public Set<String> getAttributeNames() {
-        return attributeNames;
+        return attributes.keySet();
     }
 
     public Map<String, Function<String, ? extends Object>> getReaders() {
         return readers;
     }
 
-    public Set<Attribute<?, ?>> getRelationships() {
+    public Map<String, Attribute<?, ?>> getRelationships() {
         return relationships;
     }
 
     public Set<String> getRelationshipNames() {
-        return relationshipNames;
+        return relationships.keySet();
     }
 
     public Object readId(String value) {
@@ -310,8 +306,12 @@ public class EntityMeta {
         return (EntityType<Object>) entityType;
     }
 
+    public boolean hasAttribute(String attributeName) {
+        return getAttributes().containsKey(attributeName);
+    }
+
     public boolean isRelatedTo(String relationshipName) {
-        return getRelationshipNames().contains(relationshipName);
+        return getRelationships().containsKey(relationshipName);
     }
 
     @SuppressWarnings("unchecked")

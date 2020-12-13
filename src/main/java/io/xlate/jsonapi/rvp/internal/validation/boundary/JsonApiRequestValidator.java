@@ -272,7 +272,7 @@ public class JsonApiRequestValidator implements ConstraintValidator<ValidJsonApi
 
         EntityMeta meta = value.getEntityMeta();
 
-        if (!meta.getAttributeNames().contains(attributeKey)) {
+        if (!meta.hasAttribute(attributeKey)) {
             context.buildConstraintViolationWithTemplate(""
                     + "No such attribute")
                    .addPropertyNode(JsonApiError.attributePointer(attributeKey))
