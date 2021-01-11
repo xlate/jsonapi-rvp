@@ -112,11 +112,8 @@ public class Responses {
                 continue;
             }
 
-            if (!errorMap.containsKey(property)) {
-                errorMap.put(property, new ArrayList<>(2));
-            }
-
-            errorMap.get(property).add(violation.getMessage());
+            errorMap.computeIfAbsent(property, k -> new ArrayList<>(2))
+                .add(violation.getMessage());
         }
 
         JsonArrayBuilder errors = Json.createArrayBuilder();
@@ -180,18 +177,12 @@ public class Responses {
 
             if (meta.getUniqueTuple(property) != null) {
                 for (String constrained : meta.getUniqueTuple(property)) {
-                    if (!errorMap.containsKey(constrained)) {
-                        errorMap.put(constrained, new ArrayList<>(2));
-                    }
-
-                    errorMap.get(constrained).add(new Error("not unique", Status.CONFLICT));
+                    errorMap.computeIfAbsent(constrained, k -> new ArrayList<>(2))
+                        .add(new Error("not unique", Status.CONFLICT));
                 }
             } else {
-                if (!errorMap.containsKey(property)) {
-                    errorMap.put(property, new ArrayList<>(2));
-                }
-
-                errorMap.get(property).add(new Error(violation.getMessage(), null));
+                errorMap.computeIfAbsent(property, k -> new ArrayList<>(2))
+                    .add(new Error(violation.getMessage(), null));
             }
         }
 
