@@ -2,13 +2,14 @@ package io.xlate.jsonapi.rvp.internal.rs.boundary;
 
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 import javax.json.Json;
 import javax.json.JsonArray;
@@ -16,6 +17,7 @@ import javax.json.JsonArrayBuilder;
 import javax.json.JsonObject;
 import javax.json.JsonObjectBuilder;
 import javax.validation.ConstraintViolation;
+import javax.validation.ElementKind;
 import javax.ws.rs.core.CacheControl;
 import javax.ws.rs.core.EntityTag;
 import javax.ws.rs.core.Response;
@@ -103,37 +105,18 @@ public class Responses {
         @SuppressWarnings("unchecked")
         Set<ConstraintViolation<?>> violations = (Set<ConstraintViolation<?>>) violationSet;
 
-        Map<String, List<String>> errorMap = new LinkedHashMap<>();
+        JsonObject jsonErrors = errorsObject(violations.stream()
+                                                       .filter(Responses::isPropertyViolation)
+                                                       .map(JsonApiError::forParameterViolation)
+                                                       .collect(Collectors.toList())).build();
 
-        for (ConstraintViolation<?> violation : violations) {
-            String property = violation.getPropertyPath().toString();
+        context.setResponseBuilder(Response.status(Status.BAD_REQUEST)
+                                           .entity(jsonErrors));
 
-            if (property.isEmpty()) {
-                continue;
-            }
+    }
 
-            errorMap.computeIfAbsent(property, k -> new ArrayList<>(2))
-                .add(violation.getMessage());
-        }
-
-        JsonArrayBuilder errors = Json.createArrayBuilder();
-
-        for (Entry<String, List<String>> property : errorMap.entrySet()) {
-            final String key = property.getKey();
-
-            if (key.isEmpty()) {
-                continue;
-            }
-
-            for (String message : property.getValue()) {
-                JsonApiError error = new JsonApiError("Invalid Query Parameter", message, JsonApiError.Source.forParameter(key));
-                errors.add(error.toJson());
-            }
-        }
-
-        JsonObject jsonErrors = errorsObject(errors).build();
-        context.setResponseBuilder(Response.status(Status.BAD_REQUEST).entity(jsonErrors));
-
+    static boolean isPropertyViolation(ConstraintViolation<?> violation) {
+        return violation.getPropertyPath().iterator().next().getKind() == ElementKind.PROPERTY;
     }
 
     public static void unprocessableEntity(InternalContext context, String title, Set<?> violationSet) {
@@ -178,11 +161,11 @@ public class Responses {
             if (meta.getUniqueTuple(property) != null) {
                 for (String constrained : meta.getUniqueTuple(property)) {
                     errorMap.computeIfAbsent(constrained, k -> new ArrayList<>(2))
-                        .add(new Error("not unique", Status.CONFLICT));
+                            .add(new Error("not unique", Status.CONFLICT));
                 }
             } else {
                 errorMap.computeIfAbsent(property, k -> new ArrayList<>(2))
-                    .add(new Error(violation.getMessage(), null));
+                        .add(new Error(violation.getMessage(), null));
             }
         }
 
@@ -214,6 +197,12 @@ public class Responses {
         JsonApiError error = new JsonApiError(statusCode, message);
         JsonObject errors = errorsObject(Json.createArrayBuilder().add(error.toJson())).build();
         context.setResponseBuilder(Response.status(statusCode).entity(errors));
+    }
+
+    private static JsonObjectBuilder errorsObject(Collection<JsonApiError> errors) {
+        JsonArrayBuilder errorArray = Json.createArrayBuilder();
+        errors.forEach(e -> errorArray.add(e.toJson()));
+        return errorsObject(errorArray);
     }
 
     private static JsonObjectBuilder errorsObject(JsonArrayBuilder errors) {

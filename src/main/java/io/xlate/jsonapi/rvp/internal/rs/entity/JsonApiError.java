@@ -3,6 +3,8 @@ package io.xlate.jsonapi.rvp.internal.rs.entity;
 import javax.json.Json;
 import javax.json.JsonObject;
 import javax.json.JsonObjectBuilder;
+import javax.validation.ConstraintViolation;
+import javax.validation.Path;
 import javax.ws.rs.core.Response.StatusType;
 
 public class JsonApiError {
@@ -15,6 +17,12 @@ public class JsonApiError {
     private final String title;
     private final String detail;
     private final Source source;
+
+    public static JsonApiError forParameterViolation(ConstraintViolation<?> violation) {
+        final Source source = Source.forParameter(violation.getPropertyPath());
+        final String message = violation.getMessage();
+        return new JsonApiError("Invalid Query Parameter", message, source);
+    }
 
     public JsonApiError(StatusType status, String code, String title, String detail, Source source) {
         this.status = status;
@@ -99,8 +107,8 @@ public class JsonApiError {
             return new Source(pointer, null);
         }
 
-        public static Source forParameter(String parameter) {
-            return new Source(null, parameter);
+        public static Source forParameter(Path parameter) {
+            return new Source(null, parameter.iterator().next().getName());
         }
 
         public Source(String pointer, String parameter) {
