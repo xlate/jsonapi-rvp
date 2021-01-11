@@ -9,12 +9,13 @@ Implementation of a [JSON:API](https://jsonapi.org/) server in Java using JAX-RS
 - Align client interface with JPA `EntityManager`
 
 ## Maven Coordinates
+Replace `VERSION` with the latest from Maven Central: [![Maven Central](https://img.shields.io/maven-central/v/io.xlate/jsonapi-rvp)](https://search.maven.org/artifact/io.xlate/jsonapi-rvp)
 
 ```xml
 <dependency>
   <groupId>io.xlate</groupId>
   <artifactId>jsonapi-rvp</artifactId>
-  <version>0.0.7</version>
+  <version>VERSION</version>
 </dependency>
 ```
 
