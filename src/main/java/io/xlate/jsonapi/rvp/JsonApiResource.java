@@ -74,6 +74,8 @@ import io.xlate.jsonapi.rvp.internal.validation.boundary.TransactionalValidator;
 @Produces(JsonApiMediaType.APPLICATION_JSONAPI)
 public abstract class JsonApiResource {
 
+    private static final String CLIENT_PATH = "/io/xlate/jsonapi/rvp/internal/rs/boundary/client.js";
+
     @Inject
     @Any
     Instance<JsonApiHandler<?>> handlers;
@@ -156,8 +158,7 @@ public abstract class JsonApiResource {
         StringBuilder buffer = new StringBuilder();
 
         try {
-            try (Reader prototype = new InputStreamReader(JsonApiResource.class.getResourceAsStream("/META-INF/jsonapi-rvp-client.js"))) {
-
+            try (Reader prototype = new InputStreamReader(JsonApiResource.class.getResourceAsStream(CLIENT_PATH))) {
                 var builder = UriBuilder.fromUri(uri);
                 builder.replacePath("").path(resourceClass);
                 buffer.append(String.format("const baseAdminUrl = '%s';%n%n", builder.build().toString()));
