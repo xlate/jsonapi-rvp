@@ -30,6 +30,7 @@ import javax.ws.rs.core.UriInfo;
 import io.xlate.jsonapi.rvp.JsonApiStatus;
 import io.xlate.jsonapi.rvp.internal.JsonApiErrorException;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMeta;
+import io.xlate.jsonapi.rvp.internal.rs.entity.InternalContext;
 import io.xlate.jsonapi.rvp.internal.rs.entity.JsonApiError;
 
 public class Responses {

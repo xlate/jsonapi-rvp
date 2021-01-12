@@ -1,4 +1,4 @@
-package io.xlate.jsonapi.rvp.internal.rs.boundary;
+package io.xlate.jsonapi.rvp.internal.rs.entity;
 
 import java.util.HashMap;
 import java.util.Map;
