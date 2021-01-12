@@ -42,7 +42,6 @@ import javax.persistence.metamodel.Attribute;
 import javax.persistence.metamodel.Bindable;
 import javax.persistence.metamodel.EntityType;
 
-import io.xlate.jsonapi.rvp.JsonApiContext;
 import io.xlate.jsonapi.rvp.JsonApiStatus;
 import io.xlate.jsonapi.rvp.internal.JsonApiErrorException;
 import io.xlate.jsonapi.rvp.internal.persistence.boundary.PersistenceController;
@@ -96,7 +95,7 @@ public class ResourceObjectReader {
         this.model = model;
     }
 
-    public void fromJson(PersistenceController persistence, JsonApiContext context, Object target, JsonObject source) {
+    public void fromJson(PersistenceController persistence, InternalContext context, Object target, JsonObject source) {
         JsonObject data = source.getJsonObject("data");
 
         if (data.containsKey("attributes")) {
@@ -113,7 +112,7 @@ public class ResourceObjectReader {
     }
 
     void readRelationships(PersistenceController persistence,
-                           JsonApiContext context,
+                           InternalContext context,
                            Object entity,
                            JsonObject data,
                            EntityType<Object> rootType) {
@@ -141,7 +140,7 @@ public class ResourceObjectReader {
     }
 
     void readRelationshipArray(PersistenceController persistence,
-                               JsonApiContext context,
+                               InternalContext context,
                                Object entity,
                                String fieldName,
                                JsonArray relationshipData,
@@ -157,7 +156,7 @@ public class ResourceObjectReader {
     }
 
     void readRelationshipObject(PersistenceController persistence,
-                                JsonApiContext context,
+                                InternalContext context,
                                 Object entity,
                                 String fieldName,
                                 JsonValue relationshipData,
@@ -178,7 +177,7 @@ public class ResourceObjectReader {
         putSingularRelationship(entity, model.getEntityMeta(entity.getClass()), fieldName, replacement);
     }
 
-    Object findReplacement(PersistenceController persistence, JsonApiContext context, JsonObject resourceId, String fieldName, JsonArrayBuilder errors) {
+    Object findReplacement(PersistenceController persistence, InternalContext context, JsonObject resourceId, String fieldName, JsonArrayBuilder errors) {
         final String type = resourceId.getString("type");
         final String id = resourceId.getString("id");
         final Object replacement = persistence.findObject(context, type, id);

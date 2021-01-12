@@ -66,7 +66,6 @@ import javax.validation.ConstraintViolationException;
 import javax.ws.rs.core.Response.Status;
 import javax.ws.rs.core.UriInfo;
 
-import io.xlate.jsonapi.rvp.JsonApiContext;
 import io.xlate.jsonapi.rvp.JsonApiContext.Attributes;
 import io.xlate.jsonapi.rvp.JsonApiHandler;
 import io.xlate.jsonapi.rvp.JsonApiQuery;
@@ -74,6 +73,7 @@ import io.xlate.jsonapi.rvp.internal.JsonApiErrorException;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.Entity;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMeta;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMetamodel;
+import io.xlate.jsonapi.rvp.internal.rs.boundary.InternalContext;
 import io.xlate.jsonapi.rvp.internal.rs.boundary.ResourceObjectReader;
 import io.xlate.jsonapi.rvp.internal.rs.boundary.ResourceObjectWriter;
 import io.xlate.jsonapi.rvp.internal.validation.boundary.TransactionalValidator;
@@ -134,7 +134,7 @@ public class PersistenceController {
         return Collections.emptyList();
     }
 
-    public JsonObject getRelationships(JsonApiContext context) {
+    public JsonObject getRelationships(InternalContext context) {
 
         String resourceType = context.getResourceType();
         EntityMeta meta = model.getEntityMeta(resourceType);
@@ -168,13 +168,13 @@ public class PersistenceController {
                                                        .collect(Collectors.toSet()));
     }
 
-    Class<?>[] getValidationGroups(JsonApiContext context) {
+    Class<?>[] getValidationGroups(InternalContext context) {
         Object groupsAttribute = context.getAttribute(Attributes.VALIDATION_GROUPS);
         return groupsAttribute instanceof Class[] ? (Class<?>[]) groupsAttribute : new Class<?>[0];
     }
 
     @SuppressWarnings("unchecked")
-    public <T> JsonObject create(JsonApiContext context, JsonApiHandler<T> handler) {
+    public <T> JsonObject create(InternalContext context, JsonApiHandler<T> handler) {
         JsonObject input = context.getRequestEntity();
         UriInfo uriInfo = context.getUriInfo();
         // Not null due to upstream validation
@@ -213,7 +213,7 @@ public class PersistenceController {
         return writer.toJsonApiResource(new Entity(meta, entity), uriInfo);
     }
 
-    public <T> JsonObject update(JsonApiContext context, JsonApiHandler<T> handler) {
+    public <T> JsonObject update(InternalContext context, JsonApiHandler<T> handler) {
         final String resourceType = context.getResourceType();
         // Not null due to upstream validation
         EntityMeta meta = model.getEntityMeta(resourceType);
@@ -253,7 +253,7 @@ public class PersistenceController {
         return writer.toJsonApiResource(new Entity(meta, updatedEntity), uriInfo);
     }
 
-    public <T> boolean delete(JsonApiContext context, JsonApiHandler<T> handler) {
+    public <T> boolean delete(InternalContext context, JsonApiHandler<T> handler) {
         String resourceType = context.getResourceType();
         String id = context.getResourceId();
 
@@ -358,7 +358,7 @@ public class PersistenceController {
     }
 
     @SuppressWarnings("unchecked")
-    public <T> T findObject(JsonApiContext context, String resourceType, String id) {
+    public <T> T findObject(InternalContext context, String resourceType, String id) {
         EntityMeta meta = model.getEntityMeta(resourceType);
         EntityType<Object> rootType = meta.getEntityType();
         Class<T> entityClass = (Class<T>) meta.getEntityClass();
@@ -404,7 +404,7 @@ public class PersistenceController {
         return entity;
     }
 
-    public <T> JsonObject fetch(JsonApiContext context, JsonApiHandler<T> handler) {
+    public <T> JsonObject fetch(InternalContext context, JsonApiHandler<T> handler) {
         final JsonApiQuery params = context.getQuery();
         final EntityMeta meta;
         final EntityMeta relatedMeta;
@@ -489,7 +489,7 @@ public class PersistenceController {
         return response.build();
     }
 
-    FetchQueries buildQueries(JsonApiContext context, EntityMeta meta, EntityMeta relatedMeta) {
+    FetchQueries buildQueries(InternalContext context, EntityMeta meta, EntityMeta relatedMeta) {
         JsonApiQuery params = context.getQuery();
         final String relationshipName = context.getRelationshipName();
 

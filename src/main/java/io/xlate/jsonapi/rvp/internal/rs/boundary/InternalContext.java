@@ -60,17 +60,14 @@ public class InternalContext implements JsonApiContext {
         this(request, uriInfo, security, resourceType, null, null, null);
     }
 
-    @Override
     public Request getRequest() {
         return request;
     }
 
-    @Override
     public UriInfo getUriInfo() {
         return uriInfo;
     }
 
-    @Override
     public SecurityContext getSecurity() {
         return security;
     }

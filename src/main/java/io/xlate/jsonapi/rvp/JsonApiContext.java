@@ -1,11 +1,8 @@
 package io.xlate.jsonapi.rvp;
 
 import javax.json.JsonObject;
-import javax.ws.rs.core.Request;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.StatusType;
-import javax.ws.rs.core.SecurityContext;
-import javax.ws.rs.core.UriInfo;
 
 public interface JsonApiContext {
 
@@ -14,12 +11,6 @@ public interface JsonApiContext {
 
         public static final String VALIDATION_GROUPS = Attributes.class.getPackageName() + ".VALIDATION_GROUPS";
     }
-
-    Request getRequest();
-
-    UriInfo getUriInfo();
-
-    SecurityContext getSecurity();
 
     String getResourceType();
 
