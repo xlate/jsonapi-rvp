@@ -27,9 +27,9 @@ import javax.validation.ConstraintValidator;
 import javax.validation.ConstraintValidatorContext;
 import javax.ws.rs.core.MultivaluedMap;
 
-import io.xlate.jsonapi.rvp.JsonApiQuery;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMeta;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMetamodel;
+import io.xlate.jsonapi.rvp.internal.rs.entity.JsonApiQuery;
 
 public class JsonApiUriQueryValidator
         implements ConstraintValidator<ValidJsonApiQuery, JsonApiQuery> {

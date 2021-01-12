@@ -41,10 +41,10 @@ import javax.persistence.metamodel.Attribute;
 import javax.ws.rs.core.UriBuilder;
 import javax.ws.rs.core.UriInfo;
 
-import io.xlate.jsonapi.rvp.JsonApiQuery;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.Entity;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMeta;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMetamodel;
+import io.xlate.jsonapi.rvp.internal.rs.entity.JsonApiQuery;
 
 public class ResourceObjectWriter {
 

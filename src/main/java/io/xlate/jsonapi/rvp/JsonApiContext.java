@@ -4,6 +4,8 @@ import javax.json.JsonObject;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.StatusType;
 
+import io.xlate.jsonapi.rvp.internal.rs.entity.JsonApiQuery;
+
 public interface JsonApiContext {
 
     public static class Attributes {

@@ -69,6 +69,7 @@ import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMeta;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMetamodel;
 import io.xlate.jsonapi.rvp.internal.rs.boundary.Responses;
 import io.xlate.jsonapi.rvp.internal.rs.entity.InternalContext;
+import io.xlate.jsonapi.rvp.internal.rs.entity.JsonApiQuery;
 import io.xlate.jsonapi.rvp.internal.rs.entity.JsonApiRequest;
 import io.xlate.jsonapi.rvp.internal.validation.boundary.TransactionalValidator;
 

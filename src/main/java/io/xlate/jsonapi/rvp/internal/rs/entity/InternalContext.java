@@ -12,7 +12,6 @@ import javax.ws.rs.core.SecurityContext;
 import javax.ws.rs.core.UriInfo;
 
 import io.xlate.jsonapi.rvp.JsonApiContext;
-import io.xlate.jsonapi.rvp.JsonApiQuery;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMeta;
 
 public class InternalContext implements JsonApiContext {
