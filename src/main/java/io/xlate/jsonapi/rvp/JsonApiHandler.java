@@ -1,10 +1,16 @@
 package io.xlate.jsonapi.rvp;
 
 import java.util.Set;
+import java.util.logging.Logger;
 
 import javax.validation.ConstraintViolation;
 
 public interface JsonApiHandler<T> {
+
+    static class LoggerHolder {
+        private static final Logger logger = Logger.getLogger(JsonApiHandler.class.getName()); // NOSONAR
+        private LoggerHolder() {}
+    }
 
     boolean isHandler(String resourceType, String httpMethod);
 
@@ -15,6 +21,7 @@ public interface JsonApiHandler<T> {
      * @param context
      */
     default void onRequest(JsonApiContext context) {
+        LoggerHolder.logger.finest("Default onRequest called");
     }
 
     /**
@@ -24,6 +31,7 @@ public interface JsonApiHandler<T> {
      * @param violations
      */
     default void afterValidation(JsonApiContext context, Set<ConstraintViolation<?>> violations) {
+        LoggerHolder.logger.finest("Default afterValidation called");
     }
 
     /**
@@ -34,6 +42,7 @@ public interface JsonApiHandler<T> {
      * @param entity
      */
     default void afterFind(JsonApiContext context, T entity) {
+        LoggerHolder.logger.finest("Default afterFind called");
     }
 
     /**
@@ -44,6 +53,7 @@ public interface JsonApiHandler<T> {
      * @param entity
      */
     default void beforeUpdate(JsonApiContext context, T entity) {
+        LoggerHolder.logger.finest("Default beforeUpdate called");
     }
 
     /**
@@ -54,6 +64,7 @@ public interface JsonApiHandler<T> {
      * @param entity
      */
     default void afterUpdate(JsonApiContext context, T entity) {
+        LoggerHolder.logger.finest("Default afterUpdate called");
     }
 
 
@@ -65,6 +76,7 @@ public interface JsonApiHandler<T> {
      * @param entity
      */
     default void beforePersist(JsonApiContext context, T entity) {
+        LoggerHolder.logger.finest("Default beforePersist called");
     }
 
     /**
@@ -75,6 +87,7 @@ public interface JsonApiHandler<T> {
      * @param entity
      */
     default void afterPersist(JsonApiContext context, T entity) {
+        LoggerHolder.logger.finest("Default afterPersist called");
     }
 
     /**
@@ -86,6 +99,7 @@ public interface JsonApiHandler<T> {
      * @param entity
      */
     default void beforeMerge(JsonApiContext context, T entity) {
+        LoggerHolder.logger.finest("Default beforeMerge called");
     }
 
     /**
@@ -97,6 +111,7 @@ public interface JsonApiHandler<T> {
      * @param entity
      */
     default void afterMerge(JsonApiContext context, T entity) {
+        LoggerHolder.logger.finest("Default afterMerge called");
     }
 
     /**
@@ -107,6 +122,7 @@ public interface JsonApiHandler<T> {
      * @param entity
      */
     default void beforeDelete(JsonApiContext context, T entity) {
+        LoggerHolder.logger.finest("Default beforeDelete called");
     }
 
     /**
@@ -117,6 +133,7 @@ public interface JsonApiHandler<T> {
      * @param entity
      */
     default void afterDelete(JsonApiContext context, T entity) {
+        LoggerHolder.logger.finest("Default afterDelete called");
     }
 
     /**
@@ -125,6 +142,7 @@ public interface JsonApiHandler<T> {
      * @param context
      */
     default void beforeResponse(JsonApiContext context) {
+        LoggerHolder.logger.finest("Default beforeResponse called");
     }
 
 }

@@ -25,62 +25,62 @@ public class JsonApiHandlerChain implements JsonApiHandler<Object> {
 
     @Override
     public void onRequest(JsonApiContext context) {
-        chain.stream().forEach(handler -> handler.onRequest(context));
+        chain.forEach(handler -> handler.onRequest(context));
     }
 
     @Override
     public void afterValidation(JsonApiContext context, Set<ConstraintViolation<?>> violations) {
-        chain.stream().forEach(handler -> handler.afterValidation(context, violations));
+        chain.forEach(handler -> handler.afterValidation(context, violations));
     }
 
     @Override
     public void afterFind(JsonApiContext context, Object entity) {
-        chain.stream().forEach(handler -> handler.afterFind(context, entity));
+        chain.forEach(handler -> handler.afterFind(context, entity));
     }
 
     @Override
     public void beforePersist(JsonApiContext context, Object entity) {
-        chain.stream().forEach(handler -> handler.beforePersist(context, entity));
+        chain.forEach(handler -> handler.beforePersist(context, entity));
     }
 
     @Override
     public void afterPersist(JsonApiContext context, Object entity) {
-        chain.stream().forEach(handler -> handler.afterPersist(context, entity));
+        chain.forEach(handler -> handler.afterPersist(context, entity));
     }
 
     @Override
     public void beforeUpdate(JsonApiContext context, Object entity) {
-        chain.stream().forEach(handler -> handler.beforeUpdate(context, entity));
+        chain.forEach(handler -> handler.beforeUpdate(context, entity));
     }
 
     @Override
     public void afterUpdate(JsonApiContext context, Object entity) {
-        chain.stream().forEach(handler -> handler.afterUpdate(context, entity));
+        chain.forEach(handler -> handler.afterUpdate(context, entity));
     }
 
     @Override
     public void beforeMerge(JsonApiContext context, Object entity) {
-        chain.stream().forEach(handler -> handler.beforeMerge(context, entity));
+        chain.forEach(handler -> handler.beforeMerge(context, entity));
     }
 
     @Override
     public void afterMerge(JsonApiContext context, Object entity) {
-        chain.stream().forEach(handler -> handler.afterMerge(context, entity));
+        chain.forEach(handler -> handler.afterMerge(context, entity));
     }
 
     @Override
     public void beforeDelete(JsonApiContext context, Object entity) {
-        chain.stream().forEach(handler -> handler.beforeDelete(context, entity));
+        chain.forEach(handler -> handler.beforeDelete(context, entity));
     }
 
     @Override
     public void afterDelete(JsonApiContext context, Object entity) {
-        chain.stream().forEach(handler -> handler.afterDelete(context, entity));
+        chain.forEach(handler -> handler.afterDelete(context, entity));
     }
 
     @Override
     public void beforeResponse(JsonApiContext context) {
-        chain.stream().forEach(handler -> handler.beforeResponse(context));
+        chain.forEach(handler -> handler.beforeResponse(context));
     }
 
 }
