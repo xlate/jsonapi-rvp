@@ -66,7 +66,7 @@ async function create(type, attributes, relationships) {
         .catch(console.warn);
 }
 
-async function fetchData(type, path, fields = {}, filters = {}, include = [], sort = [], pageOffset = null, pageLimit = null) {
+async function fetchData(path, fields = {}, filters = {}, include = [], sort = [], pageOffset = null, pageLimit = null) {
     let url = baseAdminUrl + '/' + path;
     let params = [];
 
@@ -124,7 +124,7 @@ async function fetchData(type, path, fields = {}, filters = {}, include = [], so
  * @param {number} [params.pageLimit] position of the last result (exclusive), numbered from 0
  */
 async function fetchList(type, { fields = [], filters = {}, include = [], sort = [], pageOffset, pageLimit } = {}) {
-    return fetchData(type, type, fields, filters, include, sort, pageOffset, pageLimit);
+    return fetchData(type, fields, filters, include, sort, pageOffset, pageLimit);
 }
 
 /**
@@ -136,7 +136,7 @@ async function fetchList(type, { fields = [], filters = {}, include = [], sort =
  * @param {Array.<string>} [params.include = []] included relationships
  */
 async function fetchSingle(type, id, { fields = {}, filters = {}, include = [] } = {}) {
-    return fetchData(type, type + '/' + id, fields, filters, include);
+    return fetchData(type + '/' + id, fields, filters, include);
 }
 
 /**

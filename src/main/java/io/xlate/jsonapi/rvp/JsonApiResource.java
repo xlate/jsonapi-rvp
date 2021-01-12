@@ -29,6 +29,8 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import javax.enterprise.inject.Any;
 import javax.enterprise.inject.Instance;
@@ -74,7 +76,8 @@ import io.xlate.jsonapi.rvp.internal.validation.boundary.TransactionalValidator;
 @Produces(JsonApiMediaType.APPLICATION_JSONAPI)
 public abstract class JsonApiResource {
 
-    private static final String CLIENT_PATH = "/io/xlate/jsonapi/rvp/internal/rs/boundary/client.js";
+    private static final Logger logger = Logger.getLogger(JsonApiResource.class.getName());
+    private static final String CLIENT_PATH = "internal/rs/boundary/client.js";
 
     @Inject
     @Any
@@ -126,8 +129,7 @@ public abstract class JsonApiResource {
         cacheControl.setPrivate(true);
     }
 
-    @SuppressWarnings("java:S1452") // Suppress Sonar warnings regarding missing generic types
-    protected Set<ConstraintViolation<?>> validateParameters(JsonApiQuery params) {
+    protected Set<ConstraintViolation<JsonApiQuery>> validateParameters(JsonApiQuery params) {
         return Collections.unmodifiableSet(validator.validate(params));
     }
 
@@ -283,7 +285,7 @@ public abstract class JsonApiResource {
 
         handler.onRequest(context);
 
-        Set<ConstraintViolation<?>> violations = validateParameters(params);
+        Set<ConstraintViolation<JsonApiQuery>> violations = validateParameters(params);
 
         if (violations.isEmpty()) {
             JsonObject response = persistence.fetch(context, handler);
@@ -331,7 +333,6 @@ public abstract class JsonApiResource {
         return context.getResponseBuilder().build();
     }
 
-    @SuppressWarnings("unused")
     @PATCH
     @Path("{resource-type}/{id}/relationships/{relationship-name}")
     public Response replaceRelationship(@PathParam("resource-type") String resourceType,
@@ -342,7 +343,6 @@ public abstract class JsonApiResource {
         return Responses.notImplemented().build();
     }
 
-    @SuppressWarnings("unused")
     @POST
     @Path("{resource-type}/{id}/relationships/{relationship-name}")
     public Response addRelationship(@PathParam("resource-type") String resourceType,
@@ -353,7 +353,6 @@ public abstract class JsonApiResource {
         return Responses.notImplemented().build();
     }
 
-    @SuppressWarnings("unused")
     @DELETE
     @Path("{resource-type}/{id}/relationships/{relationship-name}")
     public Response deleteRelationship(@PathParam("resource-type") String resourceType,
@@ -456,7 +455,8 @@ public abstract class JsonApiResource {
     boolean isValidId(EntityMeta meta, String id) {
         try {
             return meta != null && meta.readId(id) != null;
-        } catch (@SuppressWarnings("unused") Exception e) {
+        } catch (Exception e) {
+            logger.log(Level.FINER, e, () -> "Exception reading id value `" + id + "`");
             return false;
         }
     }
