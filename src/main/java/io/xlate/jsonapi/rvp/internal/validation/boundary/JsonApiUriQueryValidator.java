@@ -29,10 +29,10 @@ import javax.ws.rs.core.MultivaluedMap;
 
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMeta;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMetamodel;
-import io.xlate.jsonapi.rvp.internal.rs.entity.JsonApiQuery;
+import io.xlate.jsonapi.rvp.internal.rs.entity.InternalQuery;
 
 public class JsonApiUriQueryValidator
-        implements ConstraintValidator<ValidJsonApiQuery, JsonApiQuery> {
+        implements ConstraintValidator<ValidJsonApiQuery, InternalQuery> {
 
     private static final Logger LOGGER = Logger.getLogger(JsonApiUriQueryValidator.class.getName());
 
@@ -45,7 +45,7 @@ public class JsonApiUriQueryValidator
     }
 
     @Override
-    public boolean isValid(JsonApiQuery value, ConstraintValidatorContext context) {
+    public boolean isValid(InternalQuery value, ConstraintValidatorContext context) {
         boolean valid = true;
 
         MultivaluedMap<String, String> params = value.getUriInfo().getQueryParameters();
@@ -54,31 +54,31 @@ public class JsonApiUriQueryValidator
         valid = validateFields(value, context, valid);
         valid = validateFilters(value, context, valid);
 
-        if (params.containsKey(JsonApiQuery.PARAM_INCLUDE)) {
+        if (params.containsKey(InternalQuery.PARAM_INCLUDE)) {
             valid = validateInclude(value, params, context, valid);
         }
 
-        if (params.containsKey(JsonApiQuery.PARAM_SORT)) {
+        if (params.containsKey(InternalQuery.PARAM_SORT)) {
             valid = validateSort(value, id, params, context, valid);
         }
 
-        valid = validatePaging(id, JsonApiQuery.PARAM_PAGE_NUMBER, params, context, valid);
-        valid = validatePaging(id, JsonApiQuery.PARAM_PAGE_SIZE, params, context, valid);
+        valid = validatePaging(id, InternalQuery.PARAM_PAGE_NUMBER, params, context, valid);
+        valid = validatePaging(id, InternalQuery.PARAM_PAGE_SIZE, params, context, valid);
 
-        valid = validatePaging(id, JsonApiQuery.PARAM_PAGE_OFFSET, params, context, valid);
-        valid = validatePaging(id, JsonApiQuery.PARAM_PAGE_LIMIT, params, context, valid);
+        valid = validatePaging(id, InternalQuery.PARAM_PAGE_OFFSET, params, context, valid);
+        valid = validatePaging(id, InternalQuery.PARAM_PAGE_LIMIT, params, context, valid);
 
         return valid;
     }
 
-    boolean validateInclude(JsonApiQuery value,
+    boolean validateInclude(InternalQuery value,
                             MultivaluedMap<String, String> params,
                             ConstraintValidatorContext context,
                             boolean valid) {
 
         EntityMeta meta = getEntityMeta(value);
-        List<String> includeParams = params.get(JsonApiQuery.PARAM_INCLUDE);
-        valid = validateSingle(JsonApiQuery.PARAM_INCLUDE, includeParams, context, valid);
+        List<String> includeParams = params.get(InternalQuery.PARAM_INCLUDE);
+        valid = validateSingle(InternalQuery.PARAM_INCLUDE, includeParams, context, valid);
 
         String includeParam = includeParams.get(0);
         Set<String> included = new HashSet<>();
@@ -86,7 +86,7 @@ public class JsonApiUriQueryValidator
         for (String attribute : includeParam.split(",")) {
             if (!included.contains(attribute) && !meta.isRelatedTo(attribute)) {
                 valid = false;
-                addViolation(context, JsonApiQuery.PARAM_INCLUDE, "Invalid relationship: `" + attribute + "`");
+                addViolation(context, InternalQuery.PARAM_INCLUDE, "Invalid relationship: `" + attribute + "`");
             }
 
             included.add(attribute);
@@ -95,7 +95,7 @@ public class JsonApiUriQueryValidator
         return valid;
     }
 
-    boolean validateFields(JsonApiQuery value, ConstraintValidatorContext context, boolean valid) {
+    boolean validateFields(InternalQuery value, ConstraintValidatorContext context, boolean valid) {
         EntityMetamodel model = value.getModel();
 
         for (Entry<String, List<String>> fields : value.getFields().entrySet()) {
@@ -120,7 +120,7 @@ public class JsonApiUriQueryValidator
         return valid;
     }
 
-    boolean validateFilters(JsonApiQuery value, ConstraintValidatorContext context, boolean valid) {
+    boolean validateFilters(InternalQuery value, ConstraintValidatorContext context, boolean valid) {
         EntityMetamodel model = value.getModel();
 
         for (Entry<String, String> filter : value.getFilters().entrySet()) {
@@ -164,7 +164,7 @@ public class JsonApiUriQueryValidator
         return null;
     }
 
-    boolean validateSort(JsonApiQuery value,
+    boolean validateSort(InternalQuery value,
                          String id,
                          MultivaluedMap<String, String> params,
                          ConstraintValidatorContext context,
@@ -174,10 +174,10 @@ public class JsonApiUriQueryValidator
 
         if (id != null) {
             valid = false;
-            addViolation(context, JsonApiQuery.PARAM_SORT, "Single resource can not be sorted");
+            addViolation(context, InternalQuery.PARAM_SORT, "Single resource can not be sorted");
         } else {
-            List<String> sortParams = params.get(JsonApiQuery.PARAM_SORT);
-            valid = validateSingle(JsonApiQuery.PARAM_SORT, sortParams, context, valid);
+            List<String> sortParams = params.get(InternalQuery.PARAM_SORT);
+            valid = validateSingle(InternalQuery.PARAM_SORT, sortParams, context, valid);
 
             String sortParam = sortParams.get(0);
 
@@ -188,7 +188,7 @@ public class JsonApiUriQueryValidator
                 if (!meta.hasAttribute(attribute)) {
                     LOGGER.log(Level.FINER, () -> "Invalid attribute name: `" + attribute + "`.");
                     valid = false;
-                    addViolation(context, JsonApiQuery.PARAM_SORT, "Sort key `" + sort + "` is not an attribute");
+                    addViolation(context, InternalQuery.PARAM_SORT, "Sort key `" + sort + "` is not an attribute");
                 }
             }
         }
@@ -196,7 +196,7 @@ public class JsonApiUriQueryValidator
         return valid;
     }
 
-    EntityMeta getEntityMeta(JsonApiQuery value) {
+    EntityMeta getEntityMeta(InternalQuery value) {
         EntityMeta meta = value.getEntityMeta();
         String relationshipName = value.getRelationshipName();
 

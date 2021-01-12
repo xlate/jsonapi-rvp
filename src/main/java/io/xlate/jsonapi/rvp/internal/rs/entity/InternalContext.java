@@ -22,7 +22,7 @@ public class InternalContext implements JsonApiContext {
     private final String resourceType;
     private final String resourceId;
     private final String relationshipName;
-    private JsonApiQuery query;
+    private InternalQuery query;
     private EntityMeta entityMeta;
     private final JsonObject requestEntity;
 
@@ -87,11 +87,11 @@ public class InternalContext implements JsonApiContext {
     }
 
     @Override
-    public JsonApiQuery getQuery() {
+    public InternalQuery getQuery() {
         return query;
     }
 
-    public void setQuery(JsonApiQuery query) {
+    public void setQuery(InternalQuery query) {
         this.query = query;
     }
 

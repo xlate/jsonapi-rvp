@@ -69,7 +69,7 @@ import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMeta;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMetamodel;
 import io.xlate.jsonapi.rvp.internal.rs.boundary.Responses;
 import io.xlate.jsonapi.rvp.internal.rs.entity.InternalContext;
-import io.xlate.jsonapi.rvp.internal.rs.entity.JsonApiQuery;
+import io.xlate.jsonapi.rvp.internal.rs.entity.InternalQuery;
 import io.xlate.jsonapi.rvp.internal.rs.entity.JsonApiRequest;
 import io.xlate.jsonapi.rvp.internal.validation.boundary.TransactionalValidator;
 
@@ -130,7 +130,7 @@ public abstract class JsonApiResource {
         cacheControl.setPrivate(true);
     }
 
-    protected Set<ConstraintViolation<JsonApiQuery>> validateParameters(JsonApiQuery params) {
+    protected Set<ConstraintViolation<InternalQuery>> validateParameters(InternalQuery params) {
         return Collections.unmodifiableSet(validator.validate(params));
     }
 
@@ -281,12 +281,12 @@ public abstract class JsonApiResource {
     }
 
     void fetch(InternalContext context, EntityMeta meta, JsonApiHandler<?> handler) {
-        JsonApiQuery params = new JsonApiQuery(this.model, meta, context.getResourceId(), context.getRelationshipName(), context.getUriInfo());
+        InternalQuery params = new InternalQuery(this.model, meta, context.getResourceId(), context.getRelationshipName(), context.getUriInfo());
         context.setQuery(params);
 
         handler.onRequest(context);
 
-        Set<ConstraintViolation<JsonApiQuery>> violations = validateParameters(params);
+        Set<ConstraintViolation<InternalQuery>> violations = validateParameters(params);
 
         if (violations.isEmpty()) {
             JsonObject response = persistence.fetch(context, handler);

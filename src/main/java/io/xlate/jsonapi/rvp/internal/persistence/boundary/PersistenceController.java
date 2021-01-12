@@ -75,7 +75,7 @@ import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMetamodel;
 import io.xlate.jsonapi.rvp.internal.rs.boundary.ResourceObjectReader;
 import io.xlate.jsonapi.rvp.internal.rs.boundary.ResourceObjectWriter;
 import io.xlate.jsonapi.rvp.internal.rs.entity.InternalContext;
-import io.xlate.jsonapi.rvp.internal.rs.entity.JsonApiQuery;
+import io.xlate.jsonapi.rvp.internal.rs.entity.InternalQuery;
 import io.xlate.jsonapi.rvp.internal.validation.boundary.TransactionalValidator;
 
 public class PersistenceController {
@@ -112,7 +112,7 @@ public class PersistenceController {
         }
     }
 
-    List<Order> getOrderBy(CriteriaBuilder builder, Root<Object> root, JsonApiQuery params) {
+    List<Order> getOrderBy(CriteriaBuilder builder, Root<Object> root, InternalQuery params) {
         List<String> sortKeys = params.getSort();
 
         if (!sortKeys.isEmpty()) {
@@ -405,7 +405,7 @@ public class PersistenceController {
     }
 
     public <T> JsonObject fetch(InternalContext context, JsonApiHandler<T> handler) {
-        final JsonApiQuery params = context.getQuery();
+        final InternalQuery params = context.getQuery();
         final EntityMeta meta;
         final EntityMeta relatedMeta;
         final String relationshipName = context.getRelationshipName();
@@ -490,7 +490,7 @@ public class PersistenceController {
     }
 
     FetchQueries buildQueries(InternalContext context, EntityMeta meta, EntityMeta relatedMeta) {
-        JsonApiQuery params = context.getQuery();
+        InternalQuery params = context.getQuery();
         final String relationshipName = context.getRelationshipName();
 
         Class<Object> entityClass = meta.getEntityClass();
@@ -720,11 +720,11 @@ public class PersistenceController {
         return relationships;
     }
 
-    boolean notFoundPrimaryResource(JsonValue dataEntry, EntityMeta relatedMeta, String relationshipName, JsonApiQuery params) {
+    boolean notFoundPrimaryResource(JsonValue dataEntry, EntityMeta relatedMeta, String relationshipName, InternalQuery params) {
         return dataEntry == null && relationshipName == null && isSingular(relatedMeta, relationshipName, params);
     }
 
-    boolean isSingular(EntityMeta relatedMeta, String relationshipName, JsonApiQuery params) {
+    boolean isSingular(EntityMeta relatedMeta, String relationshipName, InternalQuery params) {
         final boolean singular;
 
         if (params.getId() != null) {
@@ -748,7 +748,7 @@ public class PersistenceController {
                             .collect(Collectors.toSet());
     }
 
-    JsonArrayBuilder mapIncludedToJson(JsonApiQuery params, Set<Entity> included) {
+    JsonArrayBuilder mapIncludedToJson(InternalQuery params, Set<Entity> included) {
         JsonArrayBuilder incl = Json.createArrayBuilder();
         Map<String, Object> related = new TreeMap<>();
 

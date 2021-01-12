@@ -35,7 +35,7 @@ import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMetamodel;
 import io.xlate.jsonapi.rvp.internal.validation.boundary.ValidJsonApiQuery;
 
 @ValidJsonApiQuery
-public class JsonApiQuery {
+public class InternalQuery {
 
     public static final String PARAM_INCLUDE = "include";
     public static final String PARAM_SORT = "sort";
@@ -66,7 +66,7 @@ public class JsonApiQuery {
     private Integer firstResult = null;
     private Integer maxResults;
 
-    public JsonApiQuery(EntityMetamodel model, EntityMeta entityMeta, String id, String relationshipName, UriInfo uriInfo) {
+    public InternalQuery(EntityMetamodel model, EntityMeta entityMeta, String id, String relationshipName, UriInfo uriInfo) {
         super();
         this.model = model;
         this.entityMeta = entityMeta;

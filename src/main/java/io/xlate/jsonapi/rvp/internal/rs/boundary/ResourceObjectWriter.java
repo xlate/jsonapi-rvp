@@ -44,7 +44,7 @@ import javax.ws.rs.core.UriInfo;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.Entity;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMeta;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMetamodel;
-import io.xlate.jsonapi.rvp.internal.rs.entity.JsonApiQuery;
+import io.xlate.jsonapi.rvp.internal.rs.entity.InternalQuery;
 
 public class ResourceObjectWriter {
 
@@ -107,13 +107,13 @@ public class ResourceObjectWriter {
         return toJson(bean, null, uriInfo);
     }
 
-    public JsonObject toJson(Entity bean, JsonApiQuery params, UriInfo uriInfo) {
+    public JsonObject toJson(Entity bean, InternalQuery params, UriInfo uriInfo) {
         return toJson(bean, Collections.emptyMap(), params, uriInfo);
     }
 
     public JsonObject toJson(Entity bean,
                              Map<String, Object> related,
-                             JsonApiQuery params,
+                             InternalQuery params,
                              UriInfo uriInfo) {
 
         String resourceType = bean.getType();
@@ -135,7 +135,7 @@ public class ResourceObjectWriter {
         return builder.build();
     }
 
-    public JsonObject getAttributes(JsonApiQuery params, Entity bean) {
+    public JsonObject getAttributes(InternalQuery params, Entity bean) {
         JsonObjectBuilder attributes = Json.createObjectBuilder();
 
         bean.getEntityMeta()
@@ -178,7 +178,7 @@ public class ResourceObjectWriter {
 
     JsonObject getRelationships(Entity bean,
                                 Map<String, Object> related,
-                                JsonApiQuery params,
+                                InternalQuery params,
                                 UriInfo uriInfo) {
 
         JsonObjectBuilder jsonRelationships = Json.createObjectBuilder();
