@@ -20,6 +20,7 @@ import static io.xlate.jsonapi.rvp.internal.validation.boundary.JsonApiUriQueryV
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,12 +31,13 @@ import java.util.regex.Pattern;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.UriInfo;
 
+import io.xlate.jsonapi.rvp.JsonApiQuery;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMeta;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMetamodel;
 import io.xlate.jsonapi.rvp.internal.validation.boundary.ValidJsonApiQuery;
 
 @ValidJsonApiQuery
-public class InternalQuery {
+public class InternalQuery implements JsonApiQuery {
 
     public static final String PARAM_INCLUDE = "include";
     public static final String PARAM_SORT = "sort";
@@ -208,19 +210,23 @@ public class InternalQuery {
         return uriInfo;
     }
 
+    @Override
     public Map<String, List<String>> getFields() {
         processUri();
-        return fields;
+        // TODO: Ensure the values are unmodifiable after creation
+        return Collections.unmodifiableMap(this.fields);
     }
 
+    @Override
     public Map<String, String> getFilters() {
         processUri();
-        return filters;
+        return Collections.unmodifiableMap(this.filters);
     }
 
+    @Override
     public List<String> getInclude() {
         processUri();
-        return include;
+        return Collections.unmodifiableList(this.include);
     }
 
     public List<String> getCount() {
@@ -228,16 +234,19 @@ public class InternalQuery {
         return count;
     }
 
+    @Override
     public List<String> getSort() {
         processUri();
-        return sort;
+        return Collections.unmodifiableList(this.sort);
     }
 
+    @Override
     public Integer getFirstResult() {
         processUri();
         return firstResult;
     }
 
+    @Override
     public Integer getMaxResults() {
         processUri();
         return maxResults;

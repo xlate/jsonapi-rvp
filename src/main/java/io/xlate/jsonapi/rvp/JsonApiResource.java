@@ -79,6 +79,7 @@ public abstract class JsonApiResource {
 
     private static final Logger logger = Logger.getLogger(JsonApiResource.class.getName());
     private static final String CLIENT_PATH = "internal/rs/boundary/client.js";
+    private static final JsonApiHandler<?> DEFAULT_HANDLER = new DefaultJsonApiHandler();
 
     @Inject
     @Any
@@ -476,6 +477,6 @@ public abstract class JsonApiResource {
             return new JsonApiHandlerChain(available);
         }
 
-        return new DefaultJsonApiHandler();
+        return DEFAULT_HANDLER;
     }
 }

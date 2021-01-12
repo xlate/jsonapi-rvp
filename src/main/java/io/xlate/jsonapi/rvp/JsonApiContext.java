@@ -4,8 +4,6 @@ import javax.json.JsonObject;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.StatusType;
 
-import io.xlate.jsonapi.rvp.internal.rs.entity.InternalQuery;
-
 public interface JsonApiContext {
 
     public static class Attributes {
@@ -20,7 +18,7 @@ public interface JsonApiContext {
 
     String getRelationshipName();
 
-    InternalQuery getQuery();
+    JsonApiQuery getQuery();
 
     JsonObject getRequestEntity();
 
