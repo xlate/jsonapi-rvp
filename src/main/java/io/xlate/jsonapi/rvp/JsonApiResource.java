@@ -131,12 +131,12 @@ public abstract class JsonApiResource {
         cacheControl.setPrivate(true);
     }
 
-    protected Set<ConstraintViolation<InternalQuery>> validateParameters(InternalQuery params) {
+    private Set<ConstraintViolation<InternalQuery>> validateParameters(InternalQuery params) {
         return Collections.unmodifiableSet(validator.validate(params));
     }
 
     @SuppressWarnings("java:S1452") // Suppress Sonar warnings regarding missing generic types
-    protected Set<ConstraintViolation<?>> validateEntity(String resourceType, String id, JsonObject input) {
+    private Set<ConstraintViolation<?>> validateEntity(String resourceType, String id, JsonObject input) {
         JsonApiRequest jsonApiRequest = new JsonApiRequest(request.getMethod(),
                                                            model,
                                                            model.getEntityMeta(resourceType),
