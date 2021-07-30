@@ -85,10 +85,17 @@ class JsonApiResourceTest {
         Mockito.when(target.handlers.iterator()).thenReturn(handlerIterator());
 
         Set<JsonApiResourceType<?>> resourceTypes = new HashSet<>();
-        resourceTypes.add(JsonApiResourceType.define("authors", Author.class).build());
-        resourceTypes.add(JsonApiResourceType.define("posts", Post.class).reader("title", String::valueOf).build());
-        resourceTypes.add(JsonApiResourceType.define("comments", Comment.class).build());
-        resourceTypes.add(JsonApiResourceType.define("readonly-codes", ReadOnlyCode.class).methods(GET.class).build());
+        resourceTypes.add(JsonApiResourceType.define("authors", Author.class)
+                                             .build());
+        resourceTypes.add(JsonApiResourceType.define("posts", Post.class)
+                                             .exposedIdAttribute("id", Integer::valueOf)
+                                             .reader("title", String::valueOf)
+                                             .build());
+        resourceTypes.add(JsonApiResourceType.define("comments", Comment.class)
+                                             .build());
+        resourceTypes.add(JsonApiResourceType.define("readonly-codes", ReadOnlyCode.class)
+                                             .methods(GET.class)
+                                             .build());
         resourceTypes.add(JsonApiResourceType.define("type-models", TypeModel.class)
                                              .methods(GET.class, POST.class, PATCH.class)
                                              .build());
@@ -173,11 +180,11 @@ class JsonApiResourceTest {
 
     @ParameterizedTest
     @CsvFileSource(
-            delimiter = '|',
-            lineSeparator = "@\n",
-            files = {
-                      "src/test/resources/create-post.txt",
-                      "src/test/resources/create-post-invalid.txt" })
+        delimiter = '|',
+        lineSeparator = "@\n",
+        files = {
+            "src/test/resources/create-post.txt",
+            "src/test/resources/create-post-invalid.txt" })
     void testCreatePost(String title,
                         String jsonDml,
                         String requestUri,
@@ -274,11 +281,11 @@ class JsonApiResourceTest {
 
     @ParameterizedTest
     @CsvFileSource(
-            delimiter = '|',
-            lineSeparator = "@\n",
-            files = {
-                      "src/test/resources/update-patch.txt",
-                      "src/test/resources/update-patch-invalid.txt" })
+        delimiter = '|',
+        lineSeparator = "@\n",
+        files = {
+            "src/test/resources/update-patch.txt",
+            "src/test/resources/update-patch-invalid.txt" })
     void testUpdatePatch(String title,
                          String jsonDml,
                          String requestUri,
@@ -299,9 +306,9 @@ class JsonApiResourceTest {
 
     @ParameterizedTest
     @CsvFileSource(
-            delimiter = '|',
-            lineSeparator = "@\n",
-            files = { "src/test/resources/delete.txt" })
+        delimiter = '|',
+        lineSeparator = "@\n",
+        files = { "src/test/resources/delete.txt" })
     void testDelete(String title,
                     String jsonDml,
                     String requestUri,
@@ -321,9 +328,9 @@ class JsonApiResourceTest {
 
     @ParameterizedTest
     @ValueSource(
-            strings = {
-                        "http://localhost:8080/test/client.js",
-                        "http://127.0.0.1/test/client.js" })
+        strings = {
+            "http://localhost:8080/test/client.js",
+            "http://127.0.0.1/test/client.js" })
     void testGetClient(String requestUri) throws IOException {
         target.uriInfo = new ResteasyUriInfo(requestUri, "/");
         Response response = target.getClient();

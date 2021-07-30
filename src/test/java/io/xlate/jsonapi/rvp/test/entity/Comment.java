@@ -8,6 +8,7 @@ import javax.persistence.Id;
 import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
 import javax.persistence.Table;
+import javax.validation.constraints.NotBlank;
 
 @Entity
 @Table(name = "COMMENTS")
@@ -18,6 +19,7 @@ public class Comment {
     private long id;
 
     @Column
+    @NotBlank
     private String text;
 
     @ManyToOne

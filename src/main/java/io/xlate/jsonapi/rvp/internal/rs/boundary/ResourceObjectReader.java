@@ -252,11 +252,16 @@ public class ResourceObjectReader {
 
     void putSingularRelationship(Object bean, EntityMeta meta, String relationshipName, Object replacement) {
         Object current = meta.getPropertyValue(bean, relationshipName);
-        updateRelated(current, bean, RelatedModelAction.REMOVE);
+
+        if (current != null) {
+            // Not currently associated
+            updateRelated(current, bean, RelatedModelAction.REMOVE);
+        }
 
         meta.setPropertyValue(bean, relationshipName, replacement);
 
         if (replacement != null) {
+            // No replacement to add to the association
             updateRelated(replacement, bean, RelatedModelAction.ADD);
         }
     }

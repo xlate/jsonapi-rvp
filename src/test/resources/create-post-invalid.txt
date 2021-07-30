@@ -143,6 +143,82 @@ Invalid Create Comment (Relationship `data` as array)
         }
       ]}
     @
+Invalid Create Comment (Invalid relationship ID)
+    | []
+    | /test/comments
+    | comments
+    | { 'data': {
+        'type': 'comments',
+        'attributes': {
+          'text': 'First comment!'
+        },
+        'relationships': {
+          'post': {
+            'data': { 'type': 'posts', 'id': 'xyz' }
+          }
+        }
+      }}
+    | 422
+    | { 'errors': [
+        {
+          'source': { 'pointer': '/data/relationships/post/data/id' },
+          'title': 'Invalid JSON API Document Structure',
+          'detail':'The value of the `id` member is invalid'
+        }
+      ]}
+    @
+Invalid Create Comment (No such relationship)
+    | []
+    | /test/comments
+    | comments
+    | { 'data': {
+        'type': 'comments',
+        'attributes': {
+          'text': 'First comment!'
+        },
+        'relationships': {
+          'post': {
+            'data': { 'type': 'posts', 'id': '100' }
+          }
+        }
+      }}
+    | 422
+    | { "errors": [{
+          "title": "Invalid relationship",
+          "detail": "Resource not found => type: `posts`, id: `100`",
+          "source": {
+            "pointer": "/data/relationships/post"
+          }
+        }]
+      }
+    @
+Invalid Create Comment (missing required attribute)
+    | [{
+        "sql": "INSERT INTO POSTS (id, title, text) VALUES (1, 'Title One', 'First post!')"
+      }]
+    | /test/comments
+    | comments
+    | { 'data': {
+        'type': 'comments',
+        'attributes': {
+          'text': ''
+        },
+        'relationships': {
+          'post': {
+            'data': { 'type': 'posts', 'id': '1' }
+          }
+        }
+      }}
+    | 422
+    | { "errors": [{
+          "title": "Invalid Input",
+          "detail": "must not be blank",
+          "source": {
+            "pointer": "/data/attributes/text"
+          }
+        }]
+      }
+    @
 Invalid Create Post (Relationship `data` as object)
     | []
     | /test/posts

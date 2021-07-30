@@ -232,9 +232,22 @@ public class JsonApiRequestValidator implements ConstraintValidator<ValidJsonApi
             context.buildConstraintViolationWithTemplate("The value of the `id` member must be a string")
                    .addPropertyNode(propertyContext + "/id")
                    .addConstraintViolation();
+        } else if (id != null && !readableIdentifier(meta, (JsonString) id)) {
+            validStructure = false;
+            context.buildConstraintViolationWithTemplate("The value of the `id` member is invalid")
+                   .addPropertyNode(propertyContext + "/id")
+                   .addConstraintViolation();
         }
 
         return validStructure;
+    }
+
+    boolean readableIdentifier(EntityMeta meta, JsonString id) {
+        try {
+            return id != null && meta.readId(id.getString()) != null;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     boolean validAttributes(JsonApiRequest value, JsonValue attributesValue, ConstraintValidatorContext context, boolean validStructure) {
