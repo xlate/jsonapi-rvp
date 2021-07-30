@@ -83,7 +83,7 @@ Invalid Create Comment (Bad relationship name)
         {
           'source': { 'pointer': '/data/relationships/post*' },
           'title': 'Invalid JSON API Document Structure',
-          'detail':'Invalid relationship name'
+          'detail':'No such relationship'
         }
       ]}
     @
@@ -394,7 +394,7 @@ Invalid TypeModel (bad types)
         },
         {
             "title": "Invalid JSON API Document Structure",
-            "detail": "Invalid attribute name",
+            "detail": "No such attribute",
             "source": {
                 "pointer": "/data/attributes/invalid*"
             }

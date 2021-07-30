@@ -26,7 +26,6 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import javax.json.JsonArray;
@@ -274,16 +273,7 @@ public class JsonApiRequestValidator implements ConstraintValidator<ValidJsonApi
                            ConstraintValidatorContext context) {
 
         final String attributeKey = attribute.getKey();
-
-        if (!validMemberName(attributeKey)) {
-            context.buildConstraintViolationWithTemplate(""
-                    + "Invalid attribute name")
-                   .addPropertyNode(JsonApiError.attributePointer(attributeKey))
-                   .addConstraintViolation();
-            return false;
-        }
-
-        EntityMeta meta = value.getEntityMeta();
+        final EntityMeta meta = value.getEntityMeta();
 
         if (!meta.hasAttribute(attributeKey)) {
             context.buildConstraintViolationWithTemplate(""
@@ -391,16 +381,7 @@ public class JsonApiRequestValidator implements ConstraintValidator<ValidJsonApi
                               boolean validStructure) {
 
         final String relationshipName = relationshipEntry.getKey();
-
-        if (!validMemberName(relationshipName)) {
-            context.buildConstraintViolationWithTemplate(""
-                    + "Invalid relationship name")
-                   .addPropertyNode(JsonApiError.relationshipPointer(relationshipName))
-                   .addConstraintViolation();
-            return false;
-        }
-
-        EntityMeta meta = value.getEntityMeta();
+        final EntityMeta meta = value.getEntityMeta();
 
         if (!meta.isRelatedTo(relationshipName)) {
             context.buildConstraintViolationWithTemplate(""
@@ -515,11 +496,6 @@ public class JsonApiRequestValidator implements ConstraintValidator<ValidJsonApi
         }
 
         return validStructure;
-    }
-
-    boolean validMemberName(String name) {
-        Pattern validPattern = Pattern.compile("^[a-zA-Z0-9][a-zA-Z0-9_ -]*[a-zA-Z0-9]+$");
-        return validPattern.matcher(name).matches();
     }
 
 }
