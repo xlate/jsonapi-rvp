@@ -1,4 +1,5 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <groupId>io.xlate</groupId>
   <artifactId>jsonapi-rvp</artifactId>
@@ -53,9 +54,19 @@
     <sonar.host.url>https://sonarcloud.io</sonar.host.url>
     <sonar.organization>xlate</sonar.organization>
 
-    <version.javax.json.api>1.1.4</version.javax.json.api>
+    <version.javax.json.api>1.1.6</version.javax.json.api>
     <version.junit-jupiter>5.7.2</version.junit-jupiter>
   </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.jboss.spec.javax.xml.bind</groupId>
+        <artifactId>jboss-jaxb-api_2.3_spec</artifactId>
+        <version>2.0.1.Final</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
 
   <dependencies>
     <dependency>
@@ -106,37 +117,38 @@
       <version>2.1.6</version>
       <scope>provided</scope>
     </dependency>
+    <dependency>
+      <groupId>org.jboss.spec.javax.xml.bind</groupId>
+      <artifactId>jboss-jaxb-api_2.3_spec</artifactId>
+      <scope>provided</scope>
+    </dependency>
 
       <!-- Testing -->
     <dependency>
       <groupId>org.junit.jupiter</groupId>
-      <artifactId>junit-jupiter-api</artifactId>
+      <artifactId>junit-jupiter</artifactId>
       <version>${version.junit-jupiter}</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.junit.jupiter</groupId>
-      <artifactId>junit-jupiter-engine</artifactId>
-      <version>${version.junit-jupiter}</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.junit.jupiter</groupId>
-      <artifactId>junit-jupiter-params</artifactId>
-      <version>${version.junit-jupiter}</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.junit.platform</groupId>
-      <artifactId>junit-platform-runner</artifactId>
-      <version>1.7.0</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.hibernate</groupId>
       <artifactId>hibernate-entitymanager</artifactId>
-      <version>5.4.22.Final</version>
+      <version>5.5.5.Final</version>
       <scope>test</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>javax.xml.bind</groupId>
+          <artifactId>jaxb-api</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>javax.persistence</groupId>
+          <artifactId>javax.persistence-api</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.jboss.spec.javax.transaction</groupId>
+          <artifactId>jboss-transaction-api_1.2_spec</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>com.h2database</groupId>
@@ -149,6 +161,12 @@
       <artifactId>resteasy-core</artifactId>
       <version>4.7.1.Final</version>
       <scope>test</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>org.jboss.spec.javax.ws.rs</groupId>
+          <artifactId>jboss-jaxrs-api_2.1_spec</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.mockito</groupId>
@@ -158,7 +176,8 @@
     </dependency>
     <dependency>
       <groupId>org.glassfish</groupId>
-      <artifactId>javax.json</artifactId>
+      <artifactId>jakarta.json</artifactId>
+      <classifier>module</classifier>
       <version>${version.javax.json.api}</version>
       <scope>test</scope>
     </dependency>
@@ -197,7 +216,7 @@
           <configuration>
             <additionalOptions>-html5</additionalOptions>
             <sourcepath>src/main/java</sourcepath>
-            <excludePackageNames>io.xlate.jsonapi.rvp.internal</excludePackageNames>
+            <excludePackageNames>io.xlate.jsonapi.rvp.internal,io.xlate.jsonapi.rvp.internal.*</excludePackageNames>
             <links>
               <link>https://docs.oracle.com/en/java/javase/11/docs/api</link>
               <link>https://jakarta.ee/specifications/platform/8/apidocs</link>
@@ -211,18 +230,23 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
-        <version>2.22.2</version>
+        <version>3.0.0-M5</version>
         <configuration>
           <systemPropertyVariables>
             <java.util.logging.config.file>${project.build.testOutputDirectory}/logging.properties</java.util.logging.config.file>
           </systemPropertyVariables>
           <redirectTestOutputToFile>true</redirectTestOutputToFile>
+          <argLine>
+            --add-opens io.xlate.jsonapi.rvp/io.xlate.jsonapi.rvp=ALL-UNNAMED
+            --add-opens io.xlate.jsonapi.rvp/io.xlate.jsonapi.rvp.test.entity=ALL-UNNAMED
+            ${argLine}
+          </argLine>
         </configuration>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-failsafe-plugin</artifactId>
-        <version>2.15</version>
+        <version>3.0.0-M5</version>
         <configuration>
           <systemProperties>
           </systemProperties>
@@ -304,13 +328,6 @@
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-jar-plugin</artifactId>
             <version>3.2.0</version>
-            <configuration>
-              <archive>
-                <manifestEntries>
-                  <Automatic-Module-Name>io.xlate.jsonapi.rvp</Automatic-Module-Name>
-                </manifestEntries>
-              </archive>
-            </configuration>
           </plugin>
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
@@ -339,16 +356,6 @@
           </plugin>
         </plugins>
       </build>
-    </profile>
-    <profile>
-      <id>java9</id>
-      <activation>
-        <jdk>[9,)</jdk>
-      </activation>
-      <properties>
-        <!-- For surefire tests -->
-        <argLine>--add-opens=java.base/jdk.internal.loader=ALL-UNNAMED</argLine>
-      </properties>
     </profile>
   </profiles>
 </project>
