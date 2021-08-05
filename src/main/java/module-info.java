@@ -30,12 +30,13 @@ module io.xlate.jsonapi.rvp {
     requires jakarta.enterprise.cdi.api;
     requires java.desktop;
     requires java.inject;
-    requires java.json;
     requires java.logging;
     requires java.persistence;
     requires java.transaction;
     requires java.validation;
-    requires java.ws.rs;
+
+    requires transitive java.json;
+    requires transitive java.ws.rs;
 
     exports io.xlate.jsonapi.rvp;
 
