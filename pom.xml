@@ -54,7 +54,7 @@
     <sonar.organization>xlate</sonar.organization>
 
     <version.javax.json.api>1.1.6</version.javax.json.api>
-    <version.junit-jupiter>5.7.2</version.junit-jupiter>
+    <version.junit-jupiter>5.8.0</version.junit-jupiter>
   </properties>
 
   <dependencyManagement>
