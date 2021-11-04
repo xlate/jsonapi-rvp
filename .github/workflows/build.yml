@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        java: [11, 16]
+        java: [11, 17]
     name: Build with JDK ${{matrix.java}}
 
     steps:
@@ -57,7 +57,7 @@ jobs:
 
       - uses: actions/setup-java@v1
         with:
-          java-version: 11
+          java-version: 17
 
       - name: Cache SonarCloud packages
         uses: actions/cache@v1
