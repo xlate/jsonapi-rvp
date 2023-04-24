@@ -16,7 +16,7 @@
  ******************************************************************************/
 package io.xlate.jsonapi.rvp.internal.rs.entity;
 
-import javax.json.JsonObject;
+import jakarta.json.JsonObject;
 
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMeta;
 import io.xlate.jsonapi.rvp.internal.persistence.entity.EntityMetamodel;

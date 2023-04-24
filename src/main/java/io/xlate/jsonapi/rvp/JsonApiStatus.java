@@ -16,8 +16,8 @@
  ******************************************************************************/
 package io.xlate.jsonapi.rvp;
 
-import javax.ws.rs.core.Response.Status.Family;
-import javax.ws.rs.core.Response.StatusType;
+import jakarta.ws.rs.core.Response.Status.Family;
+import jakarta.ws.rs.core.Response.StatusType;
 
 public enum JsonApiStatus implements StatusType {
 

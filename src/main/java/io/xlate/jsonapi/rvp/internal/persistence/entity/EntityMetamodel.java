@@ -21,7 +21,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import javax.persistence.metamodel.Metamodel;
+import jakarta.persistence.metamodel.Metamodel;
 
 import io.xlate.jsonapi.rvp.JsonApiResourceType;
 
