@@ -118,7 +118,6 @@
     <dependency>
       <groupId>jakarta.xml.bind</groupId>
       <artifactId>jakarta.xml.bind-api</artifactId>
-      <scope>provided</scope>
     </dependency>
 
       <!-- Testing -->
@@ -145,12 +144,6 @@
       <artifactId>resteasy-core</artifactId>
       <version>6.2.3.Final</version>
       <scope>test</scope>
-      <exclusions>
-        <exclusion>
-          <groupId>org.jboss.spec.javax.ws.rs</groupId>
-          <artifactId>jboss-jaxrs-api_2.1_spec</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.mockito</groupId>

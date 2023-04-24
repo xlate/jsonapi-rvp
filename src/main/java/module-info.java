@@ -31,10 +31,12 @@ module io.xlate.jsonapi.rvp {
     requires java.logging;
 
     requires jakarta.cdi;
+    requires jakarta.el;
     requires jakarta.inject;
     requires jakarta.persistence;
     requires jakarta.transaction;
     requires jakarta.validation;
+    requires jakarta.xml.bind;
 
     requires transitive jakarta.json;
     requires transitive jakarta.ws.rs;
