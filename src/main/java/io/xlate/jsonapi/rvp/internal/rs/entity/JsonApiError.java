@@ -1,11 +1,11 @@
 package io.xlate.jsonapi.rvp.internal.rs.entity;
 
-import javax.json.Json;
-import javax.json.JsonObject;
-import javax.json.JsonObjectBuilder;
-import javax.validation.ConstraintViolation;
-import javax.validation.Path;
-import javax.ws.rs.core.Response.StatusType;
+import jakarta.json.Json;
+import jakarta.json.JsonObject;
+import jakarta.json.JsonObjectBuilder;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.Path;
+import jakarta.ws.rs.core.Response.StatusType;
 
 public class JsonApiError {
 

@@ -20,10 +20,10 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 
-import javax.json.Json;
-import javax.json.JsonArray;
-import javax.json.JsonReader;
-import javax.ws.rs.core.Response.StatusType;
+import jakarta.json.Json;
+import jakarta.json.JsonArray;
+import jakarta.json.JsonReader;
+import jakarta.ws.rs.core.Response.StatusType;
 
 public class JsonApiErrorException extends RuntimeException {
     private static final long serialVersionUID = 1L;

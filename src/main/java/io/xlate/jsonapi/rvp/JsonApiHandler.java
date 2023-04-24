@@ -3,7 +3,7 @@ package io.xlate.jsonapi.rvp;
 import java.util.Set;
 import java.util.logging.Logger;
 
-import javax.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolation;
 
 public interface JsonApiHandler<T> {
 

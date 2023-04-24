@@ -1,8 +1,8 @@
 package io.xlate.jsonapi.rvp;
 
-import javax.json.JsonObject;
-import javax.ws.rs.core.Response;
-import javax.ws.rs.core.Response.StatusType;
+import jakarta.json.JsonObject;
+import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.Response.StatusType;
 
 public interface JsonApiContext {
 
