@@ -162,8 +162,8 @@ public class EntityMeta {
             return Map.entry(name, Object.class::cast);
         }
 
-        var parsers = Stream.concat(Arrays.stream(propertyType.getConstructors()),
-                                    Arrays.stream(propertyType.getMethods()))
+        var parsers = Stream.concat(Arrays.stream(propertyType.getDeclaredConstructors()),
+                                    Arrays.stream(propertyType.getDeclaredMethods()))
                             .filter(method -> Modifier.isStatic(method.getModifiers()))
                             .filter(method -> Objects.equals(method.getParameterCount(), 1))
                             .filter(this::parsingMethod)
