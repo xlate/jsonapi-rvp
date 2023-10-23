@@ -80,7 +80,8 @@ class JsonApiResourceTest {
         target.handlers = Mockito.mock(Instance.class);
         target.request = Mockito.mock(Request.class);
         target.security = Mockito.mock(SecurityContext.class);
-        target.txValidator = new TransactionalValidator(target.validator);
+        target.txValidator = new TransactionalValidator();
+        target.txValidator.setValidator(target.validator);
 
         Mockito.when(target.handlers.iterator()).thenReturn(handlerIterator());
 

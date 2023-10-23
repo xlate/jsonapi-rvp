@@ -16,11 +16,10 @@ import io.xlate.jsonapi.rvp.internal.JsonApiErrorException;
 @ApplicationScoped
 public class TransactionalValidator {
 
-    private final Validator validator;
+    private Validator validator;
 
     @Inject
-    public TransactionalValidator(Validator validator) {
-        super();
+    public void setValidator(Validator validator) {
         this.validator = validator;
     }
 
