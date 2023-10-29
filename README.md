@@ -22,6 +22,7 @@ Replace `VERSION` with the latest from Maven Central: [![Maven Central](https://
 ## Example
 ```java
 @Path("/blogapi")
+@Transactional // when using JTA transactions
 public class BlogResources extends JsonApiResource {
 
     @PostConstruct
