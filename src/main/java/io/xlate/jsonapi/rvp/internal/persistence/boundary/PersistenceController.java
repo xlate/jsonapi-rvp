@@ -376,7 +376,7 @@ public class PersistenceController {
             }
 
             Query q = em.createQuery(query);
-            q.setHint("javax.persistence.fetchgraph", graph);
+            q.setHint("jakarta.persistence.fetchgraph", graph);
 
             entity = (T) q.getSingleResult();
         } catch (NoResultException e) {
@@ -517,7 +517,7 @@ public class PersistenceController {
             selections.add(count.alias(ALIAS_PRE + collection));
         }
 
-        query.multiselect(selections);
+        query.select(builder.tuple(selections));
 
         final List<Predicate> predicates;
 
@@ -611,7 +611,7 @@ public class PersistenceController {
                                       .map(attr -> root.get(attr).alias(attr))
                                       .collect(Collectors.toList()));
 
-        query.multiselect(selections)
+        query.select(builder.tuple(selections))
              .where(primaryId.in(relationships.keySet()));
 
         TypedQuery<Tuple> typedQuery = em.createQuery(query);

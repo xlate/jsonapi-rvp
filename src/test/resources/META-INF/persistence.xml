@@ -1,8 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<persistence xmlns="http://xmlns.jcp.org/xml/ns/persistence" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://xmlns.jcp.org/xml/ns/persistence http://xmlns.jcp.org/xml/ns/persistence/persistence_2_1.xsd" version="2.1">
+<persistence xmlns="https://jakarta.ee/xml/ns/persistence" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="https://jakarta.ee/xml/ns/persistence https://jakarta.ee/xml/ns/persistence/persistence_3_2.xsd" version="3.2">
 
   <persistence-unit name="test" transaction-type="RESOURCE_LOCAL">
+    <class>io.xlate.jsonapi.rvp.test.entity.Author</class>
+    <class>io.xlate.jsonapi.rvp.test.entity.Comment</class>
+    <class>io.xlate.jsonapi.rvp.test.entity.Post</class>
+    <class>io.xlate.jsonapi.rvp.test.entity.ReadOnlyCode</class>
+    <class>io.xlate.jsonapi.rvp.test.entity.Tag</class>
+    <class>io.xlate.jsonapi.rvp.test.entity.TypeModel</class>
+    <class>io.xlate.jsonapi.rvp.test.entity.Unused</class>
+
     <exclude-unlisted-classes>false</exclude-unlisted-classes>
 
     <properties>
@@ -11,6 +19,7 @@
       <property name="jakarta.persistence.jdbc.driver" value="org.h2.Driver"/>
 
       <property name="hibernate.show_sql" value="false"/>
+      <property name="hibernate.archive.autodetection" value="class, hbm" />
       <property name="jakarta.persistence.schema-generation.database.action" value="drop-and-create"/>
       <property name="jakarta.persistence.schema-generation.create-source" value="metadata"/>
       <property name="jakarta.persistence.schema-generation.drop-source" value="metadata"/>
