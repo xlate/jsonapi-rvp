@@ -3,7 +3,6 @@ package io.xlate.jsonapi.rvp;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-import java.io.IOException;
 import java.io.StringReader;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -39,7 +38,6 @@ import org.json.JSONException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvFileSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 import org.skyscreamer.jsonassert.JSONAssert;
@@ -180,12 +178,12 @@ class JsonApiResourceTest {
     }
 
     @ParameterizedTest
-    @CsvFileSource(
+    @DelimitedFileSource(
         delimiter = '|',
         lineSeparator = "@\n",
         files = {
-            "src/test/resources/create-post.txt",
-            "src/test/resources/create-post-invalid.txt" })
+            "create-post.txt",
+            "create-post-invalid.txt" })
     void testCreatePost(String title,
                         String jsonDml,
                         String requestUri,
@@ -204,7 +202,7 @@ class JsonApiResourceTest {
     }
 
     @ParameterizedTest
-    @CsvFileSource(delimiter = '|', lineSeparator = "@\n", files = "src/test/resources/index-get.txt")
+    @DelimitedFileSource(delimiter = '|', lineSeparator = "@\n", files = "index-get.txt")
     void testIndexGet(String title,
                       String jsonDml,
                       String requestUri,
@@ -222,7 +220,7 @@ class JsonApiResourceTest {
     }
 
     @ParameterizedTest
-    @CsvFileSource(delimiter = '|', lineSeparator = "@\n", files = "src/test/resources/read-get.txt")
+    @DelimitedFileSource(delimiter = '|', lineSeparator = "@\n", files = "read-get.txt")
     void testReadGet(String title,
                      String jsonDml,
                      String requestUri,
@@ -241,7 +239,7 @@ class JsonApiResourceTest {
     }
 
     @ParameterizedTest
-    @CsvFileSource(delimiter = '|', lineSeparator = "@\n", files = "src/test/resources/read-relationship-get.txt")
+    @DelimitedFileSource(delimiter = '|', lineSeparator = "@\n", files = "read-relationship-get.txt")
     void testReadRelationshipGet(String title,
                                  String jsonDml,
                                  String requestUri,
@@ -261,7 +259,7 @@ class JsonApiResourceTest {
     }
 
     @ParameterizedTest
-    @CsvFileSource(delimiter = '|', lineSeparator = "@\n", files = "src/test/resources/read-related-get.txt")
+    @DelimitedFileSource(delimiter = '|', lineSeparator = "@\n", files = "read-related-get.txt")
     void testReadRelatedGet(String title,
                             String jsonDml,
                             String requestUri,
@@ -281,12 +279,12 @@ class JsonApiResourceTest {
     }
 
     @ParameterizedTest
-    @CsvFileSource(
+    @DelimitedFileSource(
         delimiter = '|',
         lineSeparator = "@\n",
         files = {
-            "src/test/resources/update-patch.txt",
-            "src/test/resources/update-patch-invalid.txt" })
+            "update-patch.txt",
+            "update-patch-invalid.txt" })
     void testUpdatePatch(String title,
                          String jsonDml,
                          String requestUri,
@@ -306,10 +304,10 @@ class JsonApiResourceTest {
     }
 
     @ParameterizedTest
-    @CsvFileSource(
+    @DelimitedFileSource(
         delimiter = '|',
         lineSeparator = "@\n",
-        files = { "src/test/resources/delete.txt" })
+        files = { "delete.txt" })
     void testDelete(String title,
                     String jsonDml,
                     String requestUri,
@@ -332,7 +330,7 @@ class JsonApiResourceTest {
         strings = {
             "http://localhost:8080/test/client.js",
             "http://127.0.0.1/test/client.js" })
-    void testGetClient(String requestUri) throws IOException {
+    void testGetClient(String requestUri) {
         target.uriInfo = new ResteasyUriInfo(requestUri, "/");
         Response response = target.getClient();
         String clientScript = (String) response.getEntity();
